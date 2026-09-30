@@ -1,6 +1,6 @@
 # MasaFlow · upfront cash POS
 
-MasaFlow runs locally with customer ordering, upfront cash collection, kitchen fulfillment, pickup tracking, menu management, drawer audits, and live Operations / Sales analytics.
+MasaFlow runs locally with customer ordering, upfront cash collection, kitchen fulfillment, pickup tracking, menu management, drawer audits, and live Operations / Sales analytics. The screens follow the MasaFlow UXPilot designs; [docs/DESIGN_HANDOFF.md](docs/DESIGN_HANDOFF.md) is the design spec (tokens, components, states, breakpoints, and every intentional difference from the mockups).
 
 ## Run locally
 
@@ -16,22 +16,24 @@ Open [MasaFlow](http://127.0.0.1:4173/businessDashbord.html). The service binds 
 
 | Screen | Local URL |
 | --- | --- |
-| Kitchen and cash collection | [Orders](http://127.0.0.1:4173/businessDashbord.html) |
-| Customer ordering | [Menu](http://127.0.0.1:4173/MenuUI.html) |
-| Menu prices / availability | [Menu management](http://127.0.0.1:4173/MenuManagment.html) |
-| Float, cash drops and shift audit | [Cash ledger](http://127.0.0.1:4173/history.html) |
-| Operations and Sales | [Analytics](http://127.0.0.1:4173/analytics/) |
+| Order Queue: collect cash, run the kitchen | [Orders](http://127.0.0.1:4173/businessDashbord.html) |
+| Business Analytics (the mockup screen; no build needed) | [Metrics](http://127.0.0.1:4173/metricsDashbord.html) |
+| Operations / Sales analytics with source inspection and AI summaries | [Analytics](http://127.0.0.1:4173/analytics/) (after `npm run build`) |
+| Menu prices, 86 switches, history with undo | [Menu management](http://127.0.0.1:4173/MenuManagment.html) |
+| Float, cash drops, shift audit, transaction ledger | [History & Ledger](http://127.0.0.1:4173/history.html) |
+| Customer menu, customizer and checkout | [Menu](http://127.0.0.1:4173/MenuUI.html) |
 | Customer tracking | `/readypickupUI.html?order=ORDER_UUID`, linked after submission |
+| Pickup board for a counter screen | [Pickup](http://127.0.0.1:4173/readypickupUI.html) |
 
-The previous `metricsDashbord.html` link redirects to analytics and preserves period/date/language filters. Analytics URLs restore `tab=operations|owner`, `period=day|week|month|year`, `date=YYYY-MM-DD`, and `lang=es|en`. Spanish is initially selected; language preferences persist across screens.
+Staff screens use a sidebar on tablets and desktops and a top bar with a tab bar on phones. `metricsDashbord.html` keeps its `?period=&date=` filters in the URL and links to the analytics app. Analytics URLs restore `tab=operations|owner`, `period=day|week|month|year`, `date=YYYY-MM-DD`, and `lang=es|en`. Spanish is initially selected; the language picker on every screen switches to English, and the choice persists across screens.
 
 ## Complete a cash shift
 
 1. Open Cash Ledger and record the starting float and cashier name.
-2. In Customer Menu, customize a dish, add it to the cart, and submit. The ticket awaits cash and stays outside the kitchen queue. A saved submission UUID lets a lost response be retried without creating another order.
-3. On Orders, choose Collect Cash. Enter tender or select $20, $50, $100, $200, $500, or Exact. Presets set the entire tendered amount. Check the displayed total and change, then finalize. Short tender is blocked.
+2. In Customer Menu, pick a masa, remove included toppings or ask for them on the side, add up to two extras, and submit with a name (the phone number is optional). The ticket awaits cash and stays outside the kitchen queue, and the customer lands on tracking, which says to pay at the counter. A saved submission UUID lets a lost response be retried without creating another order.
+3. On Orders, the ticket appears under Awaiting Cash with a new-order toast. Choose Collect Cash (or Cancel order for one nobody paid for). Enter tender or select $20, $50, $100, $200, $500, or Exact. Presets set the entire tendered amount. Check the displayed total and change, then finalize. Short tender is blocked.
 4. The service saves one verified cash payment and dispatches the ticket. Repeated finalization returns the original payment and does not request another drawer pulse.
-5. Move the ticket through Received → Preparing → Ready → Completed. Customer tracking receives each committed state.
+5. Move the ticket through Start Preparing → Mark as Ready → Complete Pickup. Customer tracking shows each committed step with its time, and a full-screen "¡Está listo!" when the order is ready.
 6. Record a cash drop, count the drawer, and close the shift. Expected cash, actual cash and signed variance are frozen in the closed audit.
 
 New records use MXN integer centavos and `America/Mexico_City`. Editable demo prices: Huarache $85, Sope $35, Pambazo $50, Gordita $30, Quesadilla $45; cheese $10 and avocado $15. Tax is visibly **unconfigured at zero**. Availability is an 86 flag rather than ingredient quantity tracking.
@@ -62,7 +64,11 @@ Only aggregates and definitions are sent to Gateway; customer names, cashier ide
 
 Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. Back up this directory while the service is stopped. This app is intended for a trusted local counter; authentication, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
 
-HTML screens use shared `assets/`. The React/Recharts module in `apps/analytics` preserves canonical source inspection and presentation controls. Rebuild after frontend changes. Keep protected-runtime changes narrowly authorized and verified using its [authoring guide](apps/analytics/AGENTS.md).
+HTML screens use shared `assets/`: the order store, translations (`masaflow-i18n.js`), UI helpers, the compiled stylesheet and vendored icons/charts (`assets/vendor/`: FontAwesome Free 6.4 solid, Plotly 3.1 basic), so the counter keeps working offline apart from the two Google web fonts.
+
+Styles are [Tailwind CSS v3](https://v3.tailwindcss.com) utility classes, the same ones the design mockups use, compiled ahead of time into `assets/masaflow.css`, which is committed. The source is `styles/masaflow.css` plus `tailwind.config.js`. After adding or changing classes, run `npm run build:css` (downloads the pinned Tailwind CLI on first use). Tailwind only emits classes written out in full, so `'text-' + color + '-600'` produces no CSS; use a lookup object of complete class strings. New UI text also needs a Spanish entry in `assets/masaflow-i18n.js`; customer names, notes and audit messages carry `data-i18n-skip` so they are never translated.
+
+The React/Recharts module in `apps/analytics` preserves canonical source inspection and presentation controls. Rebuild after frontend changes. Keep protected-runtime changes narrowly authorized and verified using its [authoring guide](apps/analytics/AGENTS.md).
 
 The [data model](DATA_MODEL.md), [reusable KPI context](docs/data-context/context-masaflow-cash/SKILL.md) and TypeScript contracts in `shared/types` document the measure rules. Approved concept figures and temporary browser QA fixtures are demonstration data; they are never seeded into operational records.
 
@@ -72,4 +78,4 @@ The [data model](DATA_MODEL.md), [reusable KPI context](docs/data-context/contex
 npm test
 ```
 
-Tests use temporary directories and cover cash validation, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors. Browser verification covers customer-to-audit fulfillment, reconnects, URL/language restoration, source inspection, chart interaction and desktop / 390px / 430px layouts.
+Tests use temporary directories and cover cash validation, removable toppings, optional phone numbers, cancelling unpaid orders, deleting dishes, undoable menu audit entries, kitchen step timestamps, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors, plus static checks on the screens (links resolve, no CDN scripts, one shared staff shell, translation loaded, required hooks present, no mockup placeholders). Browser verification covers customer-to-audit fulfillment, reconnects, URL/language restoration, source inspection, chart interaction and desktop / 390px / 430px layouts.
