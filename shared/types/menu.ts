@@ -3,6 +3,7 @@ import type { Currency } from './order';
 export interface MenuOption {
   id: string;
   name: string;
+  description?: string;
   group: 'masa' | 'extras';
   priceCents: number;
   currency: Currency;
@@ -18,6 +19,8 @@ export interface InventoryItem {
   currency: Currency;
   imageUrl: string;
   available: boolean;
+  /** Toppings that come on the dish. A customer may remove any of them; removal never changes the price. */
+  included?: string[];
   options: MenuOption[];
 }
 export type MenuItem = InventoryItem;

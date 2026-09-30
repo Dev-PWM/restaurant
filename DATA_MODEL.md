@@ -6,7 +6,7 @@ The revised upfront cash specification governs this implementation. The [reusabl
 
 New records store MXN integer centavos with currency snapshots. Legacy USD amounts remain exact USD cents without conversion. Menu prices are authoritative at draft creation. Names, modifier prices, line totals and tax are immutable snapshots. Unavailable dishes or modifiers block payment.
 
-Order IDs are UUIDs. A persisted submission ID and normalized fingerprint make identical retries return the same ticket and reject conflicting reuse. Payment status is separate from fulfillment. A unique verified payment links the order and its shift. Kitchen transitions require verified payment. Closed balances and signed variance are frozen.
+Order IDs are UUIDs. A persisted submission ID and normalized fingerprint (including phone, removed toppings and the on-the-side choice) make identical retries return the same ticket and reject conflicting reuse. A line's `removed` toppings must come from the dish's `included` list and never change the price; `onTheSide` asks for the rest on the side. `customerPhone` is optional contact text. Payment status is separate from fulfillment. A unique verified payment links the order and its shift. Kitchen transitions require verified payment and stamp `preparingAt`, `readyAt` and `completedAt`. An unpaid draft can be `cancelled`; a paid order cannot, so drawer math is unaffected. Deleting a dish removes it from the menu only: paid receipts keep their snapshots and still verify, while an unpaid draft containing it cannot be paid until rebuilt. Menu audit entries are split by kind (`menu_price`, `menu_stock`, `menu_add`, `menu_edit`, `menu_delete`, `modifier_edit`) and carry a `data` object with the dish id and before/after values, which lets the menu history offer an undo; a save that changes nothing writes no entry. Closed balances and signed variance are frozen.
 
 TypeScript interfaces: [orders and cash](shared/types/order.ts), [menu](shared/types/menu.ts). [The cash engine](assets/masaflow-store.js) owns validation and serialized transactions; [analytics](shared/analytics.js) owns the reporting transformations.
 
@@ -15,6 +15,7 @@ TypeScript interfaces: [orders and cash](shared/types/order.ts), [menu](shared/t
 ```mermaid
 flowchart LR
   A[Menu and cart] --> B[Draft · awaiting cash]
+  B -->|Customer leaves| K[Cancelled]
   B --> C[Cashier counts tender]
   C --> D{Full tender and matching open shift?}
   D -->|No| C

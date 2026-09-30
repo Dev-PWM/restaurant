@@ -57,25 +57,32 @@
   };
   function fail(message, code, statusCode = 400) { const error = new Error(message); error.code = code; error.statusCode = statusCode; throw error; }
   function cleanText(value, max = 120) { return String(value ?? '').trim().slice(0, max); }
+  function cleanIncluded(value) {
+    if (value == null) return [];
+    if (!Array.isArray(value) || value.length > 12) throw new Error('List at most 12 included toppings.');
+    const names = value.map(name => cleanText(name, 40)).filter(Boolean);
+    if (new Set(names.map(name => name.toLowerCase())).size !== names.length) throw new Error('Included toppings must be unique.');
+    return names;
+  }
   function options() {
     return [
-      { id: 'white', name: 'Masa Blanca', priceCents: 0, currency: 'MXN', group: 'masa', available: true },
-      { id: 'blue', name: 'Masa Azul', priceCents: 0, currency: 'MXN', group: 'masa', available: true },
-      { id: 'cheese', name: 'Extra Queso Cotija', priceCents: 1000, currency: 'MXN', group: 'extras', available: true },
-      { id: 'avocado', name: 'Aguacate', priceCents: 1500, currency: 'MXN', group: 'extras', available: true }
+      { id: 'white', name: 'Masa Blanca', description: 'Masa de maíz blanco', priceCents: 0, currency: 'MXN', group: 'masa', available: true },
+      { id: 'blue', name: 'Masa Azul', description: 'Masa de maíz azul', priceCents: 0, currency: 'MXN', group: 'masa', available: true },
+      { id: 'cheese', name: 'Extra Queso Cotija', description: 'Cotija añejo desmoronado', priceCents: 1000, currency: 'MXN', group: 'extras', available: true },
+      { id: 'avocado', name: 'Aguacate', description: 'Medio aguacate en rebanadas', priceCents: 1500, currency: 'MXN', group: 'extras', available: true }
     ];
   }
   function initialState() {
     const dishes = [
-      ['huarache', 'Huarache de Asada', 'Huaraches', 8500, 'Masa hecha a mano, carne asada, frijoles, cotija, crema y salsa.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_db75814d02_1b437c974642d683.png'],
-      ['sope', 'Sope de Chicharrón Prensado', 'Sopes', 3500, 'Masa gruesa con chicharrón prensado, frijoles y salsa verde.', ''],
-      ['pambazo', 'Pambazo de Papa con Chorizo', 'Pambazos', 5000, 'Pan bañado en guajillo con papa, chorizo, lechuga y crema.', ''],
-      ['gordita', 'Gordita de Chicharrón', 'Gorditas', 3000, 'Gordita de masa rellena de chicharrón y salsa fresca.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_825ad9b877_cafe10009ac0f8f2.png'],
-      ['quesadilla', 'Quesadilla de Flor de Calabaza', 'Quesadillas', 4500, 'Flor de calabaza y queso derretido en tortilla de maíz hecha a mano.', '']
+      ['huarache', 'Huarache de Asada', 'Huaraches', 8500, 'Masa hecha a mano, carne asada, frijoles, cotija, crema y salsa.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_db75814d02_1b437c974642d683.png', ['Cilantro', 'Cebolla picada', 'Limón', 'Salsa verde']],
+      ['sope', 'Sope de Chicharrón Prensado', 'Sopes', 3500, 'Masa gruesa con chicharrón prensado, frijoles y salsa verde.', '', ['Lechuga', 'Crema', 'Queso fresco', 'Salsa verde']],
+      ['pambazo', 'Pambazo de Papa con Chorizo', 'Pambazos', 5000, 'Pan bañado en guajillo con papa, chorizo, lechuga y crema.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_4938590a45_a54c3c8ba55ab6d3.png', ['Lechuga', 'Crema', 'Queso fresco']],
+      ['gordita', 'Gordita de Chicharrón', 'Gorditas', 3000, 'Gordita de masa rellena de chicharrón y salsa fresca.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_825ad9b877_cafe10009ac0f8f2.png', ['Cilantro', 'Cebolla picada', 'Salsa roja']],
+      ['quesadilla', 'Quesadilla de Flor de Calabaza', 'Quesadillas', 4500, 'Flor de calabaza y queso derretido en tortilla de maíz hecha a mano.', '', ['Crema', 'Salsa verde']]
     ];
     return { version: 2, revision: 0, nextOrderNumber: 2084,
       settings: { currency: 'MXN', taxBasisPoints: 0, taxConfigured: false, timeZone: 'America/Mexico_City', locale: 'es' },
-      menu: dishes.map(([id, name, category, priceCents, description, imageUrl]) => ({ id, name, category, priceCents, currency: 'MXN', description, available: true, imageUrl, options: options() })),
+      menu: dishes.map(([id, name, category, priceCents, description, imageUrl, included]) => ({ id, name, category, priceCents, currency: 'MXN', description, available: true, imageUrl, included, options: options() })),
       orders: [], payments: [], shifts: [], cashDrops: [], audit: [], hardwareJobs: [] };
   }
   function getOpenShift(state) { return state.shifts.find(s => s && !s.closedAt) || null; }
@@ -134,7 +141,8 @@
     let current = migrateState(state);
     let queue = Promise.resolve();
     const listeners = new Set();
-    function audit(s, action, message) { s.audit.push({ id: uid(), at: now(), action, message }); }
+    // `data` carries the ids and before/after values a screen needs to offer an undo.
+    function audit(s, action, message, data) { const entry = { id: uid(), at: now(), action, message }; if (data) entry.data = data; s.audit.push(entry); }
     function mutate(work) {
       const operation = queue.then(async () => {
         const draft = clone(current);
@@ -152,7 +160,8 @@
     function menuFor(s, id) { const item = s.menu.find(m => m.id === id); if (!item) throw new Error('Menu item not found.'); return item; }
     function available(s, order) {
       order.items.forEach(line => {
-        const item = menuFor(s, line.menuItemId);
+        const item = s.menu.find(m => m.id === line.menuItemId);
+        if (!item) throw new Error(`${line.name} is no longer on the menu. Rebuild this order before taking payment.`);
         if (item.currency !== order.currency) fail('Menu currency changed. Rebuild this order before taking payment.', 'LEGACY_ORDER_CURRENCY');
         if (!item.available) throw new Error(`${item.name} is sold out. Rebuild this order before taking payment.`);
         line.options.forEach(option => { if (!item.options.find(o => o.id === option.id && o.available && o.currency === order.currency)) throw new Error(`${option.name} is sold out or changed currency. Rebuild this order before taking payment.`); });
@@ -163,7 +172,7 @@
       if (!name || !category) throw new Error('Dish name and category are required.');
       const imageUrl = cleanText(data.imageUrl, 2000);
       if (imageUrl && !/^https?:\/\//i.test(imageUrl)) throw new Error('Image URL must start with https:// or http://.');
-      return { name, category, description: cleanText(data.description, 500), priceCents: cents(data.priceCents, 'Price', false), imageUrl };
+      return { name, category, description: cleanText(data.description, 500), priceCents: cents(data.priceCents, 'Price', false), imageUrl, included: cleanIncluded(data.included) };
     }
     const api = {
       getState: () => clone(current),
@@ -180,15 +189,19 @@
         const orderType = data.orderType || 'takeout'; if (!['takeout', 'counter', 'dine_in'].includes(orderType)) throw new Error('Invalid order type.');
         const tableNumber = data.tableNumber == null ? null : Number(data.tableNumber);
         if (tableNumber !== null && (!Number.isInteger(tableNumber) || tableNumber < 1 || tableNumber > 999)) throw new Error('Invalid table number.');
+        const customerPhone = cleanText(data.customerPhone, 24);
+        if (customerPhone && !/^[0-9+() .-]{7,24}$/.test(customerPhone)) throw new Error('Enter a valid phone number or leave it blank.');
         const normalizedLines = data.items.map(line => {
           if (!line || typeof line.menuItemId !== 'string') throw new Error('Invalid menu item.');
           if (!Number.isInteger(line.quantity) || line.quantity < 1 || line.quantity > 99) throw new Error('Quantity must be between 1 and 99.');
           const ids = line.optionIds ?? []; if (!Array.isArray(ids) || ids.some(id => typeof id !== 'string') || new Set(ids).size !== ids.length) throw new Error('Invalid modifier selection.');
-          return { menuItemId: line.menuItemId, quantity: line.quantity, optionIds: [...ids].sort(), notes: cleanText(line.notes, 300) };
+          const removed = line.removed ?? [];
+          if (!Array.isArray(removed) || removed.some(name => typeof name !== 'string') || new Set(removed).size !== removed.length) throw new Error('Invalid topping selection.');
+          return { menuItemId: line.menuItemId, quantity: line.quantity, optionIds: [...ids].sort(), removed: [...removed].sort(), onTheSide: line.onTheSide === true, notes: cleanText(line.notes, 300) };
         });
         const submissionId = data.submissionId == null ? uid() : String(data.submissionId).toLowerCase();
         if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(submissionId)) fail('Submission ID must be a UUID.', 'INVALID_SUBMISSION_ID');
-        const submissionFingerprint = JSON.stringify({ customerName, orderType, tableNumber, items: normalizedLines });
+        const submissionFingerprint = JSON.stringify({ customerName, customerPhone, orderType, tableNumber, items: normalizedLines });
         const existing = s.orders.find(order => order.submissionId === submissionId);
         if (existing) {
           if (existing.submissionFingerprint !== submissionFingerprint) fail('This submission ID was already used for a different order.', 'SUBMISSION_CONFLICT', 409);
@@ -204,14 +217,23 @@
           if (selected.some(option => option.currency !== currency)) fail('A modifier has legacy prices. Reprice all modifiers before ordering.', 'LEGACY_MENU_CURRENCY');
           if (selected.filter(o => o.group === 'masa').length !== 1 || selected.filter(o => o.group === 'extras').length > 2) throw new Error('Choose one masa base and up to two extras.');
           cents(item.priceCents, 'Dish price', false); selected.forEach(option => cents(option.priceCents, 'Modifier price'));
+          const included = item.included || [];
+          if (line.removed.some(name => !included.includes(name))) throw new Error('Invalid topping selection.');
           const unitPriceCents = item.priceCents + selected.reduce((sum, o) => sum + o.priceCents, 0);
-          return { menuItemId: item.id, name: item.name, quantity: line.quantity, currency, unitPriceCents, lineTotalCents: cents(unitPriceCents * line.quantity, 'Line total', false), options: selected, notes: line.notes };
+          return { menuItemId: item.id, name: item.name, quantity: line.quantity, currency, unitPriceCents, lineTotalCents: cents(unitPriceCents * line.quantity, 'Line total', false), options: selected, removed: line.removed, onTheSide: line.onTheSide && line.removed.length < included.length, notes: line.notes };
         });
         const subtotalCents = cents(items.reduce((sum, line) => sum + line.lineTotalCents, 0), 'Order total', false);
         if (!Number.isInteger(s.settings.taxBasisPoints) || s.settings.taxBasisPoints < 0 || s.settings.taxBasisPoints > 10000) throw new Error('Invalid tax configuration.');
         const taxCents = Math.round(subtotalCents * s.settings.taxBasisPoints / 10000);
-        const order = { id: uid(), submissionId, submissionFingerprint, number: `MF-${s.nextOrderNumber++}`, customerName, orderType, tableNumber, items, currency, subtotalCents, taxCents, totalCents: cents(subtotalCents + taxCents), status: 'draft', paymentStatus: 'unpaid', paymentId: null, createdAt: now(), updatedAt: now(), paidAt: null, completedAt: null };
+        const order = { id: uid(), submissionId, submissionFingerprint, number: `MF-${s.nextOrderNumber++}`, customerName, customerPhone, orderType, tableNumber, items, currency, subtotalCents, taxCents, totalCents: cents(subtotalCents + taxCents), status: 'draft', paymentStatus: 'unpaid', paymentId: null, createdAt: now(), updatedAt: now(), paidAt: null, preparingAt: null, readyAt: null, completedAt: null };
         s.orders.push(order); audit(s, 'order_draft', `${order.number} held for upfront cash payment.`); return order;
+      }); },
+      cancelDraft(id) { return mutate(s => {
+        const order = orderFor(s, id);
+        if (order.status === 'cancelled') return order;
+        if (order.status !== 'draft' || order.paymentStatus !== 'unpaid') throw new Error('Only an unpaid order can be cancelled.');
+        order.status = 'cancelled'; order.updatedAt = now();
+        audit(s, 'order_cancelled', `${order.number} cancelled before payment.`, { orderId: order.id }); return order;
       }); },
       payOrder(id, tenderedCents, cashierId = 'Cashier 1') { return mutate(s => {
         const order = orderFor(s, id);
@@ -234,7 +256,7 @@
         if (expectedStatus && order.status !== expectedStatus) throw new Error('Another kitchen screen already updated this ticket. Check its current status.');
         const next = { pending: 'preparing', preparing: 'ready', ready: 'completed' }[order.status];
         if (!next) throw new Error('This order cannot advance.');
-        order.status = next; order.updatedAt = now(); if (next === 'completed') order.completedAt = order.updatedAt;
+        order.status = next; order.updatedAt = now(); order[{ preparing: 'preparingAt', ready: 'readyAt', completed: 'completedAt' }[next]] = order.updatedAt;
         audit(s, 'kitchen_status', `${order.number} marked ${next}.`); return order;
       }); },
       openShift(floatCents, cashierId = 'Cashier 1') { return mutate(s => {
@@ -260,14 +282,23 @@
         const item = menuFor(s, id); const old = clone(item); const merged = { ...item, ...patch };
         Object.assign(item, itemData(merged)); if ('available' in patch) { if (typeof patch.available !== 'boolean') throw new Error('Availability must be true or false.'); item.available = patch.available; }
         if ('priceCents' in patch) { item.currency = s.settings.currency; item.options.forEach(option => { if (option.priceCents === 0) option.currency = s.settings.currency; }); }
-        audit(s, 'menu_edit', `${item.name}: price ${old.currency} ${money(old.priceCents, old.currency)} → ${item.currency} ${money(item.priceCents, item.currency)}; ${item.available ? 'in stock' : '86’d'}.`); return item;
+        // One entry per kind of change, each with the data needed to undo it. A save that changes nothing writes nothing.
+        const ref = { menuItemId: item.id, name: item.name };
+        if (old.priceCents !== item.priceCents || old.currency !== item.currency) audit(s, 'menu_price', `${item.name} changed from ${old.currency} ${money(old.priceCents, old.currency)} to ${item.currency} ${money(item.priceCents, item.currency)}.`, { ...ref, fromCents: old.priceCents, toCents: item.priceCents, fromCurrency: old.currency, currency: item.currency });
+        if (old.available !== item.available) audit(s, 'menu_stock', `${item.name} marked ${item.available ? 'in stock' : 'out of stock'}.`, { ...ref, available: item.available });
+        if (['name', 'category', 'description', 'imageUrl'].some(field => old[field] !== item[field]) || JSON.stringify(old.included || []) !== JSON.stringify(item.included)) audit(s, 'menu_edit', `${item.name} details updated.`, ref);
+        return item;
       }); },
-      addMenuItem(data) { return mutate(s => { const item = { id: uid(), ...itemData(data), currency: s.settings.currency, available: true, options: options() }; s.menu.push(item); audit(s, 'menu_add', `${item.name} added at ${item.currency} ${money(item.priceCents, item.currency)}.`); return item; }); },
+      addMenuItem(data) { return mutate(s => { const item = { id: uid(), ...itemData(data), currency: s.settings.currency, available: true, options: options() }; s.menu.push(item); audit(s, 'menu_add', `${item.name} added at ${item.currency} ${money(item.priceCents, item.currency)}.`, { menuItemId: item.id, name: item.name, priceCents: item.priceCents, currency: item.currency }); return item; }); },
+      deleteMenuItem(id) { return mutate(s => {
+        const item = menuFor(s, id); s.menu = s.menu.filter(m => m.id !== id);
+        audit(s, 'menu_delete', `${item.name} removed from the menu.`, { menuItemId: item.id, name: item.name, priceCents: item.priceCents, currency: item.currency }); return item;
+      }); },
       updateMenuOption(menuId, optionId, patch) { return mutate(s => {
         const item = menuFor(s, menuId); const option = item.options.find(o => o.id === optionId); if (!option) throw new Error('Modifier not found.');
         if ('priceCents' in patch) { option.priceCents = cents(patch.priceCents, 'Modifier price'); option.currency = s.settings.currency; }
         if ('available' in patch) { if (typeof patch.available !== 'boolean') throw new Error('Invalid availability.'); option.available = patch.available; }
-        audit(s, 'modifier_edit', `${item.name} · ${option.name}: ${option.currency} ${money(option.priceCents, option.currency)}, ${option.available ? 'in stock' : '86’d'}.`); return option;
+        audit(s, 'modifier_edit', `${item.name} · ${option.name}: ${option.currency} ${money(option.priceCents, option.currency)}, ${option.available ? 'in stock' : 'out of stock'}.`, { menuItemId: item.id, optionId: option.id, name: `${item.name} · ${option.name}`, available: option.available }); return option;
       }); },
       reserveHardwareJob(key, paymentId = null) { return mutate(s => {
         const existing = s.hardwareJobs.find(j => j.key === key); if (existing) return { job: existing, duplicate: true };
@@ -286,7 +317,7 @@
     };
     return api;
   }
-  const clientActions = ['createDraft', 'payOrder', 'advanceOrder', 'openShift', 'recordCashDrop', 'closeShift', 'updateMenuItem', 'addMenuItem', 'updateMenuOption'];
+  const clientActions = ['createDraft', 'cancelDraft', 'payOrder', 'advanceOrder', 'openShift', 'recordCashDrop', 'closeShift', 'updateMenuItem', 'addMenuItem', 'deleteMenuItem', 'updateMenuOption'];
   function createBrowserStore() {
     let state = initialState(); const listeners = new Set();
     let connectionStatus = { connected: false, syncedAt: null, hasConfirmedState: false, revision: null };
@@ -341,9 +372,12 @@
     api.reconnect = () => { api.ready = connect(); api.ready.catch(() => {}); return api.ready; };
     api.ready = connect();
     api.ready.catch(() => {});
-    const stream = new EventSource('/api/events');
-    stream.onmessage = event => { try { accept(JSON.parse(event.data)); api.ready = Promise.resolve(); } catch (_) { connection(false); } };
-    stream.onerror = () => connection(false);
+    (function listen() {
+      const stream = new EventSource('/api/events');
+      stream.onmessage = event => { try { accept(JSON.parse(event.data)); api.ready = Promise.resolve(); } catch (_) { connection(false); } };
+      // Network drops retry on their own; an HTTP error closes the stream for good, so reopen it.
+      stream.onerror = () => { connection(false); if (stream.readyState === 2 /* CLOSED */) setTimeout(listen, 3000); };
+    })();
     return api;
   }
   return { createEngine, initialState, migrateState, createBrowserStore, money, parseMoney, clientActions, validTimestamp, verifiedReceipts, isVerifiedPaid, shiftSummary };

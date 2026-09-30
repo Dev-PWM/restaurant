@@ -1,6 +1,6 @@
 /** Money is integer minor units (MXN centavos or legacy USD cents). Never combine currencies. */
 export type Currency = 'MXN' | 'USD';
-export type OrderStatus = 'draft' | 'pending' | 'preparing' | 'ready' | 'completed';
+export type OrderStatus = 'draft' | 'pending' | 'preparing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeout' | 'counter';
 export interface LineItem {
   menuItemId: string;
@@ -9,16 +9,22 @@ export interface LineItem {
   currency: Currency;
   unitPriceCents: number;
   lineTotalCents: number;
-  options: { id: string; name: string; priceCents: number; currency: Currency; group: 'masa' | 'extras'; available: boolean }[];
+  options: { id: string; name: string; description?: string; priceCents: number; currency: Currency; group: 'masa' | 'extras'; available: boolean }[];
+  /** Included toppings the customer left off. Always a subset of the dish's `included`; never repriced. */
+  removed: string[];
+  /** Serve the remaining included toppings on the side. */
+  onTheSide: boolean;
   notes: string;
 }
 export interface CreateOrderInput {
   /** A browser must persist this UUID until a definitive creation response arrives. */
   submissionId: string;
   customerName: string;
+  /** Optional. Digits, spaces and + ( ) . - only, 7 to 24 characters. Part of the submission fingerprint. */
+  customerPhone?: string;
   orderType: OrderType;
   tableNumber: number | null;
-  items: { menuItemId: string; quantity: number; optionIds: string[]; notes?: string }[];
+  items: { menuItemId: string; quantity: number; optionIds: string[]; removed?: string[]; onTheSide?: boolean; notes?: string }[];
 }
 export interface Order {
   id: string;
@@ -27,6 +33,8 @@ export interface Order {
   submissionFingerprint?: string;
   number: string;
   customerName: string;
+  /** Empty string when the customer gave none. */
+  customerPhone?: string;
   orderType: OrderType;
   tableNumber: number | null;
   items: LineItem[];
@@ -40,6 +48,9 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   paidAt: string | null;
+  /** When the kitchen started and marked the ticket ready. Absent on orders saved before 0.2.0. */
+  preparingAt?: string | null;
+  readyAt?: string | null;
   completedAt: string | null;
 }
 export interface PaymentRecord {
@@ -90,4 +101,12 @@ export interface DrawerSummary {
   expectedCents: number;
   orderCount: number;
   excludedReceipts: number;
+}
+/** `data` holds the ids and before/after values a screen needs to offer an undo. Older entries have none. */
+export interface AuditEntry {
+  id: string;
+  at: string;
+  action: string;
+  message: string;
+  data?: Record<string, unknown>;
 }
