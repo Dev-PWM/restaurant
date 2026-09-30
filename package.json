@@ -4,6 +4,8 @@
   "private": true,
   "description": "MasaFlow upfront cash ordering and drawer reconciliation",
   "scripts": {
+    "setup": "npm --prefix apps/analytics ci",
+    "build": "npm --prefix apps/analytics run build",
     "start": "node server.js",
     "dev": "node server.js",
     "test": "node --test tests/*.test.js"

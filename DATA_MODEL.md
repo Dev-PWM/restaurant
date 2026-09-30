@@ -1,63 +1,48 @@
-# MasaFlow cash data context
+# MasaFlow cash data model
 
-Applies to this upfront cash implementation. The revised payment specification is the primary requirement; the attached designs provide the visual and culinary examples. Cash receipt recognition is defined here to make the implementation explicit, not as a preexisting accounting policy.
+The revised upfront cash specification governs this implementation. The [reusable data context](docs/data-context/context-masaflow-cash/SKILL.md) contains the complete KPI dictionary, sources, filters, currencies, time windows and interpretation caveats.
 
 ## Money and record rules
 
-Every money field is an integer number of USD cents. The service calculates prices from the current menu when creating an order; customer-supplied prices are never accepted. A draft preserves item names, options, and unit prices. Later price changes do not reprice an existing draft. Unavailable items or options block draft creation and payment, so an affected draft must be rebuilt before collecting cash.
+New records store MXN integer centavos with currency snapshots. Legacy USD amounts remain exact USD cents without conversion. Menu prices are authoritative at draft creation. Names, modifier prices, line totals and tax are immutable snapshots. Unavailable dishes or modifiers block payment.
 
-| Record | Meaning and important fields |
-| --- | --- |
-| `Order` | One customer ticket. `id` is a UUID; `number` is an increasing MF reference. `status` describes fulfillment separately from `paymentStatus`. `items`, `subtotalCents`, `taxCents`, and `totalCents` are snapshots. `paymentId` links its one verified payment. |
-| `LineItem` | One selected dish with integer `quantity` (1–99), dish/name snapshot, option snapshots, notes, `unitPriceCents`, and `lineTotalCents = quantity × unitPriceCents`. Exactly one available masa choice and up to two extras are required by the current sample menu. |
-| `PaymentRecord` | One finalized upfront cash receipt linked to an order and open drawer shift. `totalCents` equals the order total; `changeCents = tenderedCents − totalCents`; tender must cover total. `paidAt` is the cash recognition time. `cashierId` is a supplied name, not an authenticated identity. |
-| `CashDrawerShift` | One drawer session with a starting `floatCents`, opening cashier and timestamp. Closing saves `expectedCentsAtClose`, `actualCents`, `varianceCents`, closing time, and the supplied closing cashier name. Only one shift may be open. |
-| `CashDrop` | A positive removal to the safe, attached to one open shift with amount, note, supplied cashier and timestamp. It cannot exceed the expected balance. |
-| `InventoryItem` | Dish name, category, description, integer base price, image URL, availability and modifiers. Availability is an 86 flag; quantity/ingredient stock is not modeled. |
-| `Audit` | Timestamped events for drafts, payments, kitchen transitions, float setup, cash drops, shift close, price changes, stock changes and drawer requests/results. |
-| `HardwareJob` | Durable drawer-pulse reservation keyed by payment ID or an explicit manual-request ID. Result: simulated, sent, failed, unknown. It prevents a duplicate payment request from opening the drawer twice. |
+Order IDs are UUIDs. A persisted submission ID and normalized fingerprint make identical retries return the same ticket and reject conflicting reuse. Payment status is separate from fulfillment. A unique verified payment links the order and its shift. Kitchen transitions require verified payment. Closed balances and signed variance are frozen.
 
-## Cash and reporting definitions
-
-| Measure | Exact rule and scope |
-| --- | --- |
-| Cash receipts / cash sales | Sum verified `PaymentRecord.totalCents` by `paidAt` in the selected America/Los_Angeles day/week/month/year. Payments must match their paid order's ID, payment ID, and total. Includes pending, preparing, ready and completed fulfillment. Excludes unpaid drafts; includes tax. |
-| Net sales | Sum `Order.subtotalCents` for those same verified payments; excludes tax. No refund or void events are implemented. |
-| Tax collected | Sum `Order.taxCents` for the same verified payment population. Current zero rate is unconfigured. |
-| Transactions | Count those verified payments. Each finalized order has exactly one payment. |
-| Average ticket | Cash receipts ÷ transactions. Display zero when no payments exist. |
-| Top dishes | Sum purchased line quantities for the same paid-ticket population, ranked by quantity. |
-| Expected drawer cash | Shift starting float + all shift cash tendered − all shift change returned − all shift cash drops. Equivalent to float + cash receipts − drops. Includes payments even if food is not yet complete. |
-| Over/short | Actual physical cash count − expected cash at close. Positive is over, negative is short, zero is balanced. Later shifts cannot alter the saved audit. |
-| Kitchen completion time | `completedAt − paidAt` for completed paid tickets. Includes wait between payment and preparation. Draft waiting time is excluded. |
+TypeScript interfaces: [orders and cash](shared/types/order.ts), [menu](shared/types/menu.ts). [The cash engine](assets/masaflow-store.js) owns validation and serialized transactions; [analytics](shared/analytics.js) owns the reporting transformations.
 
 ## Upfront cash lifecycle
 
 ```mermaid
 flowchart LR
-  A[Menu and cart] --> B[Draft · unpaid]
+  A[Menu and cart] --> B[Draft · awaiting cash]
   B --> C[Cashier counts tender]
-  C --> D{Tender covers total and shift open?}
+  C --> D{Full tender and matching open shift?}
   D -->|No| C
   D -->|Yes| E[Persist payment and change]
-  E --> F[Pending kitchen ticket]
-  E --> G[Request drawer pulse once]
+  E --> F[Received kitchen ticket]
+  E --> G[Durable pulse reservation]
   F --> H[Preparing]
   H --> I[Ready]
   I --> J[Completed]
 ```
 
-Hardware failure never removes or reverses a saved payment. Only a linked, verified paid cash record permits kitchen transitions. The server serializes mutations so two concurrent finalizations create one payment.
+Persistence failure does not dispatch a ticket. Drawer failure does not remove a payment. Lost or duplicate responses cannot create another verified payment or repeat a reserved pulse.
+
+## Drawer lifecycle
 
 ```mermaid
 flowchart LR
-  A[Record float and open shift] --> B[Finalize cash sales]
+  A[Record float and open shift] --> B[Finalize upfront cash sales]
   B --> C[Record safe drops]
   C --> D[Count physical drawer]
   D --> E[Expected = float + tender - change - drops]
-  E --> F[Save actual count and over/short]
+  E --> F[Freeze expected, actual and signed variance]
   F --> G[Close shift]
   G --> A
 ```
 
-TypeScript interfaces: [orders and cash](shared/types/order.ts), [menu and availability](shared/types/menu.ts). Runtime validation lives in `apps/html/assets/masaflow-store.js` and is executed by the local service.
+## Analytics API
+
+GET `/api/analytics` normalizes tab (or legacy view), period, date and lang. It returns revision, observation time, currency, timezone, definitions, quality counts, sales and Operations evidence. Sales use Mexico City paidAt; the live queue spans all dates. Pickup median uses today's completedAt, including overnight payments.
+
+POST `/api/analytics/summary` accepts displayed scope, locale and revision, recomputes verified aggregates and rejects stale requests. [Summary generation](shared/sales-summary.js) sends aggregates and definitions only, validates references and renders authoritative numbers. The browser accepts matching responses atomically; earlier filter requests and older revisions cannot overwrite displayed evidence.

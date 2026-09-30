@@ -1,47 +1,75 @@
-# MasaFlow · upfront cash ordering
+# MasaFlow · upfront cash POS
 
-Run `npm start`, then open [the kitchen and cashier screen](http://127.0.0.1:4173/businessDashbord.html). Node 20 or later is required. No package installation is needed.
+MasaFlow runs locally with customer ordering, upfront cash collection, kitchen fulfillment, pickup tracking, menu management, drawer audits, and live Operations / Sales analytics.
 
-The six supplied HTML screens now share a local Node service and saved records:
+## Run locally
 
-- [Kitchen / cash collection](http://127.0.0.1:4173/businessDashbord.html)
-- [Cash ledger and shift audit](http://127.0.0.1:4173/history.html)
-- [Menu and stock management](http://127.0.0.1:4173/MenuManagment.html)
-- [Customer menu](http://127.0.0.1:4173/MenuUI.html)
-- [Cash analytics](http://127.0.0.1:4173/metricsDashbord.html)
-- Order tracking: `readypickupUI.html?order=ORDER_UUID` (linked after customer submission)
+Use Node 22.12 or later (the analytics build uses Vite 8).
 
-## Try the complete flow
+```sh
+npm run setup
+npm run build
+npm start
+```
 
-1. Open Cash Ledger. Enter the starting float and cashier name to open a shift.
-2. Open Customer Menu in a second tab. Customize a dish, add it to the cart, and submit with a customer name. A draft is held for cash payment; it stays out of the kitchen queue.
-3. In the kitchen screen, find the draft under Awaiting Cash and choose Collect Cash. Enter tendered cash or select $5, $10, $20, $50, or Exact. The presets set the full tendered amount rather than adding bills.
-4. Count the physical cash, verify the displayed change, and finalize. Short tender is blocked. The saved cash payment dispatches the order to the kitchen and requests a drawer pulse. Repeated finalization cannot create a second payment or pulse.
-5. Move the ticket through Start → Mark Ready → Complete. The customer tracking page receives actual changes.
-6. Record cash drops in Cash Ledger, then count the drawer and close the shift. Expected cash, actual cash, and over/short are saved in the shift audit.
+Open [MasaFlow](http://127.0.0.1:4173/businessDashbord.html). The service binds to `127.0.0.1`; `PORT` and `MASAFLOW_HOST` override its address. Serve the app through Node rather than opening HTML files from disk.
 
-## Cash drawer hardware
+| Screen | Local URL |
+| --- | --- |
+| Kitchen and cash collection | [Orders](http://127.0.0.1:4173/businessDashbord.html) |
+| Customer ordering | [Menu](http://127.0.0.1:4173/MenuUI.html) |
+| Menu prices / availability | [Menu management](http://127.0.0.1:4173/MenuManagment.html) |
+| Float, cash drops and shift audit | [Cash ledger](http://127.0.0.1:4173/history.html) |
+| Operations and Sales | [Analytics](http://127.0.0.1:4173/analytics/) |
+| Customer tracking | `/readypickupUI.html?order=ORDER_UUID`, linked after submission |
 
-Without a configured printer, the service records a **simulated pulse** and the interface clearly labels it. Real TCP printer support uses the printer's ESC/POS drawer connector. Start the service with:
+The previous `metricsDashbord.html` link redirects to analytics and preserves period/date/language filters. Analytics URLs restore `tab=operations|owner`, `period=day|week|month|year`, `date=YYYY-MM-DD`, and `lang=es|en`. Spanish is initially selected; language preferences persist across screens.
+
+## Complete a cash shift
+
+1. Open Cash Ledger and record the starting float and cashier name.
+2. In Customer Menu, customize a dish, add it to the cart, and submit. The ticket awaits cash and stays outside the kitchen queue. A saved submission UUID lets a lost response be retried without creating another order.
+3. On Orders, choose Collect Cash. Enter tender or select $20, $50, $100, $200, $500, or Exact. Presets set the entire tendered amount. Check the displayed total and change, then finalize. Short tender is blocked.
+4. The service saves one verified cash payment and dispatches the ticket. Repeated finalization returns the original payment and does not request another drawer pulse.
+5. Move the ticket through Received → Preparing → Ready → Completed. Customer tracking receives each committed state.
+6. Record a cash drop, count the drawer, and close the shift. Expected cash, actual cash and signed variance are frozen in the closed audit.
+
+New records use MXN integer centavos and `America/Mexico_City`. Editable demo prices: Huarache $85, Sope $35, Pambazo $50, Gordita $30, Quesadilla $45; cheese $10 and avocado $15. Tax is visibly **unconfigured at zero**. Availability is an 86 flag rather than ingredient quantity tracking.
+
+Version-one data migrates with its original currency and exact amounts. USD and MXN totals are never added or converted. Close a legacy USD shift before opening MXN. Explicitly reprice legacy dishes and priced modifiers in menu management before creating new MXN orders; existing receipts and closed audits remain unchanged.
+
+## Drawer hardware
+
+Without a printer, the service records and displays a **simulated pulse**. For a TCP ESC/POS printer:
 
 ```sh
 MASAFLOW_PRINTER_HOST=192.168.1.50 MASAFLOW_PRINTER_PORT=9100 npm start
 ```
 
-Check the printer/drawer manufacturer's connector and pulse compatibility first. The pulse bytes are `1B 70 00 19 FA` (pin 2, 50 ms on, 500 ms off), following [Epson's ESC p reference](https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/esc_lp.html). The service records that bytes were sent; it cannot confirm the drawer physically opened. USB-specific printer drivers and silent thermal receipt printing are not implemented. Receipt reprints use the browser print dialog.
+The command is `1B 70 00 19 FA`, following [Epson's ESC p reference](https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/esc_lp.html). A durable reservation keyed to the payment prevents duplicate delivery. A restart during delivery records an unknown result; inspect the drawer before an intentional manual pulse. Hardware failure retains the payment. Sending bytes cannot confirm physical opening. Manual pulses require an open shift and are audited. Receipt reprints use the browser print dialog.
 
-The server persists a pulse reservation before contacting the printer, keyed to payment ID. A repeated request does not send another pulse. Failed or uncertain hardware responses keep the payment and order intact. After a service crash during a pulse, its result is marked unknown; inspect the physical drawer before an intentional manual pulse. Manual pulses require an open shift and create an audit record.
+## Live analytics and summaries
 
-## Data and scope
+Analytics, ledger calculations and summary inputs share one receipt validator. Sales use verified payment time. Operations includes the entire paid queue and today's completed-ticket pickup median. The source inspector exposes exact evidence, formulas, observation time and exclusions. Charts use zero baselines and exact tables. Disconnected screens retain confirmed data with a stale notice; initial failures recover from SSE or retry.
 
-Records are persisted to `.masaflow/state.json` using serialized transactions and atomic file replacement. All browsers on this service receive Server-Sent Events. Opening HTML directly from disk does not provide a shared service. Stop the service before backing up or moving its data directory.
+AI summaries generate only on request. Set the **server environment** variable `AI_GATEWAY_API_KEY` and optionally `AI_GATEWAY_MODEL` (default `openai/gpt-6-luna`, verified in the [model catalog](https://ai-gateway.vercel.sh/v1/models)). Local calls use the [Gateway Chat Completions API](https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions); no Vercel deployment is required. Without a key, the interface shows unavailable.
 
-This is a local implementation for a trusted restaurant counter. It does not provide authenticated cashier/customer roles or restaurant isolation and should not be published as a public POS. The service binds to `127.0.0.1` by default. Currency defaults to USD; tax is set to zero and is explicitly unconfigured. Configure actual tax and business settings before operational use. These values are implementation defaults rather than inferred restaurant policies.
+For a local `.env` copied from `.env.example`, launch with `node --env-file=.env server.js`. Normal `npm start` reads exported environment variables. Credentials are ignored by Git and never sent to the browser. Do not use a `VITE_` credential variable.
 
-Menu prices are sample values and missing dish imagery uses a neutral placeholder. Original supplied images are used where available. Funds are all integer cents. Analytics recognizes verified cash payments at `paidAt`, including orders still in preparation; drafts do not count. It groups dates in America/Los_Angeles. Drawer float and drops do not count as sales. Refunds, voids, cash payouts, denomination counts, login history, and ingredient quantity depletion are outside this cash-flow revision.
+Only aggregates and definitions are sent to Gateway; customer names, cashier identifiers and raw ledger rows are excluded. The model selects validated references; localized factual clauses and numbers come from server calculations. Forecasts, causal claims and cash actions are excluded. Identical scope/revision/language calls deduplicate and cache for five minutes. New calls are limited to ten per rolling hour per running service, with a twenty-second timeout. Data changing during generation rejects the result as stale.
 
-The detailed [data definitions](DATA_MODEL.md) and TypeScript contracts in `shared/types` describe this implementation. They are project documentation; no personal or team context skill is installed.
+## Persistence and development
 
-## Verification
+Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. Back up this directory while the service is stopped. This app is intended for a trusted local counter; authentication, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
 
-Run `npm test` for payment-gate, cents arithmetic, duplicate finalization, stock availability, shift/drop/audit, persistence rollback, actual ESC/POS byte delivery to a test TCP receiver, and hardware deduplication across restart checks. The suite creates temporary records and does not alter the running app's data.
+HTML screens use shared `assets/`. The React/Recharts module in `apps/analytics` preserves canonical source inspection and presentation controls. Rebuild after frontend changes. Keep protected-runtime changes narrowly authorized and verified using its [authoring guide](apps/analytics/AGENTS.md).
+
+The [data model](DATA_MODEL.md), [reusable KPI context](docs/data-context/context-masaflow-cash/SKILL.md) and TypeScript contracts in `shared/types` document the measure rules. Approved concept figures and temporary browser QA fixtures are demonstration data; they are never seeded into operational records.
+
+## Verify
+
+```sh
+npm test
+```
+
+Tests use temporary directories and cover cash validation, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors. Browser verification covers customer-to-audit fulfillment, reconnects, URL/language restoration, source inspection, chart interaction and desktop / 390px / 430px layouts.

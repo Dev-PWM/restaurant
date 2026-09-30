@@ -1,18 +1,18 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MasaFlow — Cash Ledger &amp; History</title>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/masaflow.css">
+  <link rel="stylesheet" href="/assets/masaflow.css"><link rel="stylesheet" href="/assets/masaflow-ui.css">
   <style>
     body{margin:0;background:#f8f7f4;color:#292524;font-family:Outfit,system-ui,sans-serif}*{box-sizing:border-box}button,input,select{font:inherit}button,a{touch-action:manipulation}button{cursor:pointer}a{color:inherit;text-decoration:none}.l-shell{display:flex;min-height:100vh}.l-nav{width:94px;flex-shrink:0;background:#1c1917;color:#a8a29e;display:flex;flex-direction:column;align-items:center;gap:28px;padding:28px 10px;position:sticky;top:0;height:100vh}.l-logo{display:grid;place-items:center;width:46px;height:46px;background:#ea580c;color:white;border-radius:16px;font-size:24px;font-weight:700}.l-nav nav{display:grid;gap:22px;width:100%}.l-nav a{text-align:center;font-size:10px;letter-spacing:.06em;font-weight:600;text-transform:uppercase;padding:8px 2px;border-radius:10px}.l-nav a span{display:block;font-size:23px;margin-bottom:6px}.l-nav a:hover,.l-nav a[aria-current]{color:#fb923c;background:#292524}.l-nav-note{margin-top:auto;font-size:10px;text-align:center;line-height:1.5}.l-main{flex:1;min-width:0}.l-header{background:white;border-bottom:1px solid #e7e5e4;padding:27px 34px;display:flex;justify-content:space-between;align-items:center;gap:18px}.l-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#a8a29e;font-weight:700;margin:0 0 7px}.l-header h1{font-family:'Playfair Display',Georgia,serif;font-size:30px;margin:0}.l-subtitle{color:#78716c;font-size:13px;margin:8px 0 0}.l-button{border:1px solid #d6d3d1;border-radius:12px;background:white;font-weight:600;padding:12px 17px;display:inline-flex;align-items:center;justify-content:center;gap:8px}.l-button:hover{background:#f5f5f4}.l-button-primary{background:#1c1917;color:white;border-color:#1c1917}.l-button-primary:hover{background:#ea580c;border-color:#ea580c}.l-content{padding:28px 34px}.l-error{padding:15px 18px;border-radius:14px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin:0 0 20px}.l-error:empty{display:none}.l-section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:21px}.l-section-heading h2{font-family:'Playfair Display',Georgia,serif;font-size:23px;margin:0}.l-section-note{font-size:12px;color:#78716c;margin:7px 0 0;line-height:1.5}.l-pill{font-size:11px;font-weight:600;padding:8px 12px;border-radius:30px;background:#f5f5f4;color:#78716c}.l-pill-open{background:#f0fdf4;color:#15803d}.l-panel{background:white;border:1px solid #e7e5e4;border-radius:23px;padding:24px;margin-bottom:25px}.l-shift-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.l-stat{padding:20px;background:#f8f7f4;border-radius:16px}.l-stat:first-child{background:#fff7ed;border:1px solid #fed7aa}.l-stat p{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:#78716c;font-weight:700;margin:0 0 9px}.l-stat strong{display:block;font-size:27px;font-weight:600}.l-stat small{display:block;font-size:11px;color:#a8a29e;margin-top:6px}.l-drawer-formulas{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:#78716c;margin:18px 0 22px}.l-drawer-formulas strong{color:#44403c}.l-cashier{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:20px}.l-cashier label{font-size:12px;color:#78716c;font-weight:600}.l-input{border:1px solid #d6d3d1;border-radius:10px;padding:11px 12px;background:white;max-width:100%;width:100%;color:#292524;outline:none}.l-input:focus{border-color:#f97316;box-shadow:0 0 0 3px #ffedd5}.l-cashier .l-input{width:180px}.l-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.l-form-box{border:1px solid #e7e5e4;border-radius:17px;padding:20px}.l-form-box h3{font-size:16px;font-weight:600;margin:0 0 7px}.l-form-box p{font-size:12px;color:#78716c;line-height:1.6;margin:0 0 17px}.l-form-box label,.l-open-form label{font-size:12px;font-weight:600;display:block;margin-bottom:7px}.l-form-box .l-input{margin-bottom:13px}.l-form-box .l-button{width:100%}.l-open-form{display:flex;gap:14px;align-items:end;flex-wrap:wrap;max-width:690px}.l-open-form>div{flex:1;min-width:160px}.l-open-note{padding:17px 19px;border-radius:14px;background:#fff7ed;color:#9a3412;font-size:13px;line-height:1.6;margin:0 0 21px}.l-count-preview{display:flex;justify-content:space-between;gap:12px;padding:11px 13px;background:#f8f7f4;border-radius:9px;margin:0 0 15px;font-size:12px;color:#78716c}.l-count-preview strong{color:#292524}.l-count-preview[data-variance=short] strong{color:#b91c1c}.l-count-preview[data-variance=over] strong{color:#c2410c}.l-table-wrap{overflow-x:auto}.l-table{border-collapse:collapse;width:100%;text-align:left;font-size:12px;white-space:nowrap}.l-table th{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#a8a29e;font-weight:600;padding:13px 14px;border-bottom:1px solid #e7e5e4}.l-table td{padding:17px 14px;border-bottom:1px solid #f5f5f4}.l-table tbody tr:hover{background:#fafaf9}.l-table th:first-child,.l-table td:first-child{padding-left:0}.l-table td strong{font-weight:600}.l-table td small{display:block;font-size:10px;color:#a8a29e;margin-top:5px}.l-empty-cell{text-align:center!important;color:#78716c;padding:30px 14px!important;white-space:normal}.l-reprint{font-size:11px;color:#c2410c;background:#fff7ed;border:1px solid #ffedd5;padding:8px 11px;border-radius:8px}.l-status{font-size:10px;border-radius:7px;padding:5px 8px;background:#f5f5f4;color:#57534e}.l-status.completed{background:#f0fdf4;color:#15803d}.l-history-filters{display:flex;gap:10px;flex-wrap:wrap}.l-history-filters .l-input{width:200px;font-size:12px;padding:9px 11px}.l-bottom-grid{display:grid;grid-template-columns:1fr 1fr;gap:25px}.l-bottom-grid .l-panel{min-width:0}.l-feed{list-style:none;margin:0;padding:0}.l-feed li{border-bottom:1px solid #f5f5f4;padding:14px 0;display:flex;justify-content:space-between;gap:15px;font-size:12px;line-height:1.6}.l-feed li:first-child{padding-top:0}.l-feed small{display:block;color:#a8a29e;font-size:10px}.l-feed time{color:#a8a29e;white-space:nowrap;font-size:10px}.l-empty-text{font-size:13px;line-height:1.6;color:#78716c;margin:0}.l-audit-heading{margin-top:25px}.l-audit-variance{font-weight:600}.l-audit-variance.short{color:#b91c1c}.l-audit-variance.over{color:#c2410c}.l-audit-variance.balanced{color:#15803d}.l-drawer-tools{display:flex;gap:10px;align-items:center}.l-button:focus-visible,.l-reprint:focus-visible,a:focus-visible{outline:3px solid #fb923c;outline-offset:3px}
     @media(max-width:1000px){.l-shift-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.l-bottom-grid{grid-template-columns:1fr}.l-content,.l-header{padding:24px}.l-form-grid{grid-template-columns:1fr}}
     @media(max-width:600px){.l-shell{display:block}.l-nav{position:static;width:100%;height:auto;padding:12px;display:block}.l-logo,.l-nav-note{display:none}.l-nav nav{display:flex;justify-content:space-around;gap:2px}.l-nav a{flex:1;font-size:8px;letter-spacing:0}.l-nav a span{font-size:18px;margin-bottom:4px}.l-header{flex-direction:column;align-items:start;padding:22px 18px}.l-header h1{font-size:27px}.l-content{padding:20px 16px}.l-panel{padding:19px}.l-stat{padding:15px}.l-stat strong{font-size:23px}.l-shift-grid{gap:10px}.l-history-filters{width:100%}.l-history-filters .l-input{flex:1;min-width:140px}.l-open-form .l-button{width:100%}.l-button{font-size:12px}.l-drawer-tools{flex-wrap:wrap}.l-table td{padding:15px 12px}}
   </style>
-  <script defer src="./assets/masaflow-store.js"></script>
-  <script defer src="./assets/masaflow-ui.js"></script>
+  <script defer src="/assets/masaflow-store.js"></script>
+  <script defer src="/assets/masaflow-i18n.js"></script><script defer src="/assets/masaflow-ui.js"></script>
 </head>
 <body>
 <div class="l-shell">
@@ -21,7 +21,7 @@
     <nav aria-label="Main navigation">
       <a href="businessDashbord.html"><span aria-hidden="true">▤</span>Orders</a>
       <a href="MenuUI.html"><span aria-hidden="true">＋</span>New order</a>
-      <a href="readypickupUI.html"><span aria-hidden="true">✓</span>Pickup</a>
+      <a href="businessDashbord.html"><span aria-hidden="true">✓</span>Kitchen</a>
       <a href="metricsDashbord.html"><span aria-hidden="true">◴</span>Metrics</a>
       <a href="MenuManagment.html"><span aria-hidden="true">☷</span>Menu</a>
       <a href="history.html" aria-current="page"><span aria-hidden="true">↺</span>Ledger</a>
@@ -36,7 +36,7 @@
     <div class="l-content">
       <div id="ledger-error" class="l-error" role="alert" data-testid="ledger-error"></div>
       <section class="l-panel" aria-labelledby="drawer-heading">
-        <div class="l-section-heading"><div><h2 id="drawer-heading">Shift cash drawer</h2><p id="shift-subtitle" class="l-section-note">Loading drawer…</p></div><span id="shift-status" class="l-pill" data-testid="shift-status">Closed</span></div>
+        <div class="l-section-heading"><div><h2 id="drawer-heading">Shift cash drawer</h2><p id="shift-subtitle" class="l-section-note">Loading drawer…</p></div><span id="shift-status" class="l-pill" data-testid="shift-status">Connecting to the local service…</span></div>
         <div id="shift-controls" data-testid="shift-controls"></div>
       </section>
       <section class="l-panel" aria-labelledby="transactions-heading">
@@ -49,7 +49,7 @@
       </section>
       <div class="l-bottom-grid">
         <section class="l-panel" aria-labelledby="drops-heading"><div class="l-section-heading"><div><h2 id="drops-heading">Cash drops</h2><p class="l-section-note">Cash removed from the drawer with a saved reason.</p></div></div><ul class="l-feed" id="drops-feed" data-testid="cash-drops"></ul></section>
-        <section class="l-panel" aria-labelledby="activity-heading"><div class="l-section-heading"><div><h2 id="activity-heading">Audit trail</h2><p class="l-section-note">The latest 20 recorded actions.</p></div></div><ul class="l-feed" id="activity-feed" data-testid="audit-trail"></ul></section>
+        <section class="l-panel" aria-labelledby="activity-heading"><div class="l-section-heading"><div><h2 id="activity-heading">Audit trail · original record text</h2><p class="l-section-note">The latest 20 recorded actions.</p></div></div><ul class="l-feed" id="activity-feed" data-testid="audit-trail"></ul></section>
       </div>
     </div>
   </main>
@@ -61,38 +61,33 @@
   let search = '';
   let transactionScope = 'all';
   const escape = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-  const when = value => new Date(value).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:MasaFlow.getState().settings.timeZone || 'America/Los_Angeles'});
+  const when = value => new Date(value).toLocaleString(MasaFlowI18n.getLocale()==='es'?'es-MX':'en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZone:MasaFlow.getState().settings.timeZone || 'America/Mexico_City'});
   const cashier = () => (document.getElementById('cashier-id')?.value || 'Cashier 1').trim() || 'Cashier 1';
   function setError(error) { document.getElementById('ledger-error').textContent = error ? (error.message || String(error)) : ''; }
   function requireAmount(input, label, allowZero) {
     const raw = input.value.trim();
-    if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) throw new Error(label + ' must be a dollar amount with no more than two decimal places.');
+    if (!/^\d+(?:\.\d{1,2})?$/.test(raw)) throw new Error(label + ' must be a peso amount with no more than two decimal places.');
     const cents = MasaFlow.parseMoney(raw);
     if (!Number.isSafeInteger(cents) || cents < 0 || (!allowZero && cents === 0)) throw new Error(label + ' must be ' + (allowZero ? 'zero or greater.' : 'greater than zero.'));
     return cents;
   }
-  function validPayments(state) {
-    return state.payments.filter(payment => {
-      const order = state.orders.find(order => order.id === payment.orderId && order.paymentId === payment.id);
-      return payment.method === 'cash' && order && order.paymentStatus === 'paid' && order.totalCents === payment.totalCents && payment.tenderedCents >= payment.totalCents && payment.changeCents === payment.tenderedCents - payment.totalCents;
-    });
-  }
+  function validPayments(state) { return state.payments.filter(payment => {const order=state.orders.find(order=>order.id===payment.orderId&&order.paymentId===payment.id);return order&&MasaFlow.isVerifiedPaid(order);}); }
   function countPreview() {
     const input = document.getElementById('drawer-count');
     const preview = document.getElementById('count-preview');
     if (!input || !preview) return;
     const summary = MasaFlow.shiftSummary();
     let value;
-    try { value = requireAmount(input,'Drawer count',true); } catch { preview.dataset.variance = ''; preview.innerHTML = '<span>Expected in drawer</span><strong>' + MasaFlow.money(summary.expectedCents) + '</strong>'; return; }
+    try { value = requireAmount(input,'Drawer count',true); } catch { preview.dataset.variance = ''; preview.innerHTML = '<span>Expected in drawer</span><strong>' + MasaFlow.money(summary.expectedCents,summary.currency,MasaFlowI18n.getLocale()) + '</strong>'; return; }
     const variance = value - summary.expectedCents;
     preview.dataset.variance = variance < 0 ? 'short' : variance > 0 ? 'over' : 'balanced';
-    preview.innerHTML = '<span>' + (variance < 0 ? 'Short' : variance > 0 ? 'Over' : 'Balanced drawer') + '</span><strong>' + MasaFlow.money(Math.abs(variance)) + '</strong>';
+    preview.innerHTML = '<span>' + (variance < 0 ? 'Short' : variance > 0 ? 'Over' : 'Balanced drawer') + '</span><strong>' + MasaFlow.money(Math.abs(variance),MasaFlow.getOpenShift()?.currency||MasaFlow.getState().settings.currency,MasaFlowI18n.getLocale()) + '</strong>';
   }
   function renderShift(state) {
     const shift = MasaFlow.getOpenShift();
     const id = shift ? shift.id : null;
     const status = document.getElementById('shift-status');
-    status.textContent = shift ? '● Shift open' : 'Drawer closed';
+    status.textContent = shift ? '● Shift open · '+shift.currency : 'Drawer closed';
     status.className = 'l-pill' + (shift ? ' l-pill-open' : '');
     document.getElementById('shift-subtitle').textContent = shift ? 'Opened ' + when(shift.openedAt) + ' · ' + shift.cashierId : 'Start a shift to collect upfront cash payments.';
     if (id !== activeShiftId) {
@@ -101,7 +96,7 @@
     }
     if (shift) {
       const summary = MasaFlow.shiftSummary(shift.id);
-      for (const [element,amount] of [['expected-cash',summary.expectedCents],['float-cash',summary.floatCents],['sales-cash',summary.salesCents],['drops-cash',summary.dropsCents],['tendered-cash',summary.tenderedCents],['change-cash',summary.changeCents]]) document.getElementById(element).textContent = MasaFlow.money(amount);
+      for (const [element,amount] of [['expected-cash',summary.expectedCents],['float-cash',summary.floatCents],['sales-cash',summary.salesCents],['drops-cash',summary.dropsCents],['tendered-cash',summary.tenderedCents],['change-cash',summary.changeCents]]) document.getElementById(element).textContent = MasaFlow.money(amount,shift.currency,MasaFlowI18n.getLocale());
       document.getElementById('sales-order-count').textContent = summary.orderCount + ' finalized cash ' + (summary.orderCount === 1 ? 'payment' : 'payments');
       countPreview();
     }
@@ -115,23 +110,24 @@
     document.getElementById('transaction-count').textContent = payments.length + ' cash ' + (payments.length === 1 ? 'transaction' : 'transactions') + ' shown · unpaid drafts are excluded';
     document.getElementById('transactions-body').innerHTML = payments.length ? payments.map(payment => {
       const order = state.orders.find(order => order.id === payment.orderId);
-      return '<tr data-testid="transaction-' + escape(payment.id) + '"><td><strong>' + escape(order.number) + '</strong><small>' + escape(order.customerName || 'Walk-in guest') + '</small></td><td>' + escape(when(payment.paidAt)) + '</td><td><strong>' + MasaFlow.money(payment.totalCents) + '</strong></td><td>' + MasaFlow.money(payment.tenderedCents) + '</td><td>' + MasaFlow.money(payment.changeCents) + '</td><td>' + escape(payment.cashierId) + '</td><td><span class="l-status ' + escape(order.status) + '">' + escape({pending:'New',preparing:'Preparing',ready:'Ready',completed:'Completed'}[order.status] || order.status) + '</span></td><td><button class="l-reprint" data-receipt="' + escape(order.id) + '" data-testid="reprint-' + escape(order.id) + '">Reprint</button></td></tr>';
+      return '<tr data-testid="transaction-' + escape(payment.id) + '"><td><strong>' + escape(order.number) + '</strong><small>' + escape(order.customerName || 'Walk-in guest') + '</small></td><td>' + escape(when(payment.paidAt)) + '</td><td><strong>' + MasaFlow.money(payment.totalCents,payment.currency,MasaFlowI18n.getLocale()) + '</strong></td><td>' + MasaFlow.money(payment.tenderedCents,payment.currency,MasaFlowI18n.getLocale()) + '</td><td>' + MasaFlow.money(payment.changeCents,payment.currency,MasaFlowI18n.getLocale()) + '</td><td>' + escape(payment.cashierId) + '</td><td><span class="l-status ' + escape(order.status) + '">' + escape({pending:'New',preparing:'Preparing',ready:'Ready',completed:'Completed'}[order.status] || order.status) + '</span></td><td><button class="l-reprint" data-receipt="' + escape(order.id) + '" data-testid="reprint-' + escape(order.id) + '">Reprint</button></td></tr>';
     }).join('') : '<tr><td class="l-empty-cell" colspan="8">' + (search ? 'No cash transactions match your search.' : transactionScope === 'current' && !shift ? 'There is no open shift. Open a drawer to start accepting cash.' : 'No cash transactions yet. Finalized upfront payments will appear here.') + '</td></tr>';
   }
   function render() {
     try {
+      if (!MasaFlow.getConnection().hasConfirmedState) return;
       const state = MasaFlow.getState();
       renderShift(state);
       renderTransactions(state);
       const shifts = state.shifts.filter(shift => shift.closedAt).sort((a,b) => new Date(b.closedAt) - new Date(a.closedAt));
       document.getElementById('audits-body').innerHTML = shifts.length ? shifts.map(shift => {
         const variance = shift.varianceCents;
-        return '<tr data-testid="audit-' + escape(shift.id) + '"><td><strong>' + escape(when(shift.openedAt)) + '</strong><small>' + escape('Opened by ' + shift.cashierId + ' · Closed by ' + (shift.closedBy || shift.cashierId)) + '</small></td><td>' + escape(when(shift.closedAt)) + '</td><td>' + MasaFlow.money(shift.floatCents) + '</td><td>' + MasaFlow.money(shift.expectedCentsAtClose) + '</td><td>' + MasaFlow.money(shift.actualCents) + '</td><td class="l-audit-variance ' + (variance < 0 ? 'short' : variance > 0 ? 'over' : 'balanced') + '">' + (variance < 0 ? 'Short ' : variance > 0 ? 'Over ' : 'Balanced ') + MasaFlow.money(Math.abs(variance)) + '</td></tr>';
+        return '<tr data-testid="audit-' + escape(shift.id) + '"><td><strong>' + escape(when(shift.openedAt)) + '</strong><small>' + escape('Opened by ' + shift.cashierId + ' · Closed by ' + (shift.closedBy || shift.cashierId)) + '</small></td><td>' + escape(when(shift.closedAt)) + '</td><td>' + MasaFlow.money(shift.floatCents,shift.currency,MasaFlowI18n.getLocale()) + '</td><td>' + MasaFlow.money(shift.expectedCentsAtClose,shift.currency,MasaFlowI18n.getLocale()) + '</td><td>' + MasaFlow.money(shift.actualCents,shift.currency,MasaFlowI18n.getLocale()) + '</td><td class="l-audit-variance ' + (variance < 0 ? 'short' : variance > 0 ? 'over' : 'balanced') + '">' + (variance < 0 ? 'Short ' : variance > 0 ? 'Over ' : 'Balanced ') + MasaFlow.money(Math.abs(variance),shift.currency,MasaFlowI18n.getLocale()) + '</td></tr>';
       }).join('') : '<tr><td class="l-empty-cell" colspan="6">No closed shifts yet. Count and close a shift to save its audit.</td></tr>';
       const drops = state.cashDrops.slice().sort((a,b) => new Date(b.createdAt) - new Date(a.createdAt));
-      document.getElementById('drops-feed').innerHTML = drops.length ? drops.map(drop => '<li><div><strong>' + MasaFlow.money(drop.amountCents) + '</strong> · ' + escape(drop.note) + '<small>' + escape(drop.cashierId) + '</small></div><time datetime="' + escape(drop.createdAt) + '">' + escape(when(drop.createdAt)) + '</time></li>').join('') : '<li class="l-empty-text">No cash drops recorded.</li>';
+      document.getElementById('drops-feed').innerHTML = drops.length ? drops.map(drop => '<li><div><strong>' + MasaFlow.money(drop.amountCents,drop.currency,MasaFlowI18n.getLocale()) + '</strong> · ' + escape(drop.note) + '<small>' + escape(drop.cashierId) + '</small></div><time datetime="' + escape(drop.createdAt) + '">' + escape(when(drop.createdAt)) + '</time></li>').join('') : '<li class="l-empty-text">No cash drops recorded.</li>';
       const audit = state.audit.slice().sort((a,b) => new Date(b.at) - new Date(a.at)).slice(0,20);
-      document.getElementById('activity-feed').innerHTML = audit.length ? audit.map(entry => '<li><div>' + escape(entry.message) + '<small>' + escape(entry.action.replace(/[_-]/g,' ')) + '</small></div><time datetime="' + escape(entry.at) + '">' + escape(when(entry.at)) + '</time></li>').join('') : '<li class="l-empty-text">Recorded actions will appear here as you use the cash drawer.</li>';
+      document.getElementById('activity-feed').innerHTML = audit.length ? audit.map(entry => '<li><div><span data-i18n-skip>' + escape(entry.message) + '</span>' + '<small>' + escape(entry.action.replace(/[_-]/g,' ')) + '</small></div><time datetime="' + escape(entry.at) + '">' + escape(when(entry.at)) + '</time></li>').join('') : '<li class="l-empty-text">Recorded actions will appear here as you use the cash drawer.</li>';
     } catch (error) { setError(error); }
   }
   document.addEventListener('submit', async event => {
@@ -181,8 +177,10 @@
   });
   window.addEventListener('DOMContentLoaded', () => {
     if (!window.MasaFlow || !window.MasaFlowUI) { setError('The cash ledger service could not load. Reload this page to try again.'); return; }
-    MasaFlow.subscribe(render);
-    render();
+    MasaFlow.subscribe(() => {setError(null);render();});
+    MasaFlowI18n.subscribe(render);
+    document.addEventListener('masaflow:connection',event=>{if(event.detail.connected){setError(null);render();}});
+    Promise.resolve(MasaFlow.ready).then(render).catch(()=>{setError('The cash ledger service could not load. Reload this page to try again.');});
   });
 })();
 </script>

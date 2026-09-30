@@ -1,0 +1,182 @@
+{
+  "title": "MasaFlow · Analítica",
+  "status": "unavailable",
+  "generatedAt": null,
+  "filters": [],
+  "queries": {
+    "sales_summary": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "sales_buckets": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "menu_rank": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "receipts": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "operations_summary": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "active_queue": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "drawer_reconciliation": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "drawer_audit": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    },
+    "drawer_exceptions": {
+      "rows": [],
+      "source": {
+        "label": "MasaFlow local API",
+        "provider": "MasaFlow",
+        "files": [
+          ".masaflow/state.json"
+        ],
+        "evidenceFlow": [
+          {
+            "title": "Local verified ledger",
+            "detail": "GET /api/analytics returns receipt validation and currency-separated aggregates. This initial snapshot contains no observations; live evidence is loaded from the same-origin local API."
+          }
+        ],
+        "caveats": [
+          "Initial snapshot: operational data has not been loaded."
+        ]
+      }
+    }
+  },
+  "surface": "dashboard",
+  "id": "dashboard:693ad299-21c9-481d-9ea4-4f8268744da1",
+  "buildStatus": "creating"
+}
