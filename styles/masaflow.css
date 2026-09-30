@@ -40,10 +40,10 @@
   /* Cash controls while the service is unreachable (masaflow-ui.js blocks the click as well). */
   .mf-offline-action { @apply opacity-60 pointer-events-none; }
 
-  .mf-service-banner { @apply fixed top-[76px] md:top-24 left-1/2 -translate-x-1/2 z-[999] w-max max-w-[calc(100%-2rem)] px-5 py-2.5 rounded-2xl text-center text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 shadow-xl; }
+  .mf-service-banner { @apply fixed top-[76px] md:top-24 left-1/2 -translate-x-1/2 z-notice w-max max-w-[calc(100%-2rem)] px-5 py-2.5 rounded-2xl text-center text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 shadow-xl; }
 
   /* Toasts: bottom-right on desktop, above the tab bar on phones. */
-  .mf-toast-host { @apply fixed z-[300] right-4 left-4 bottom-24 md:left-auto md:right-10 md:bottom-10 flex flex-col items-end gap-3 pointer-events-none; }
+  .mf-toast-host { @apply fixed z-toast right-4 left-4 bottom-24 md:left-auto md:right-10 md:bottom-10 flex flex-col items-end gap-3 pointer-events-none; }
   .mf-toast { @apply pointer-events-auto w-full md:w-auto md:min-w-[320px] md:max-w-md bg-stone-900 text-stone-100 rounded-2xl px-6 py-4 shadow-2xl border border-stone-800 flex items-center gap-4 transition-all duration-500 translate-y-20 opacity-0; }
   .mf-toast.is-open { @apply translate-y-0 opacity-100; }
   .mf-toast-icon { @apply w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs; }

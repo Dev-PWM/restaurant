@@ -88,7 +88,7 @@ Web fonts come from Google Fonts. Offline, they fall back to `system-ui` and Geo
 | `rounded-[32px]` | Tickets, ledger card, Kitchen Alert, dialogs, new-order toast | |
 | `rounded-[40px]` | Chart cards, tracking card, bottom sheets (`rounded-t-[40px]`) | |
 | Shadows | `shadow-sm` resting cards; `shadow-lg` dark buttons; `shadow-xl shadow-orange-100` highlighted ticket and orange CTA; `shadow-2xl` toasts and drawers | |
-| Z layers | tab/top bar `z-50`; toasts `z-[300]`; offline notice `z-[999]`; dialogs are in the browser top layer | |
+| Z layers | Named tokens in `tailwind.config.js`: `z-bar` (50) fixed top/tab/cart bars, `z-toast` (60) toasts, `z-notice` (70) offline notice, `z-overlay` (80) full-screen "ready" overlay. `z-10`/`z-20` only for stacking inside a card. Dialogs use the browser top layer. Never add `z-[…]` literals | |
 
 ### Breakpoints
 

@@ -7,6 +7,8 @@ module.exports = {
       colors: {
         brand: { orange: '#EA580C', stone: '#F9F8F6', obsidian: '#1C1917' }
       },
+      // Named stacking layers, lowest to highest. Use these instead of z-[…] literals.
+      zIndex: { bar: '50', toast: '60', notice: '70', overlay: '80' },
       fontFamily: {
         sans: ['Outfit', 'system-ui', 'sans-serif'],
         serif: ['"Playfair Display"', 'Georgia', 'serif']

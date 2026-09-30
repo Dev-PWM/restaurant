@@ -65,13 +65,13 @@ test('the compiled stylesheet contains every class the screens build at runtime'
   // pieces compiles to nothing, so sample the state-dependent ones that are easy to break.
   const css = fs.readFileSync(path.join(repo, 'assets', 'masaflow.css'), 'utf8');
   const escape = name => name.replace(/[^a-zA-Z0-9_-]/g, character => `\\${character}`);
-  const stateClasses = ['order-card-pulse', 'price-pulse', 'animate-slide-up', 'bg-orange-50', 'bg-green-50', 'bg-red-50', 'text-orange-600', 'text-green-600', 'text-red-600', 'border-orange-500', 'bg-emerald-500', 'rounded-[32px]', 'rounded-[40px]', 'mf-toast-order', 'mf-sync'];
+  const stateClasses = ['order-card-pulse', 'price-pulse', 'animate-slide-up', 'bg-orange-50', 'bg-green-50', 'bg-red-50', 'text-orange-600', 'text-green-600', 'text-red-600', 'border-orange-500', 'bg-emerald-500', 'rounded-[32px]', 'rounded-[40px]', 'mf-toast-order', 'mf-sync', 'z-bar', 'z-overlay'];
   for (const name of stateClasses) assert.ok(css.includes(`.${escape(name)}`), `masaflow.css is missing .${name} — run npm run build:css`);
   for (const page of pages) assert.match(read(page), /<link rel="stylesheet" href="\/assets\/masaflow\.css">/, `${page} must load the compiled stylesheet`);
 });
 
 test('no mockup placeholders or simulation code shipped', () => {
-  const leftovers = [/Maria Sanchez/, /Carlos Ruiz/, /Roberto J\./, /Lucia Flores/, /Terminal 0?1/, /Tablet 04/, /Head Chef/, /uxpilot-auth\.appspot\.com\/avatars/, /1,284/, /\$2,485/, /simulateNewOrder/, /cdn\.tailwindcss\.com/, /\bonclick=/];
+  const leftovers = [/Maria Sanchez/, /Carlos Ruiz/, /Roberto J\./, /Lucia Flores/, /Terminal 0?1/, /Tablet 04/, /Head Chef/, /uxpilot-auth\.appspot\.com\/avatars/, /1,284/, /\$2,485/, /simulateNewOrder/, /cdn\.tailwindcss\.com/, /\bonclick=/, /\bz-\[\d+\]/];
   for (const page of pages) for (const pattern of leftovers) assert.doesNotMatch(read(page), pattern, `${page} still contains ${pattern}`);
 });
 
