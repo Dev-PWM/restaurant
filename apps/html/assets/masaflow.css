@@ -1,0 +1,32 @@
+:root { color-scheme: light; --mf-orange: #ea580c; --mf-stone: #1c1917; }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .5; }
+:focus-visible { outline: 3px solid #ea580c; outline-offset: 3px; }
+.mf-toast-host { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 10000; width: min(560px,calc(100% - 32px)); display: grid; gap: 8px; pointer-events: none; }
+.mf-toast { background: #1c1917; color: white; border-radius: 16px; padding: 16px 20px; box-shadow: 0 10px 30px #0003; }
+.mf-toast.error { background: #9f1239; }
+.mf-service-banner { padding: 12px 20px; color: #9f1239; background: #fff1f2; text-align: center; position: relative; z-index: 999; }
+.mf-dialog { width: min(560px,calc(100vw - 24px)); border: 0; border-radius: 24px; padding: 0; background: #fafaf9; color: #1c1917; max-height: 94dvh; overflow-y: auto; box-shadow: 0 24px 80px #0005; }
+.mf-dialog::backdrop { background: #1c191780; backdrop-filter: blur(4px); }
+.mf-dialog header { padding: 24px 24px 16px; display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.mf-dialog h2 { font-size: 25px; margin: 0 0 4px; }
+.mf-dialog p { margin: 0; }
+.mf-dialog .mf-body { padding: 0 24px 24px; }
+.mf-close { min-height: 48px; min-width: 48px; border: 0; border-radius: 12px; background: #e7e5e4; }
+.mf-cash-totals { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+.mf-cash-totals div { background: #fff; border: 1px solid #e7e5e4; border-radius: 16px; padding: 16px; }
+.mf-cash-totals small { color: #78716c; display: block; }
+.mf-cash-totals strong { font-size: 28px; display: block; margin-top: 5px; }
+.mf-field { display: block; margin: 14px 0; }
+.mf-field input { display: block; width: 100%; padding: 14px; border: 1px solid #d6d3d1; border-radius: 12px; margin-top: 8px; font-size: 20px; }
+.mf-presets { display: flex; gap: 6px; flex-wrap: wrap; }
+.mf-presets button { flex: 1; min-width: 68px; min-height: 48px; background: white; border: 1px solid #d6d3d1; border-radius: 10px; }
+.mf-keypad { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin-top: 14px; }
+.mf-keypad button { min-height: 48px; border: 1px solid #e7e5e4; background: #fff; border-radius: 10px; font-weight: 600; font-size: 20px; }
+.mf-primary { border: 0; background: #ea580c; color: #fff; border-radius: 12px; min-height: 52px; padding: 12px 18px; font-weight: 700; width: 100%; }
+.mf-help { color: #78716c; font-size: 13px; line-height: 1.5; margin: 12px 0 !important; }
+.mf-error { color: #be123c; font-size: 14px; min-height: 20px; margin-top: 12px !important; }
+.mf-success { padding: 16px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 16px; margin-bottom: 16px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; } }

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasaFlow — Order Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./assets/masaflow.css">
+  <style>
+    body{margin:0;background:#f8f7f4;color:#292524;font-family:Outfit,system-ui,sans-serif}*{box-sizing:border-box}button,input,select{font:inherit}button,a{touch-action:manipulation}button{cursor:pointer}a{color:inherit;text-decoration:none}.q-shell{display:flex;min-height:100vh}.q-nav{width:94px;flex-shrink:0;background:#1c1917;color:#a8a29e;display:flex;flex-direction:column;align-items:center;gap:28px;padding:28px 10px;position:sticky;top:0;height:100vh}.q-logo{display:grid;place-items:center;width:46px;height:46px;background:#ea580c;color:white;border-radius:16px;font-size:24px;font-weight:700}.q-nav nav{display:grid;gap:22px;width:100%}.q-nav a{text-align:center;font-size:10px;letter-spacing:.06em;font-weight:600;text-transform:uppercase;padding:8px 2px;border-radius:10px}.q-nav a span{display:block;font-size:23px;margin-bottom:6px}.q-nav a:hover,.q-nav a[aria-current]{color:#fb923c;background:#292524}.q-nav-note{margin-top:auto;font-size:10px;text-align:center;line-height:1.5}.q-main{flex:1;min-width:0}.q-header{background:white;border-bottom:1px solid #e7e5e4;padding:27px 34px;display:flex;justify-content:space-between;align-items:center;gap:18px}.q-kicker{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:#a8a29e;font-weight:700;margin:0 0 7px}.q-header h1{font-family:'Playfair Display',Georgia,serif;font-size:30px;margin:0}.q-subtitle{color:#78716c;font-size:13px;margin:8px 0 0}.q-header-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.q-pill{font-size:11px;font-weight:600;background:#f0fdf4;color:#15803d;padding:10px 14px;border:1px solid #dcfce7;border-radius:30px}.q-button{border:1px solid #d6d3d1;border-radius:13px;background:white;font-weight:600;padding:12px 17px;display:inline-flex;align-items:center;justify-content:center;gap:8px}.q-button:hover{background:#f5f5f4}.q-button-primary{background:#1c1917;color:white;border-color:#1c1917}.q-button-primary:hover{background:#ea580c;border-color:#ea580c}.q-content{padding:28px 34px}.q-error{padding:15px 18px;border-radius:14px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;margin:0 0 20px}.q-error:empty{display:none}.q-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px;margin-bottom:26px}.q-stat{background:white;border:1px solid #e7e5e4;border-radius:20px;padding:20px}.q-stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:#78716c;margin:0 0 10px}.q-stat-value{font-size:30px;font-weight:600;margin:0}.q-stat-small{font-size:11px;color:#a8a29e;margin:7px 0 0}.q-payment-panel{border:1px solid #fed7aa;background:#fff7ed;border-radius:22px;padding:24px;margin-bottom:27px}.q-section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}.q-section-heading h2{font-family:'Playfair Display',Georgia,serif;font-size:23px;margin:0}.q-section-note{font-size:12px;color:#78716c;margin:7px 0 0;line-height:1.5}.q-shift-warning{color:#c2410c;border-left:3px solid #ea580c;padding:0 0 0 13px;margin-bottom:18px;font-size:13px;line-height:1.6}.q-shift-warning a{font-weight:600;text-decoration:underline}.q-drafts{display:grid;grid-template-columns:repeat(auto-fill,minmax(245px,1fr));gap:14px}.q-draft{padding:20px;border:1px solid #fed7aa;border-radius:17px;background:white}.q-draft h3{font-size:16px;margin:0 0 5px}.q-draft p{font-size:12px;color:#78716c;margin:0 0 15px}.q-draft-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px}.q-draft-bottom strong{font-size:21px;color:#c2410c}.q-draft .q-button{background:#ea580c;border-color:#ea580c;color:white;font-size:12px;padding:11px 14px}.q-empty{padding:32px 20px;text-align:center;border:1px dashed #d6d3d1;border-radius:20px;background:#ffffff9c;color:#78716c;font-size:13px;line-height:1.7}.q-empty strong{display:block;color:#44403c;font-size:16px;margin-bottom:5px}.q-filters{display:flex;flex-wrap:wrap;gap:7px}.q-filter{padding:10px 15px;border:1px solid #e7e5e4;border-radius:30px;background:white;color:#78716c;font-size:12px;font-weight:600}.q-filter[aria-pressed=true]{background:#1c1917;color:white;border-color:#1c1917}.q-orders{display:grid;grid-template-columns:repeat(auto-fill,minmax(285px,1fr));gap:20px;align-items:start}.q-card{padding:24px;border-radius:25px;background:white;border:1px solid #e7e5e4;box-shadow:0 7px 22px #29252404}.q-card.pending{border-color:#fb923c}.q-card-top{display:flex;justify-content:space-between;gap:10px;align-items:start}.q-order-number{font-size:13px;font-weight:700;background:#f5f5f4;border-radius:8px;padding:7px 10px;display:inline-block}.q-card.pending .q-order-number{background:#ea580c;color:white}.q-time{font-size:11px;color:#78716c;line-height:1.5;text-align:right}.q-card h3{font-family:'Playfair Display',Georgia,serif;font-size:21px;margin:18px 0 5px}.q-meta{font-size:12px;color:#78716c;margin:0}.q-stage{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.06em;font-weight:700;padding:6px 9px;border-radius:7px;margin:14px 0;background:#f5f5f4;color:#57534e}.q-stage.pending{background:#fff7ed;color:#c2410c}.q-stage.preparing{background:#eff6ff;color:#1d4ed8}.q-stage.ready{background:#f0fdf4;color:#15803d}.q-items{list-style:none;margin:0 0 20px;padding:0;display:grid;gap:9px}.q-item{background:#f8f7f4;border-radius:12px;padding:11px;display:flex;gap:10px}.q-qty{flex-shrink:0;width:24px;height:24px;border-radius:6px;background:#292524;color:white;text-align:center;line-height:24px;font-size:11px;font-weight:700}.q-item-name{font-size:13px;font-weight:600;line-height:1.5}.q-options,.q-notes{font-size:11px;color:#78716c;line-height:1.5;margin:3px 0 0}.q-notes{color:#c2410c}.q-card-footer{border-top:1px solid #e7e5e4;padding-top:18px}.q-paid{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#15803d;margin-bottom:15px}.q-paid strong{font-size:20px;color:#292524}.q-card-footer .q-button{width:100%;padding:14px}.q-small-button{border:0;background:none;text-decoration:underline;color:#78716c;font-size:11px;margin-top:12px;width:100%;padding:5px}.q-queue-empty{grid-column:1/-1}.q-no-drafts{font-size:13px;color:#9a3412;margin:0}.q-button:focus-visible,.q-filter:focus-visible,a:focus-visible{outline:3px solid #fb923c;outline-offset:3px}
+    @media(max-width:900px){.q-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.q-header{align-items:start}.q-content,.q-header{padding:24px}}
+    @media(max-width:600px){.q-shell{display:block}.q-nav{position:static;width:100%;height:auto;padding:12px;display:block}.q-logo,.q-nav-note{display:none}.q-nav nav{display:flex;justify-content:space-around;gap:2px}.q-nav a{flex:1;font-size:8px;letter-spacing:0}.q-nav a span{font-size:18px;margin-bottom:4px}.q-header{flex-direction:column;padding:22px 18px}.q-header h1{font-size:27px}.q-header-actions{width:100%}.q-content{padding:20px 16px}.q-stat{padding:17px}.q-stat-label{font-size:10px}.q-stat-value{font-size:27px}.q-stats{gap:10px}.q-payment-panel{padding:19px}.q-orders{grid-template-columns:1fr}.q-section-heading{align-items:start}.q-button{font-size:12px}}
+  </style>
+  <script defer src="./assets/masaflow-store.js"></script>
+  <script defer src="./assets/masaflow-ui.js"></script>
+</head>
+<body>
+<div class="q-shell">
+  <aside class="q-nav" aria-label="MasaFlow navigation">
+    <div class="q-logo" aria-label="MasaFlow">M</div>
+    <nav aria-label="Main navigation">
+      <a href="businessDashbord.html" aria-current="page"><span aria-hidden="true">▤</span>Orders</a>
+      <a href="MenuUI.html"><span aria-hidden="true">＋</span>New order</a>
+      <a href="readypickupUI.html"><span aria-hidden="true">✓</span>Pickup</a>
+      <a href="metricsDashbord.html"><span aria-hidden="true">◴</span>Metrics</a>
+      <a href="MenuManagment.html"><span aria-hidden="true">☷</span>Menu</a>
+      <a href="history.html"><span aria-hidden="true">↺</span>Ledger</a>
+    </nav>
+    <div class="q-nav-note">MASAFLOW<br>CASH ONLY</div>
+  </aside>
+  <main class="q-main">
+    <header class="q-header">
+      <div><p class="q-kicker">Kitchen operations</p><h1>Order Queue</h1><p class="q-subtitle" id="queue-subtitle">Loading saved orders…</p></div>
+      <div class="q-header-actions"><span class="q-pill">● Cash paid before prep</span><a href="MenuUI.html" class="q-button q-button-primary">＋ New order</a></div>
+    </header>
+    <div class="q-content">
+      <div id="queue-error" class="q-error" role="alert" data-testid="queue-error"></div>
+      <section class="q-stats" aria-label="Order queue summary">
+        <div class="q-stat"><p class="q-stat-label">Awaiting cash</p><p class="q-stat-value" id="draft-count" data-testid="draft-count">0</p><p class="q-stat-small">Held before kitchen dispatch</p></div>
+        <div class="q-stat"><p class="q-stat-label">New paid orders</p><p class="q-stat-value" id="pending-count" data-testid="pending-count">0</p><p class="q-stat-small">Ready to start cooking</p></div>
+        <div class="q-stat"><p class="q-stat-label">Preparing</p><p class="q-stat-value" id="preparing-count" data-testid="preparing-count">0</p><p class="q-stat-small">In the kitchen now</p></div>
+        <div class="q-stat"><p class="q-stat-label">Ready for pickup</p><p class="q-stat-value" id="ready-count" data-testid="ready-count">0</p><p class="q-stat-small">Waiting to be handed over</p></div>
+      </section>
+      <section class="q-payment-panel" aria-labelledby="cash-heading">
+        <div class="q-section-heading"><div><h2 id="cash-heading">Awaiting upfront payment</h2><p class="q-section-note">Collect cash in full to release an order to the kitchen.</p></div><a href="history.html" class="q-button" data-testid="manage-drawer">Manage cash drawer →</a></div>
+        <div id="shift-warning"></div>
+        <div class="q-drafts" id="awaiting-orders" data-testid="awaiting-payment-orders"></div>
+      </section>
+      <section aria-labelledby="kitchen-heading">
+        <div class="q-section-heading"><div><h2 id="kitchen-heading">Paid kitchen queue</h2><p class="q-section-note">Every order here has a recorded cash payment.</p></div><div class="q-filters" aria-label="Filter kitchen queue"><button class="q-filter" data-filter="all" aria-pressed="true">All active</button><button class="q-filter" data-filter="pending" aria-pressed="false">New</button><button class="q-filter" data-filter="preparing" aria-pressed="false">Preparing</button><button class="q-filter" data-filter="ready" aria-pressed="false">Ready</button></div></div>
+        <div class="q-orders" id="kitchen-orders" data-testid="kitchen-orders"></div>
+      </section>
+    </div>
+  </main>
+</div>
+<script>
+(function () {
+  'use strict';
+  let queueFilter = 'all';
+  const escape = value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+  const when = value => new Date(value).toLocaleTimeString([], {hour:'numeric',minute:'2-digit',timeZone:MasaFlow.getState().settings.timeZone || 'America/Los_Angeles'});
+  const service = order => order.orderType === 'dine_in' ? ('Dine in' + (order.tableNumber ? ' · Table ' + order.tableNumber : '')) : order.orderType === 'takeout' ? 'Takeout' : 'Counter';
+  function validPayment(state, order) {
+    const payment = state.payments.find(p => p.id === order.paymentId && p.orderId === order.id);
+    return order.paymentStatus === 'paid' && payment && payment.method === 'cash' && payment.totalCents === order.totalCents && payment.tenderedCents >= order.totalCents && payment.changeCents === payment.tenderedCents - payment.totalCents;
+  }
+  function setError(error) { document.getElementById('queue-error').textContent = error ? (error.message || String(error)) : ''; }
+  function render() {
+    try {
+      const state = MasaFlow.getState();
+      const drafts = state.orders.filter(order => order.status === 'draft' && order.paymentStatus === 'unpaid');
+      const active = state.orders.filter(order => ['pending','preparing','ready'].includes(order.status) && validPayment(state, order));
+      const shift = MasaFlow.getOpenShift();
+      document.getElementById('draft-count').textContent = drafts.length;
+      for (const status of ['pending','preparing','ready']) document.getElementById(status + '-count').textContent = active.filter(order => order.status === status).length;
+      document.getElementById('queue-subtitle').textContent = active.length + ' paid active ' + (active.length === 1 ? 'order' : 'orders') + ' · ' + drafts.length + ' awaiting cash';
+      document.getElementById('shift-warning').innerHTML = shift ? '' : '<div class="q-shift-warning">The cash drawer is closed. <a href="history.html">Open a shift and record the starting float</a> before collecting cash.</div>';
+      document.getElementById('awaiting-orders').innerHTML = drafts.length ? drafts.map(order => '<article class="q-draft" data-testid="draft-' + escape(order.id) + '"><h3>' + escape(order.number) + ' · ' + escape(order.customerName || 'Walk-in guest') + '</h3><p>' + escape(service(order)) + ' · ' + order.items.reduce((sum,item) => sum + item.quantity,0) + ' items</p><div class="q-draft-bottom"><strong>' + MasaFlow.money(order.totalCents) + '</strong><button class="q-button" data-tender="' + escape(order.id) + '" data-testid="collect-cash-' + escape(order.id) + '">Collect cash</button></div></article>').join('') : '<p class="q-no-drafts">No unpaid orders. New orders will wait here until cash is collected.</p>';
+      const shown = active.filter(order => queueFilter === 'all' || order.status === queueFilter).sort((a,b) => new Date(a.paidAt) - new Date(b.paidAt));
+      document.getElementById('kitchen-orders').innerHTML = shown.length ? shown.map(order => {
+        const stage = {pending:'New · paid',preparing:'Preparing',ready:'Ready for pickup'}[order.status];
+        const next = {pending:'Start preparing',preparing:'Mark ready',ready:'Complete pickup'}[order.status];
+        const items = order.items.map(item => '<li class="q-item"><span class="q-qty">' + item.quantity + '</span><div><div class="q-item-name">' + escape(item.name) + '</div>' + (item.options.length ? '<p class="q-options">' + item.options.map(option => escape(option.name)).join(' · ') + '</p>' : '') + (item.notes ? '<p class="q-notes">Note: ' + escape(item.notes) + '</p>' : '') + '</div></li>').join('');
+        return '<article class="q-card ' + order.status + '" data-testid="kitchen-order-' + escape(order.id) + '"><div class="q-card-top"><span class="q-order-number">' + escape(order.number) + '</span><span class="q-time">Paid at<br>' + escape(when(order.paidAt)) + '</span></div><h3>' + escape(order.customerName || 'Walk-in guest') + '</h3><p class="q-meta">' + escape(service(order)) + '</p><span class="q-stage ' + order.status + '">' + stage + '</span><ul class="q-items">' + items + '</ul><div class="q-card-footer"><div class="q-paid"><span>✓ Paid in cash</span><strong>' + MasaFlow.money(order.totalCents) + '</strong></div><button class="q-button q-button-primary" data-advance="' + escape(order.id) + '" data-status="' + escape(order.status) + '" data-testid="advance-' + escape(order.id) + '">' + next + '</button><button class="q-small-button" data-receipt="' + escape(order.id) + '">Print receipt</button></div></article>';
+      }).join('') : '<div class="q-empty q-queue-empty"><strong>' + (queueFilter === 'all' ? 'The kitchen queue is clear' : 'No ' + ({pending:'new',preparing:'preparing',ready:'ready'}[queueFilter]) + ' orders') + '</strong>' + (queueFilter === 'all' ? 'Create an order and collect cash to dispatch it here.' : 'Orders appear here when they reach this stage.') + '</div>';
+    } catch (error) { setError(error); }
+  }
+  document.addEventListener('click', async event => {
+    const filter = event.target.closest('[data-filter]');
+    if (filter) { queueFilter = filter.dataset.filter; document.querySelectorAll('[data-filter]').forEach(button => button.setAttribute('aria-pressed', String(button.dataset.filter === queueFilter))); render(); return; }
+    const tender = event.target.closest('[data-tender]');
+    const advance = event.target.closest('[data-advance]');
+    const receipt = event.target.closest('[data-receipt]');
+    if (!tender && !advance && !receipt) return;
+    const button = tender || advance || receipt;
+    button.disabled = true;
+    setError(null);
+    try {
+      if (tender) await MasaFlowUI.tender(tender.dataset.tender);
+      if (advance) { await MasaFlow.advanceOrder(advance.dataset.advance,advance.dataset.status); MasaFlowUI.toast('Order updated.'); }
+      if (receipt) await MasaFlowUI.printReceipt(receipt.dataset.receipt);
+      render();
+    } catch (error) { setError(error); } finally { button.disabled = false; }
+  });
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!window.MasaFlow || !window.MasaFlowUI) { setError('The order service could not load. Reload this page to try again.'); return; }
+    MasaFlow.subscribe(render);
+    render();
+  });
+})();
+</script>
+</body>
+</html>
