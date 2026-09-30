@@ -20,7 +20,7 @@
   function lineDetails(line) {
     const parts = (line.options || []).map(option => option.name);
     // Composed per part, because the joined line is too specific for the dictionary to match.
-    if (line.removed && line.removed.length) parts.push(tr(`No ${line.removed.join(', ')}`));
+    if (line.removed && line.removed.length) parts.push(I ? I.t('No {items}', { items: line.removed.join(', ') }) : `No ${line.removed.join(', ')}`);
     if (line.onTheSide) parts.push(tr('Toppings on the side'));
     return parts;
   }
@@ -70,7 +70,8 @@
   document.addEventListener('masaflow:connection', event => connectionChanged(event.detail.connected));
   if (M?.getConnection) { const status = M.getConnection(); if (status.hasConfirmedState || status.connected === false) connectionChanged(status.connected); }
   // While the service is unreachable a cash action could not be confirmed, so block it before it starts.
-  const CASH_ACTIONS = '[data-tender],[data-advance],[data-cancel],#manual-drawer,#cash-finalize,[data-testid="open-shift"],[data-testid="record-cash-drop"],[data-testid="close-shift"]';
+  // Scoped to <main>: the confirm dialog's own Cancel button also carries data-cancel and must keep working offline.
+  const CASH_ACTIONS = '[data-tender],[data-advance],main [data-cancel],#manual-drawer,#cash-finalize,[data-testid="open-shift"],[data-testid="record-cash-drop"],[data-testid="close-shift"]';
   const offline = () => M?.getConnection?.().connected === false;
   document.addEventListener('click', event => {
     if (!offline() || !event.target.closest(CASH_ACTIONS)) return;

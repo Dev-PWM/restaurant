@@ -208,6 +208,7 @@
             <span class="text-stone-500 text-sm">Tax</span>
             <span id="checkout-tax" data-testid="checkout-tax" class="font-semibold">$0.00</span>
           </div>
+          <p id="tax-note" data-testid="tax-note" class="text-xs text-stone-400 mb-2" hidden>Tax unconfigured · 0%</p>
           <div class="border-t border-stone-200 pt-4 flex justify-between items-center">
             <span class="font-bold">Total</span>
             <span id="checkout-total" data-testid="checkout-total" class="text-2xl font-bold text-orange-600">$0.00</span>
@@ -440,6 +441,7 @@
       $('view-cart').setAttribute('aria-label', `View your cart, ${sum.count} ${sum.count === 1 ? 'item' : 'items'}, ${money(sum.totalCents)}`);
       $('checkout-subtotal').textContent = money(sum.totalCents);
       $('tax-row').hidden = taxBasisPoints <= 0;
+      $('tax-note').hidden = Boolean(MasaFlow.getState().settings?.taxConfigured);
       $('checkout-tax').textContent = money(taxCents);
       $('checkout-total').textContent = money(sum.totalCents + taxCents);
       renderInto($('cart-items'), cart.length ? cart.map(cartLine).join('') : `<p class="${NOTE}">Your cart is empty. Add a freshly made dish to begin.</p>`);
