@@ -1,52 +1,369 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MasaFlow — Order tracking</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/masaflow.css"><link rel="stylesheet" href="/assets/masaflow-ui.css">
-<style>
-body{margin:0;background:#fafaf9;color:#292524;font-family:Outfit,system-ui,sans-serif}.tracking-shell{max-width:740px;margin:auto;padding:0 24px 50px}.tracking-header{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:25px 0}.tracking-brand{color:#ea580c;text-decoration:none;font-size:25px;font-weight:700}.tracking-actions{display:flex;gap:12px;align-items:center}.tracking-actions a{font-size:12px;color:#78716c;text-decoration:none}.tracking-status{background:white;border:1px solid #e7e5e4;border-radius:26px;padding:30px;text-align:center;margin-top:15px}.tracking-label{text-transform:uppercase;letter-spacing:.12em;color:#78716c;font-size:11px;font-weight:600;margin:0 0 10px}.tracking-status h1{font-size:30px;margin:0 0 10px}.tracking-number{color:#ea580c;font-size:24px;font-weight:700;margin:0 0 16px}.tracking-explainer{color:#78716c;font-size:14px;line-height:1.7;max-width:450px;margin:0 auto}.tracking-live{font-size:12px;color:#15803d;margin:20px 0 0}.tracking-live.stale{color:#9a3412}.tracking-steps{list-style:none;padding:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:30px 0 0}.tracking-steps li{font-size:11px;color:#78716c;line-height:1.5}.tracking-step-dot{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#f5f5f4;border:1px solid #e7e5e4;margin:0 auto 10px;font-weight:700}.tracking-steps .done{color:#c2410c}.done .tracking-step-dot{background:#fff7ed;border-color:#fdba74}.tracking-steps [aria-current=step]{color:#c2410c;font-weight:700}.tracking-steps [aria-current=step] .tracking-step-dot{background:#ea580c;color:#fff;border-color:#ea580c;box-shadow:0 0 0 5px #fff7ed}.tracking-details{background:white;border:1px solid #e7e5e4;border-radius:24px;padding:26px;margin-top:20px}.tracking-details h2{font-size:20px;margin:0 0 17px}.tracking-meta{color:#78716c;font-size:13px;line-height:1.6;margin:0 0 20px}.tracking-items{list-style:none;margin:0;padding:0}.tracking-items li{display:flex;justify-content:space-between;gap:18px;padding:16px 0;border-bottom:1px solid #f5f5f4}.tracking-items strong{font-size:14px}.tracking-items small{display:block;font-size:12px;color:#78716c;line-height:1.6;margin-top:4px;overflow-wrap:anywhere}.tracking-totals{padding-top:17px}.tracking-row{display:flex;justify-content:space-between;gap:15px;font-size:14px;margin:12px 0}.tracking-grand{font-size:19px;font-weight:700;border-top:1px solid #e7e5e4;padding-top:17px}.tracking-payment{font-size:12px;color:#9a3412;background:#fff7ed;padding:12px 15px;border-radius:12px;margin:19px 0 0}.tracking-payment.paid{background:#f0fdf4;color:#15803d}.tracking-error{color:#9f1239;font-size:13px;line-height:1.7;margin:17px 0 0}.tracking-error:empty{display:none}.tracking-link{display:inline-block;text-decoration:none;border-radius:14px;background:#292524;color:#fff;padding:14px 20px;margin-top:22px;font-size:14px;font-weight:600}.tracking-print{width:100%;margin-top:20px;border:1px solid #d6d3d1;border-radius:12px;background:#fff;padding:13px;font-size:13px}button,a{touch-action:manipulation}[hidden]{display:none!important}@media(max-width:540px){.tracking-shell{padding:0 18px 35px}.tracking-header{padding:20px 0;flex-wrap:wrap}.tracking-actions{gap:10px}.tracking-status{padding:26px 18px}.tracking-status h1{font-size:25px}.tracking-details{padding:22px}.tracking-steps{gap:5px}.tracking-steps li{font-size:10px}.tracking-step-dot{width:27px;height:27px}.tracking-explainer{font-size:13px}}
-</style>
-<script defer src="/assets/masaflow-store.js"></script><script defer src="/assets/masaflow-i18n.js"></script><script defer src="/assets/masaflow-ui.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasaFlow — Order Tracking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/masaflow.css">
+  <script>window.FontAwesomeConfig = { autoReplaceSvg: 'nest' };</script>
+  <script defer src="/assets/vendor/fa-solid.min.js"></script>
+  <script defer src="/assets/vendor/fontawesome.min.js"></script>
+  <script defer src="/assets/masaflow-store.js"></script>
+  <script defer src="/assets/masaflow-i18n.js"></script>
+  <script defer src="/assets/masaflow-ui.js"></script>
 </head>
-<body>
-<div class="tracking-shell"><header class="tracking-header"><a href="MenuUI.html" class="tracking-brand">MasaFlow</a><div class="tracking-actions"><a href="MenuUI.html">Back to menu</a></div></header>
-<main><section class="tracking-status" aria-live="polite" data-testid="tracking-status"><p class="tracking-label">Order tracking</p><h1 id="tracking-title">Loading your order…</h1><p id="tracking-number" class="tracking-number" data-testid="tracking-number" data-i18n-skip></p><p id="tracking-description" class="tracking-explainer"></p><p id="tracking-error" class="tracking-error" role="alert"></p><ol id="tracking-steps" class="tracking-steps" aria-label="Order tracking" hidden></ol><p id="tracking-live" class="tracking-live"></p><a id="tracking-menu" class="tracking-link" href="MenuUI.html" hidden>Back to menu</a></section>
-<section id="tracking-details" class="tracking-details" hidden><h2>Order details</h2><p id="tracking-meta" class="tracking-meta"></p><ul id="tracking-items" class="tracking-items"></ul><div class="tracking-totals"><div class="tracking-row"><span>Subtotal</span><span id="tracking-subtotal"></span></div><div class="tracking-row"><span>Tax</span><span id="tracking-tax"></span></div><p id="tracking-tax-note" class="tracking-meta">Tax not configured</p><div class="tracking-row tracking-grand"><span>Total</span><span id="tracking-total" data-testid="tracking-total"></span></div></div><p id="tracking-payment" class="tracking-payment" data-testid="tracking-payment"></p><button id="tracking-print" class="tracking-print">Print receipt</button></section></main></div>
+<body class="bg-orange-500 text-stone-900 min-h-screen flex flex-col items-center p-6">
+
+  <h1 id="page-heading" class="sr-only">MasaFlow order tracking</h1>
+
+  <!-- Status Badge -->
+  <div class="bg-white/20 backdrop-blur-md px-6 py-2 rounded-full mb-8 flex items-center gap-2">
+    <div id="status-dot" class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+    <span id="status-badge" data-testid="status-badge" class="text-white text-xs font-bold uppercase tracking-widest">Connecting</span>
+  </div>
+
+  <!-- Main Card -->
+  <main id="card" class="bg-white w-full max-w-sm rounded-[40px] shadow-2xl overflow-hidden flex flex-col">
+
+    <!-- Illustration/Status Header. min-h + py instead of the mockup's fixed h-48: same box for a
+         one-line message, but longer messages grow the header instead of being clipped. -->
+    <div class="min-h-48 py-5 bg-stone-50 flex items-center justify-center relative overflow-hidden">
+      <div class="absolute inset-0 opacity-10">
+        <img class="w-full h-full object-cover" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_ca2ef42ec9_fbf72d68c84d656c.png" alt="">
+      </div>
+      <div class="relative z-10 flex flex-col items-center px-6 text-center">
+        <div id="status-icon" class="w-20 h-20 bg-orange-100 rounded-3xl flex items-center justify-center text-orange-600 mb-4"></div>
+        <div class="flex flex-col items-center" aria-live="polite" aria-atomic="true">
+          <h2 id="status-title" data-testid="status-title" class="text-2xl font-bold"></h2>
+          <p id="status-sub" data-testid="status-sub" class="text-stone-400 text-sm"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Order Content -->
+    <div id="order-body" hidden class="p-8">
+      <div class="flex justify-between items-start gap-4 mb-6">
+        <div class="flex-shrink-0">
+          <span class="text-[10px] font-bold text-stone-400 uppercase tracking-widest block mb-1">Order Number</span>
+          <h3 id="order-number" data-testid="order-number" class="text-xl font-bold text-stone-800"></h3>
+        </div>
+        <div class="text-right min-w-0">
+          <span class="text-[10px] font-bold text-stone-400 uppercase tracking-widest block mb-1">Customer</span>
+          <h3 id="customer-name" data-testid="customer-name" data-i18n-skip class="text-lg font-bold text-stone-800 truncate"></h3>
+        </div>
+      </div>
+
+      <!-- Receipt Details -->
+      <div class="space-y-4 mb-8">
+        <ul id="order-lines" data-testid="order-lines" class="space-y-4" aria-label="Items in this order"></ul>
+        <div id="order-total" data-testid="order-total"></div>
+      </div>
+
+      <!-- Timeline -->
+      <ol id="timeline" data-testid="timeline" aria-label="Order progress" class="relative pl-8 space-y-8 before:content-[''] before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-stone-100"></ol>
+    </div>
+
+    <!-- Action / Note -->
+    <div id="order-footer" hidden class="bg-stone-900 p-6 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white">
+          <i class="fa-solid fa-map-pin" aria-hidden="true"></i>
+        </div>
+        <div class="text-white">
+          <p class="text-[10px] font-bold opacity-60 uppercase tracking-widest">Pickup At</p>
+          <p id="pickup-at" data-testid="pickup-at" class="text-xs font-bold"></p>
+        </div>
+      </div>
+      <!-- The before: layer widens the tap area to 48px without changing the mockup's 40px circle. -->
+      <a href="MenuUI.html" aria-label="Back to the menu" class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-stone-900 shadow-lg relative before:content-[''] before:absolute before:-inset-1 focus-visible:outline-white">
+        <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+      </a>
+    </div>
+
+    <!-- Unknown order -->
+    <div id="missing-footer" hidden class="bg-stone-900 p-6 flex items-center justify-center">
+      <a href="MenuUI.html" data-testid="missing-back" class="w-full text-center bg-white text-orange-600 px-12 py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition-transform focus-visible:outline-white">Back to the menu</a>
+    </div>
+
+    <!-- Pickup Board -->
+    <div id="board-body" hidden class="p-8 grid gap-8 md:grid-cols-2">
+      <section class="min-w-0" aria-labelledby="board-ready-title">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h3 id="board-ready-title" class="text-xl font-bold text-stone-800">Ready for Pickup</h3>
+          <span id="board-ready-count" data-testid="board-ready-count" aria-hidden="true" class="min-w-[24px] h-6 px-1.5 rounded-md bg-orange-100 flex items-center justify-center text-[10px] font-bold text-orange-600"></span>
+        </div>
+        <ul id="board-ready" data-testid="board-ready" class="space-y-3" aria-live="polite"></ul>
+        <p id="board-ready-empty" hidden class="text-sm text-stone-400">Nothing is waiting right now.</p>
+      </section>
+      <section class="min-w-0" aria-labelledby="board-kitchen-title">
+        <div class="flex items-center justify-between gap-3 mb-4">
+          <h3 id="board-kitchen-title" class="text-xl font-bold text-stone-800">In the Kitchen</h3>
+          <span id="board-kitchen-count" data-testid="board-kitchen-count" aria-hidden="true" class="min-w-[24px] h-6 px-1.5 rounded-md bg-stone-100 flex items-center justify-center text-[10px] font-bold text-stone-600"></span>
+        </div>
+        <ul id="board-kitchen" data-testid="board-kitchen" class="space-y-2"></ul>
+        <p id="board-kitchen-empty" hidden class="text-sm text-stone-400">The kitchen is all caught up.</p>
+      </section>
+    </div>
+  </main>
+
+  <!-- Ready Overlay -->
+  <div id="ready-overlay" data-testid="ready-overlay" role="alertdialog" aria-modal="true" aria-labelledby="ready-title" aria-describedby="ready-text" class="fixed inset-0 z-[200] bg-orange-600 flex flex-col items-center justify-center p-8 text-center hidden">
+    <div class="w-32 h-32 bg-white rounded-full flex items-center justify-center text-orange-600 text-6xl mb-8 animate-bounce">
+      <i class="fa-solid fa-utensils" aria-hidden="true"></i>
+    </div>
+    <h2 id="ready-title" class="text-4xl font-bold text-white mb-4">It's Ready!</h2>
+    <p id="ready-text" class="text-white/80 text-xl mb-12">Please head to the counter to pick up your order.</p>
+    <button type="button" id="ready-dismiss" data-testid="ready-dismiss" class="bg-white text-orange-600 px-12 py-4 rounded-2xl font-bold text-lg shadow-xl active:scale-95 transition-transform focus-visible:outline-white">
+      Got it!
+    </button>
+  </div>
+
+  <!-- Pickup Board: back to the visitor's own order -->
+  <a id="track-link" data-testid="track-link" hidden href="readypickupUI.html" class="mt-8 bg-white text-orange-600 px-8 py-3 rounded-full font-bold text-sm shadow-xl active:scale-95 transition-transform flex items-center gap-2 focus-visible:outline-white">
+    <i class="fa-solid fa-receipt" aria-hidden="true"></i> Track my order
+  </a>
+
+  <!-- Feedback Message -->
+  <p id="keep-open" hidden class="text-white/80 text-[10px] mt-8 text-center font-medium tracking-widest uppercase">
+    Please keep this screen open until your food is ready
+  </p>
+
+  <!-- Menu link. The padding (cancelled by -mb-4) makes the small text a 44px+ tap target. -->
+  <div data-mf-language-host class="mt-6 flex justify-center"></div>
+  <a id="menu-link" data-testid="menu-link" hidden href="MenuUI.html" class="mt-auto pt-8 pb-4 -mb-4 text-white/60 hover:text-white transition-colors font-semibold text-xs flex items-center gap-2 focus-visible:outline-white">
+    <i class="fa-solid fa-utensils" aria-hidden="true"></i> <span id="menu-link-label">Order something else</span>
+  </a>
+
 <script>
-window.addEventListener('DOMContentLoaded',()=>{
-  const M=window.MasaFlow,I=window.MasaFlowI18n,UI=window.MasaFlowUI,$=id=>document.getElementById(id),esc=UI.escape;
-  const requested=new URLSearchParams(location.search).get('order');
-  const orderId=typeof requested==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(requested)?requested:null;
-  let confirmed=false,connected=false,lastOrder=null;
-  const money=(value,record)=>M.money(value,record.currency,I.getLocale());
-  const steps=['Awaiting payment','Received','Preparing','Ready to collect','Picked up'];
-  function render(){
-    $('tracking-error').textContent='';
-    if(!orderId){$('tracking-title').textContent='No order selected';$('tracking-description').textContent='Use the tracking link from your order or place an order from the menu.';$('tracking-menu').hidden=false;return;}
-    if(!confirmed){$('tracking-title').textContent=connected?'Loading your order…':'Unable to load your order';$('tracking-description').textContent='Reconnect to the local service. The last confirmed order remains visible when available.';return;}
-    const order=M.getOrder(orderId)||lastOrder;
-    if(!order){$('tracking-title').textContent='We could not find this order';$('tracking-description').textContent='Check your tracking link. Your order number alone is not a tracking link.';$('tracking-menu').hidden=false;$('tracking-live').textContent=connected?'Live order status':'Last confirmed status · reconnecting';return;}
-    lastOrder=order;
-    const paid=M.isVerifiedPaid(order),index=paid?Math.max(1,{pending:1,preparing:2,ready:3,completed:4}[order.status]||1):0;
-    $('tracking-title').textContent=steps[index];$('tracking-number').textContent=order.number;
-    $('tracking-description').textContent=['Pay your total at the counter. Preparation begins after the cashier records your payment.','Payment recorded. Your order is in the kitchen queue.','The kitchen is preparing your order.','Your order is ready. Show this order number at the counter.','Your order has been handed over. Thank you!'][index];
-    if(order.paymentStatus==='paid'&&!paid)$('tracking-error').textContent='Recorded payment could not be verified. Please ask the cashier.';
-    $('tracking-steps').hidden=false;$('tracking-steps').innerHTML=steps.map((label,step)=>`<li class="${step<index?'done':''}" ${step===index?'aria-current="step"':''}><span class="tracking-step-dot">${step<index?'✓':step+1}</span>${label}</li>`).join('');
-    $('tracking-live').textContent=connected?'Live order status':'Last confirmed status · reconnecting';$('tracking-live').className='tracking-live'+(connected?'':' stale');
-    $('tracking-details').hidden=false;
-    const service=order.orderType==='dine_in'?'Dine in'+(order.tableNumber?' · Table '+order.tableNumber:''):order.orderType==='takeout'?'Takeout':'Counter pickup';
-    $('tracking-meta').innerHTML=`<span data-i18n-skip>${esc(order.customerName)}</span><br><span>${esc(service)}</span> · <span data-i18n-skip>${esc(new Date(order.createdAt).toLocaleString(I.getLocale()==='es'?'es-MX':'en-US',{timeZone:M.getState().settings.timeZone}))}</span>`;
-    $('tracking-items').innerHTML=order.items.map(line=>`<li><div><strong data-i18n-skip>${line.quantity} × ${esc(line.name)}</strong>${line.options.length?`<small data-i18n-skip>${line.options.map(option=>esc(option.name)).join(' · ')}</small>`:''}${line.notes?`<small data-i18n-skip>${esc(line.notes)}</small>`:''}</div><strong data-i18n-skip>${esc(money(line.lineTotalCents,order))}</strong></li>`).join('');
-    $('tracking-subtotal').textContent=money(order.subtotalCents,order);$('tracking-tax').textContent=money(order.taxCents,order);$('tracking-total').textContent=money(order.totalCents,order);$('tracking-tax-note').hidden=order.taxCents!==0||M.getState().settings.taxConfigured;
-    $('tracking-payment').textContent=paid?'Paid in cash':'Awaiting cash payment';$('tracking-payment').className='tracking-payment'+(paid?' paid':'');I.apply();
+window.addEventListener('DOMContentLoaded', () => {
+  'use strict';
+  const M = window.MasaFlow;
+  const UI = window.MasaFlowUI;
+  const esc = UI.escape;
+  const $ = id => document.getElementById(id);
+
+  const params = new URLSearchParams(location.search);
+  // null = Pickup Board. Anything that is not an order UUID (an order number, say) can never match, so it shows "not found".
+  const orderId = !params.has('order') ? null : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.get('order')) ? params.get('order') : '';
+  const seenKey = id => `masaflow.customer.readySeen.${id}`;
+  const lastKey = 'masaflow.customer.lastOrder';
+
+  const TILE_ORANGE = 'w-20 h-20 bg-orange-100 rounded-3xl flex items-center justify-center text-orange-600 mb-4';
+  const TILE_BOUNCE = 'w-20 h-20 bg-orange-100 rounded-3xl flex items-center justify-center text-orange-600 mb-4 animate-bounce';
+  const TILE_STONE = 'w-20 h-20 bg-stone-200 rounded-3xl flex items-center justify-center text-stone-500 mb-4';
+
+  // One entry per order status. `active` keeps the badge dot pulsing and the "keep this screen open" hint visible.
+  const VIEWS = {
+    draft: { badge: 'Pay at Counter', icon: 'fa-solid fa-cash-register text-4xl', tile: TILE_ORANGE, title: 'Pay at the Counter', sub: 'Show this number to the cashier. Cooking starts once cash is collected.', pulse: true, waiting: true },
+    pending: { badge: 'Order Received', icon: 'fa-solid fa-receipt text-4xl', tile: TILE_ORANGE, title: 'Order Received', sub: 'Paid in cash. The kitchen will start shortly.', pulse: true, waiting: true },
+    preparing: { badge: 'In Kitchen', icon: 'fa-solid fa-fire-burner text-4xl', tile: TILE_BOUNCE, title: 'Preparing…', sub: "We'll let you know the moment it is ready.", pulse: true, waiting: true },
+    ready: { badge: 'Ready', icon: 'fa-solid fa-bell-concierge text-4xl', tile: TILE_ORANGE, title: 'Order Ready!', sub: 'Please pick it up at the counter.', pulse: true, waiting: false },
+    completed: { badge: 'Picked Up', icon: 'fa-solid fa-circle-check text-4xl', tile: TILE_ORANGE, title: 'Enjoy!', sub: 'Thanks for ordering with MasaFlow.', pulse: false, waiting: false },
+    cancelled: { badge: 'Cancelled', icon: 'fa-solid fa-ban text-4xl', tile: TILE_STONE, title: 'Order Cancelled', sub: 'This order was cancelled before payment. Order again any time.', pulse: false, waiting: false }
+  };
+  const MISSING = { badge: 'Order Not Found', icon: 'fa-solid fa-circle-question text-4xl', tile: TILE_ORANGE, title: "We can't find that order", sub: 'Check the link, or ask at the counter.', pulse: false };
+  const LOADING = { badge: 'Connecting', icon: 'fa-solid fa-receipt text-4xl', tile: TILE_ORANGE, title: 'Finding your order…', sub: 'One moment.', pulse: true };
+  const OFFLINE = { badge: 'Reconnecting…', icon: 'fa-solid fa-wifi text-4xl', tile: TILE_STONE, title: 'Reconnecting…', sub: "We'll show your order as soon as we are back online.", pulse: true };
+  const BOARD = { badge: 'Pickup Board', icon: 'fa-solid fa-bell-concierge text-4xl', tile: TILE_ORANGE, title: 'Pickup Board', sub: 'Your number shows here when it is ready.', pulse: true };
+  const BOARD_LOADING = { badge: 'Pickup Board', icon: 'fa-solid fa-bell-concierge text-4xl', tile: TILE_ORANGE, title: 'Pickup Board', sub: 'Loading the orders…', pulse: true };
+  const BOARD_OFFLINE = { badge: 'Reconnecting…', icon: 'fa-solid fa-wifi text-4xl', tile: TILE_STONE, title: 'Reconnecting…', sub: 'The board updates as soon as we are back online.', pulse: true };
+
+  const STEP = {
+    done: { dot: 'absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-orange-500 ring-4 ring-orange-100', label: 'text-sm font-bold text-stone-800', spoken: 'done' },
+    next: { dot: 'absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-orange-200', label: 'text-sm font-bold text-stone-400', spoken: 'up next' },
+    future: { dot: 'absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-stone-100', label: 'text-sm font-bold text-stone-300', spoken: 'not yet' },
+    stopped: { dot: 'absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-stone-400 ring-4 ring-stone-200', label: 'text-sm font-bold text-stone-800', spoken: '' }
+  };
+  const AMOUNT = {
+    live: 'text-xl font-bold text-orange-600',
+    void: 'text-xl font-bold text-stone-400'
+  };
+
+  let loaded = false;       // true once the service has delivered real state
+  let connected = true;
+  let overlayOpen = false;
+  let focusBeforeOverlay = null;
+  const seenInMemory = new Set();   // fallback when sessionStorage is unavailable
+
+  // Every change on any device re-renders this page. Writing only what changed keeps
+  // the aria-live regions quiet and stops icons from being rebuilt on each update.
+  const written = new WeakMap();
+  function html(element, markup) { if (written.get(element) !== markup) { written.set(element, markup); element.innerHTML = markup; } }
+  function text(element, value) { if (element.textContent !== value) element.textContent = value; }
+  function show(element, visible) { element.hidden = !visible; }
+
+  function readSession(key) { try { return JSON.parse(sessionStorage.getItem(key)); } catch (_) { return null; } }
+  function writeSession(key, value) { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch (_) {} }
+
+  function showStatus(view, sub = view.sub) {
+    text($('status-badge'), connected || !loaded ? view.badge : 'Reconnecting…');
+    $('status-dot').classList.toggle('animate-pulse', view.pulse);
+    const tile = $('status-icon');
+    if (tile.className !== view.tile) tile.className = view.tile;
+    html(tile, `<i class="${view.icon}" aria-hidden="true"></i>`);
+    text($('status-title'), view.title);
+    text($('status-sub'), sub);
   }
-  M.subscribe(()=>{confirmed=true;render();});I.subscribe(render);
-  document.addEventListener('masaflow:connection',event=>{connected=event.detail.connected;if(connected)confirmed=true;render();});
-  Promise.resolve(M.ready).then(()=>{confirmed=true;connected=true;render();}).catch(()=>{connected=false;render();});
-  $('tracking-print').addEventListener('click',()=>{if(lastOrder)UI.printReceipt(lastOrder.id);});
-  if(!orderId)render();
+
+  // Mean cooking time (kitchen start to ready) of the last ten finished orders, in whole minutes.
+  // Orders saved before those timestamps existed fall back to paid-to-picked-up time.
+  // Null until three orders exist, so one unusual ticket cannot set the estimate.
+  const cookStart = order => order.preparingAt || order.paidAt;
+  const cookEnd = order => order.readyAt || order.completedAt;
+  function usualMinutes(state) {
+    const recent = state.orders
+      .filter(order => ['ready', 'completed'].includes(order.status) && cookStart(order) && cookEnd(order) && M.isVerifiedPaid(order))
+      .sort((a, b) => new Date(cookEnd(b)) - new Date(cookEnd(a)))
+      .slice(0, 10);
+    if (recent.length < 3) return null;
+    const mean = recent.reduce((sum, order) => sum + (new Date(cookEnd(order)) - new Date(cookStart(order))), 0) / recent.length;
+    return Math.max(1, Math.round(mean / 60000));
+  }
+
+  function lineRow(line) {
+    const details = UI.lineDetails(line).join(' · ');
+    const under = (details ? `<span class="block text-xs text-stone-400">${esc(details)}</span>` : '')
+      + (line.notes ? `<span class="block text-xs text-stone-400 italic break-words" data-i18n-skip>${esc(line.notes)}</span>` : '');
+    const badge = `<span class="w-6 h-6 rounded-md bg-stone-100 flex items-center justify-center text-[10px] font-bold text-stone-600 flex-shrink-0"><span class="sr-only">Quantity </span>${line.quantity}</span>`;
+    if (!under) {
+      return `<li class="flex justify-between items-center gap-3"><div class="flex items-center gap-3 min-w-0">${badge}<span class="text-sm font-medium text-stone-700">${esc(line.name)}</span></div><span class="text-sm font-bold flex-shrink-0">${M.money(line.lineTotalCents, line.currency)}</span></li>`;
+    }
+    return `<li class="flex justify-between items-start gap-3"><div class="flex items-start gap-3 min-w-0">${badge}<div class="min-w-0 mt-0.5"><span class="block text-sm font-medium text-stone-700">${esc(line.name)}</span>${under}</div></div><span class="text-sm font-bold flex-shrink-0 mt-0.5">${M.money(line.lineTotalCents, line.currency)}</span></li>`;
+  }
+
+  function totalBlock(order, payment) {
+    const paid = order.paymentStatus === 'paid';
+    const label = order.status === 'cancelled' ? 'Total (Not Charged)' : paid ? 'Paid (Cash)' : 'Total to Pay (Cash)';
+    const amount = order.status === 'cancelled' ? AMOUNT.void : AMOUNT.live;
+    const cash = paid && payment ? `<span class="block text-xs text-stone-400" data-testid="order-cash">Tendered ${M.money(payment.tenderedCents, payment.currency)} · Change ${M.money(payment.changeCents, payment.currency)}</span>` : '';
+    const total = `<div><span class="block font-bold text-stone-900">${label}</span>${cash}</div><span class="${amount}" data-testid="order-amount">${M.money(order.totalCents, order.currency)}</span>`;
+    if (!(order.taxCents > 0)) return `<div class="border-t border-dashed border-stone-200 pt-4 flex justify-between items-center">${total}</div>`;
+    const small = (name, cents) => `<div class="flex justify-between items-center text-sm text-stone-500"><span>${name}</span><span>${M.money(cents, order.currency)}</span></div>`;
+    return `<div class="border-t border-dashed border-stone-200 pt-4 space-y-2">${small('Subtotal', order.subtotalCents)}${small('Tax', order.taxCents)}<div class="flex justify-between items-center">${total}</div></div>`;
+  }
+
+  // Orders saved before preparingAt/readyAt existed show those two steps without a time.
+  function steps(order) {
+    if (order.status === 'cancelled') {
+      return [
+        { label: 'Order Placed', at: order.createdAt, kind: 'done', current: false },
+        { label: 'Cancelled', at: order.updatedAt, kind: 'stopped', current: true }
+      ];
+    }
+    const reached = { draft: 1, pending: 2, preparing: 3, ready: 4, completed: 4 }[order.status] || 1;
+    return [['Order Placed', order.createdAt], ['Cash Paid', order.paidAt], ['In the Kitchen', order.preparingAt], ['Ready for Pickup', order.readyAt]]
+      .map(([label, at], index) => ({ label, at: index < reached ? at : null, kind: index < reached ? 'done' : index === reached ? 'next' : 'future', current: index === reached - 1 }));
+  }
+  function stepRow(step) {
+    const style = STEP[step.kind];
+    const spoken = style.spoken ? `<span class="sr-only"> (${style.spoken})</span>` : '';
+    return `<li class="relative"${step.current ? ' aria-current="step"' : ''}><div class="${style.dot}"></div><p class="${style.label}">${step.label}${spoken}</p>${step.at ? `<p class="text-xs text-stone-400">${esc(UI.time(step.at))}</p>` : ''}</li>`;
+  }
+
+  function hasSeenReady(id) { return seenInMemory.has(id) || readSession(seenKey(id)) === true; }
+  function markReadySeen(id) { seenInMemory.add(id); writeSession(seenKey(id), true); }
+  // Everything behind the full-screen announcement is made inert, so focus and screen readers stay on it.
+  function behindOverlay() { return [...document.body.children].filter(element => element !== $('ready-overlay')); }
+  function openReady() {
+    overlayOpen = true;
+    focusBeforeOverlay = document.activeElement;
+    behindOverlay().forEach(element => { element.inert = true; });
+    $('ready-overlay').classList.remove('hidden');
+    $('ready-dismiss').focus();
+  }
+  function closeReady() {
+    if (!overlayOpen) return;
+    overlayOpen = false;
+    markReadySeen(orderId);
+    $('ready-overlay').classList.add('hidden');
+    behindOverlay().forEach(element => { element.inert = false; });
+    if (focusBeforeOverlay && focusBeforeOverlay !== document.body && document.contains(focusBeforeOverlay)) focusBeforeOverlay.focus();
+    else $('ready-dismiss').blur();
+    focusBeforeOverlay = null;
+  }
+  function syncReadyOverlay(order) {
+    if (order && order.status === 'ready') { if (!overlayOpen && !hasSeenReady(order.id)) openReady(); }
+    else closeReady();
+  }
+
+  function renderOrder(order, state) {
+    const view = VIEWS[order.status] || VIEWS.pending;
+    const minutes = order.status === 'preparing' ? usualMinutes(state) : null;
+    showStatus(view, minutes ? `Usually ready in about ${minutes} min` : view.sub);
+
+    text($('order-number'), `#${order.number}`);
+    text($('customer-name'), order.customerName);
+    $('customer-name').title = order.customerName;
+    html($('order-lines'), order.items.map(lineRow).join(''));
+    html($('order-total'), totalBlock(order, state.payments.find(payment => payment.id === order.paymentId)));
+    html($('timeline'), steps(order).map(stepRow).join(''));
+    text($('pickup-at'), order.orderType === 'dine_in' && order.tableNumber ? `Table ${order.tableNumber}` : 'Counter');
+
+    show($('order-body'), true); show($('order-footer'), true); show($('missing-footer'), false);
+    show($('keep-open'), view.waiting); show($('menu-link'), true);
+    document.title = `MasaFlow — Order #${order.number}`;
+    syncReadyOverlay(order);
+  }
+
+  function renderTracker() {
+    const order = loaded ? M.getOrder(orderId) : null;
+    if (order) return renderOrder(order, M.getState());
+    // Until the service answers, an empty local state must not read as "order not found".
+    showStatus(loaded ? MISSING : connected ? LOADING : OFFLINE);
+    show($('order-body'), false); show($('order-footer'), false); show($('missing-footer'), loaded);
+    show($('keep-open'), false); show($('menu-link'), false);
+    syncReadyOverlay(null);
+  }
+
+  const readyRow = order => `<li class="flex items-center justify-between gap-4 bg-orange-50 rounded-2xl px-5 py-4"><span class="text-2xl font-bold text-orange-600 flex-shrink-0">#${esc(order.number)}</span><span class="text-sm font-bold text-stone-800 truncate" data-i18n-skip title="${esc(order.customerName)}">${esc(order.customerName)}</span></li>`;
+  const kitchenRow = order => `<li class="flex items-center gap-3 bg-stone-50 rounded-xl px-4 py-3"><span class="text-sm font-bold text-stone-700 flex-shrink-0">#${esc(order.number)}</span><span class="text-sm font-medium text-stone-500 truncate flex-1" data-i18n-skip title="${esc(order.customerName)}">${esc(order.customerName)}</span><span class="text-[10px] font-bold uppercase tracking-widest text-stone-400 flex-shrink-0">${order.status === 'preparing' ? 'Cooking' : 'Up next'}</span></li>`;
+
+  function renderBoard() {
+    showStatus(loaded ? BOARD : connected ? BOARD_LOADING : BOARD_OFFLINE);
+    show($('board-body'), loaded); show($('menu-link'), true);
+    if (!loaded) return;
+    // Only orders with a verified cash payment are shown; unpaid drafts never reach the kitchen.
+    const paid = M.getState().orders.filter(order => M.isVerifiedPaid(order));
+    const ready = paid.filter(order => order.status === 'ready').sort((a, b) => new Date(a.updatedAt) - new Date(b.updatedAt));
+    const kitchen = paid.filter(order => order.status === 'preparing' || order.status === 'pending')
+      .sort((a, b) => (a.status === b.status ? new Date(a.paidAt) - new Date(b.paidAt) : a.status === 'preparing' ? -1 : 1));
+    html($('board-ready'), ready.map(readyRow).join(''));
+    html($('board-kitchen'), kitchen.map(kitchenRow).join(''));
+    text($('board-ready-count'), String(ready.length)); text($('board-kitchen-count'), String(kitchen.length));
+    // The lists stay in the page when empty: a live region that was hidden does not announce its first order.
+    show($('board-ready-empty'), ready.length === 0); show($('board-kitchen-empty'), kitchen.length === 0);
+  }
+
+  function setUpBoard() {
+    document.title = 'MasaFlow — Pickup Board';
+    text($('page-heading'), 'MasaFlow pickup board');
+    $('card').classList.add('md:max-w-4xl');
+    text($('menu-link-label'), 'Order here');
+    const lastOrder = readSession(lastKey);
+    if (typeof lastOrder === 'string' && lastOrder) {
+      $('track-link').href = `readypickupUI.html?order=${encodeURIComponent(lastOrder)}&lang=${MasaFlowI18n.getLocale()}`;
+      show($('track-link'), true);
+    }
+  }
+
+  const render = orderId === null ? renderBoard : renderTracker;
+  if (orderId === null) setUpBoard();
+
+  $('ready-dismiss').addEventListener('click', closeReady);
+  document.addEventListener('keydown', event => {
+    if (!overlayOpen) return;
+    if (event.key === 'Escape') { event.preventDefault(); closeReady(); }
+    // "Got it!" is the only control in the announcement, so Tab stays on it.
+    if (event.key === 'Tab') { event.preventDefault(); $('ready-dismiss').focus(); }
+  });
+  document.addEventListener('masaflow:connection', event => { connected = event.detail.connected; render(); });
+  M.subscribe(() => { if (!M.getConnection().hasConfirmedState) return; loaded = true; render(); });
+  MasaFlowI18n.subscribe(() => render());
+
+  render();
+  // If the first load fails, the live stream keeps retrying and the subscription above takes over.
+  M.ready.then(() => { loaded = true; render(); }, () => { connected = false; render(); });
 });
 </script>
 </body>

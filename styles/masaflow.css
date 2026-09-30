@@ -1,0 +1,101 @@
+/*! MasaFlow styles. Source: styles/masaflow.css. Build: npm run build:css -> assets/masaflow.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root { color-scheme: light; --mf-orange: #ea580c; --mf-obsidian: #1c1917; --mf-stone: #f9f8f6; }
+  body { -webkit-tap-highlight-color: transparent; }
+  h1, h2, h3 { font-family: 'Playfair Display', Georgia, serif; }
+  [hidden] { display: none !important; }
+  button, a { touch-action: manipulation; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 3px solid #ea580c; outline-offset: 3px; }
+  dialog { color: inherit; }
+}
+
+@layer components {
+  /* Sidebar and mobile navigation, shared by every staff screen. */
+  .mf-nav-link { @apply text-stone-500 hover:text-white transition-colors flex flex-col items-center gap-1; }
+  .mf-nav-link[aria-current="page"] { @apply text-orange-500 hover:text-orange-500; }
+  .mf-nav-label { @apply text-[9px] font-bold uppercase tracking-widest; }
+  .mf-tab-link { @apply flex flex-col items-center gap-1 p-2 min-w-[44px] text-stone-400; }
+  .mf-tab-link[aria-current="page"] { @apply text-orange-600; }
+  .mf-tab-label { @apply text-[10px] font-bold uppercase tracking-tighter; }
+
+  /* Connection pill in staff headers. masaflow-ui.js sets data-state. */
+  .mf-sync { @apply flex items-center gap-2 bg-green-50 text-green-700 px-4 py-2 rounded-full border border-green-100; }
+  .mf-sync .mf-sync-ping { @apply animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75; }
+  .mf-sync .mf-sync-dot { @apply relative inline-flex rounded-full h-2 w-2 bg-green-500; }
+  .mf-sync[data-state="offline"] { @apply bg-red-50 text-red-700 border-red-100; }
+  .mf-sync[data-state="offline"] .mf-sync-ping { @apply hidden; }
+  .mf-sync[data-state="offline"] .mf-sync-dot { @apply bg-red-500; }
+
+  /* A floating pill rather than a full-width bar: fixed so it never becomes a flex child of the
+     staff shell, and placed just under the phone top bar / desktop header so neither is covered. */
+  /* Language picker that masaflow-i18n.js injects into [data-mf-language-host]. */
+  .mf-language { @apply inline-flex items-center flex-shrink-0; }
+  .mf-language > span { @apply sr-only; }
+  .mf-language select { @apply bg-white border border-stone-200 rounded-xl px-3 py-2 min-h-[40px] text-xs font-bold text-stone-600 outline-none focus:ring-2 focus:ring-orange-500 cursor-pointer; }
+  /* Cash controls while the service is unreachable (masaflow-ui.js blocks the click as well). */
+  .mf-offline-action { @apply opacity-60 pointer-events-none; }
+
+  .mf-service-banner { @apply fixed top-[76px] md:top-24 left-1/2 -translate-x-1/2 z-[999] w-max max-w-[calc(100%-2rem)] px-5 py-2.5 rounded-2xl text-center text-xs font-bold text-rose-800 bg-rose-50 border border-rose-200 shadow-xl; }
+
+  /* Toasts: bottom-right on desktop, above the tab bar on phones. */
+  .mf-toast-host { @apply fixed z-[300] right-4 left-4 bottom-24 md:left-auto md:right-10 md:bottom-10 flex flex-col items-end gap-3 pointer-events-none; }
+  .mf-toast { @apply pointer-events-auto w-full md:w-auto md:min-w-[320px] md:max-w-md bg-stone-900 text-stone-100 rounded-2xl px-6 py-4 shadow-2xl border border-stone-800 flex items-center gap-4 transition-all duration-500 translate-y-20 opacity-0; }
+  .mf-toast.is-open { @apply translate-y-0 opacity-100; }
+  .mf-toast-icon { @apply w-8 h-8 bg-orange-600 text-white rounded-full flex items-center justify-center flex-shrink-0 text-xs; }
+  .mf-toast.error .mf-toast-icon { @apply bg-red-600; }
+  .mf-toast-order { @apply bg-orange-600 text-white p-6 rounded-[32px] border-4 border-white; }
+  .mf-toast-order .mf-toast-icon { @apply w-12 h-12 bg-white/20 rounded-2xl text-xl; }
+
+  /* Dialogs created by masaflow-ui.js: cash tender and confirmation. */
+  .mf-dialog { @apply w-[min(560px,calc(100vw-24px))] max-h-[94dvh] overflow-y-auto rounded-[32px] border-0 p-0 bg-white text-stone-900 shadow-2xl; }
+  .mf-dialog::backdrop { background: rgb(28 25 23 / .6); backdrop-filter: blur(4px); }
+  .mf-field-label { @apply block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2; }
+  .mf-input { @apply w-full bg-stone-50 border border-stone-200 rounded-xl px-4 py-3 focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all; }
+  .mf-btn-primary { @apply w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-4 rounded-2xl shadow-xl shadow-orange-100 transition-all active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100; }
+  .mf-btn-dark { @apply w-full bg-stone-900 text-white py-4 rounded-2xl font-bold hover:bg-orange-600 transition-colors shadow-lg active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:active:scale-100; }
+  .mf-btn-ghost { @apply w-full text-stone-400 hover:text-stone-600 font-bold text-sm py-2 transition-colors; }
+}
+
+@layer utilities {
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #e7e5e4; border-radius: 10px; }
+
+  /* New paid ticket on the order queue. */
+  .order-card-pulse { animation: mf-pulse-border 2s infinite; }
+  /* Price edited moments ago on the menu manager. */
+  .price-pulse { animation: mf-price-glow 2s infinite; }
+  .animate-spin-slow { animation: spin 3s linear infinite; }
+  .animate-slide-up { animation: mf-slide-up .4s cubic-bezier(.16, 1, .3, 1); }
+  .table-row-hover { transition: all .2s cubic-bezier(.4, 0, .2, 1); }
+  .table-row-hover:hover { background-color: rgb(249 248 246 / .8); transform: translateX(4px); }
+}
+
+@keyframes mf-pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(249, 115, 22, .4); }
+  70% { box-shadow: 0 0 0 10px rgba(249, 115, 22, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(249, 115, 22, 0); }
+}
+@keyframes mf-price-glow {
+  0% { box-shadow: 0 0 0 0 rgba(234, 88, 12, .4); }
+  70% { box-shadow: 0 0 0 6px rgba(234, 88, 12, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(234, 88, 12, 0); }
+}
+@keyframes mf-slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+}
+
+@media print {
+  [data-mf-noprint], .mf-toast-host, .mf-service-banner { display: none !important; }
+  /* The staff shell is a fixed-height app frame on screen; on paper it must flow onto more pages. */
+  body[data-mf-shell], body[data-mf-shell] main { display: block !important; height: auto !important; overflow: visible !important; padding: 0 !important; }
+}

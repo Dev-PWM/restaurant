@@ -1,119 +1,756 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>MasaFlow — Mexican Kitchen</title>
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/masaflow.css"><link rel="stylesheet" href="/assets/masaflow-ui.css">
-<style>
-body{margin:0;background:#fafaf9;color:#292524;font-family:Outfit,system-ui,sans-serif}button,a,input,textarea,select{-webkit-tap-highlight-color:transparent}[hidden]{display:none!important}button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #fb923c;outline-offset:3px}.shell{max-width:850px;margin:auto;padding:0 22px 130px}.header{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:23px 0}.brand{display:flex;align-items:center;gap:11px;text-decoration:none;color:#ea580c}.brand-mark{display:grid;place-items:center;width:43px;height:43px;border-radius:13px;background:#f97316;color:white;box-shadow:0 4px 12px #fed7aa}.brand-title{font-size:23px;font-weight:700;line-height:1}.brand-subtitle{display:block;font-size:10px;letter-spacing:1.7px;color:#78716c;text-transform:uppercase;margin-top:5px}.header-actions{display:flex;gap:12px;align-items:center}.header-actions a{font-size:13px;text-decoration:none;color:#78716c;font-weight:600}.header-actions a:first-child{color:#ea580c}.icon-button{border:0;background:#f5f5f4;color:#57534e;display:grid;place-items:center;width:42px;height:42px;border-radius:50%;flex-shrink:0}.hero{height:210px;border-radius:27px;position:relative;overflow:hidden;background:#292524}.hero img{width:100%;height:100%;object-fit:cover;opacity:.7}.hero:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent,#000a)}.hero h1{position:absolute;left:28px;bottom:25px;z-index:1;font-size:30px;line-height:1.1;color:white;margin:0}.context{font-size:14px;color:#78716c;margin:18px 0 0}.search{width:100%;margin-top:20px;padding:13px 16px;border:1px solid #e7e5e4;border-radius:14px;background:white}.section-title{font-size:20px;margin:30px 0 15px}.categories{display:flex;gap:10px;overflow:auto;padding:2px 2px 8px}.category{min-height:45px;white-space:nowrap;background:white;border:1px solid #e7e5e4;border-radius:14px;padding:10px 17px;font-weight:600;font-size:14px;color:#57534e}.category[aria-pressed=true]{color:#c2410c;background:#ffedd5;border-color:#fed7aa}.menu-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.menu-card{display:flex;align-items:center;gap:15px;background:white;border:1px solid #f0eeec;border-radius:24px;padding:17px;box-shadow:0 2px 5px #29252404}.dish-image{width:96px;height:108px;object-fit:cover;border-radius:16px;flex-shrink:0;background:#f5f5f4}.dish-info{min-width:0;flex:1}.dish-info h3{font-size:17px;line-height:1.25;margin:2px 0 7px}.dish-info p{font-size:12px;color:#78716c;line-height:1.5;margin:0}.dish-footer{display:flex;align-items:center;justify-content:space-between;gap:9px;margin-top:13px}.price{font-size:16px;font-weight:700;color:#ea580c}.add{width:36px;height:36px;border:0;border-radius:50%;background:#292524;color:white;display:grid;place-items:center;flex-shrink:0}.sold-out{color:#be123c!important;font-size:12px;font-weight:600}.empty{padding:30px;border:1px dashed #e7e5e4;border-radius:18px;background:white;text-align:center;color:#78716c;font-size:14px;grid-column:1/-1}.cart-bar{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);width:calc(100% - 44px);max-width:806px;display:flex;align-items:center;justify-content:space-between;gap:15px;padding:18px 22px;background:#292524;color:white;border:0;border-radius:18px;box-shadow:0 12px 30px #29252425;z-index:10}.cart-bar-left{display:flex;align-items:center;gap:13px;font-size:14px}.cart-count{font-size:13px;font-weight:700;padding:6px 9px;border-radius:7px;background:#ffffff25}.cart-bar-total{font-weight:700;font-size:18px;display:flex;gap:13px;align-items:center}.customer-dialog{border:0;border-radius:28px;padding:0;width:calc(100% - 28px);max-width:500px;max-height:90dvh;overflow:auto;background:white;color:#292524;box-shadow:0 20px 70px #0004;font-family:Outfit,system-ui,sans-serif}.customer-dialog::backdrop{background:#0009;backdrop-filter:blur(4px)}.dialog-header{padding:23px 25px 12px;display:flex;align-items:center;justify-content:space-between;gap:15px}.dialog-header h2{font-size:24px;margin:0;line-height:1.2}.dialog-body{padding:0 25px 25px}.custom-image{width:100%;height:185px;object-fit:cover;background:#f5f5f4;display:block}.custom-price{font-size:18px;font-weight:700;color:#ea580c;margin:0 0 10px}.muted{font-size:13px;color:#78716c;line-height:1.5;margin:0 0 15px}fieldset{border:0;padding:0;margin:0}.option-heading{font-size:15px;font-weight:700;margin:23px 0 9px}.option-row{display:flex;align-items:center;gap:12px;padding:14px 16px;border:1px solid #e7e5e4;background:#fafaf9;border-radius:14px;margin:8px 0;font-size:14px;cursor:pointer}.option-row input{width:20px;height:20px;accent-color:#ea580c;flex-shrink:0}.option-row:has(input:checked){background:#fff7ed;border-color:#fdba74}.option-row:has(input:disabled){color:#a8a29e}.option-cost{font-size:12px;color:#78716c;font-weight:600;margin-left:auto}.field-label{display:block;font-size:14px;font-weight:600;margin:18px 0 7px}.field{width:100%;padding:13px 15px;border:1px solid #e7e5e4;border-radius:13px;background:#fafaf9;color:#292524}textarea.field{min-height:75px;resize:vertical}.custom-footer{position:sticky;bottom:0;display:flex;align-items:center;gap:15px;padding:18px 25px;background:white;border-top:1px solid #e7e5e4}.stepper{display:flex;align-items:center;gap:13px}.stepper button{width:42px;height:42px;background:#f5f5f4;border:1px solid #e7e5e4;border-radius:12px;font-size:22px}.stepper output{min-width:22px;text-align:center;font-weight:700}.primary{background:#ea580c;color:white;border:0;border-radius:15px;padding:14px 19px;min-height:50px;font-weight:700;line-height:1.3}.custom-footer .primary{flex:1}.cart-line{padding:16px 0;border-bottom:1px solid #e7e5e4}.cart-line-top{display:flex;justify-content:space-between;align-items:start;gap:13px}.cart-line h3{font-size:15px;margin:0 0 6px}.cart-line p{font-size:12px;color:#78716c;line-height:1.5;margin:0;overflow-wrap:anywhere}.cart-line-actions{display:flex;justify-content:space-between;align-items:center;margin-top:10px}.small-stepper{display:flex;gap:12px;align-items:center}.small-stepper button{width:34px;height:34px;background:#f5f5f4;border:1px solid #e7e5e4;border-radius:9px}.remove{border:0;background:none;color:#9f1239;font-size:12px;padding:10px}.checkout-note{padding:15px 17px;margin:19px 0;border-radius:16px;background:#fff7ed;font-size:13px;line-height:1.5;color:#9a3412}.totals{background:#fafaf9;border-radius:17px;padding:18px;margin:19px 0}.total-row{display:flex;justify-content:space-between;gap:12px;font-size:14px;margin-bottom:10px}.total-row.grand{border-top:1px solid #e7e5e4;padding-top:14px;margin:14px 0 0;font-size:19px;font-weight:700}.grand span:last-child{color:#ea580c}.error{font-size:13px;line-height:1.5;color:#be123c;margin:10px 0}.footer{font-size:12px;color:#78716c;text-align:center;margin-top:30px}@media(max-width:680px){.shell{padding:0 18px 125px}.menu-grid{grid-template-columns:1fr}.hero{height:190px}.hero h1{left:24px;font-size:27px}.cart-bar{width:calc(100% - 36px);bottom:16px;padding:16px 19px}.customer-dialog{width:100%;margin:0 auto;border-radius:28px 28px 0 0;position:fixed;bottom:0;top:auto;max-height:92dvh}.dialog-header{padding:22px 22px 12px}.dialog-body{padding:0 22px 24px}.custom-footer{padding:17px 20px}.stepper{gap:10px}.header-actions{gap:8px}.header-actions a{font-size:12px}.cart-bar-left{font-size:13px;gap:9px}}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasaFlow — Mexican Kitchen</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/masaflow.css">
+  <script>window.FontAwesomeConfig = { autoReplaceSvg: 'nest' };</script>
+  <script defer src="/assets/vendor/fa-solid.min.js"></script>
+  <script defer src="/assets/vendor/fontawesome.min.js"></script>
+  <script defer src="/assets/masaflow-store.js"></script>
+  <script defer src="/assets/masaflow-i18n.js"></script>
+  <script defer src="/assets/masaflow-ui.js"></script>
 </head>
-<body>
-<div class="shell">
-<header class="header"><a class="brand" href="MenuUI.html" aria-label="MasaFlow menu"><span class="brand-mark" aria-hidden="true"><svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor"><path d="M13 2c1 5-3 5-3 9 0 1 1 2 2 2-1-4 4-4 4-7 3 3 5 6 5 9a9 9 0 1 1-18 0c0-4 3-7 5-9-1 5 1 5 2 6-1-4 3-6 3-10Z"/></svg></span><span><span class="brand-title">MasaFlow</span><span class="brand-subtitle">Mexican Kitchen</span></span></a><div class="header-actions"><a id="last-order-link" hidden>Track order</a><a href="businessDashbord.html">Staff</a><button id="search-toggle" class="icon-button" type="button" aria-label="Search menu" aria-expanded="false"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></svg></button></div></header>
-<main><section class="hero" aria-label="Mexican kitchen"><img src="https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_61144eb2ce_200916290fd3f978.png" alt="Fresh Mexican street food platter"><h1>Authentic Masa<br>Crafted Daily</h1></section><p id="order-context" class="context"></p><input id="menu-search" type="search" class="search" aria-label="Search dishes" placeholder="Search dishes" data-testid="menu-search" hidden><section aria-labelledby="categories-title"><h2 id="categories-title" class="section-title">Categories</h2><div id="categories" class="categories" aria-label="Menu categories" data-testid="categories"></div></section><section aria-labelledby="menu-title"><h2 id="menu-title" class="section-title">Our Menu</h2><div id="menu-items" class="menu-grid" data-testid="menu-items"></div></section></main><footer class="footer">Made with masa. Served with care.</footer>
-</div>
-<button id="view-cart" class="cart-bar" type="button" data-testid="view-cart" aria-label="View your cart"><span class="cart-bar-left"><span id="cart-count" class="cart-count">0 items</span><strong>View Cart</strong></span><span class="cart-bar-total"><span id="cart-total">$0.00</span><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></span></button>
-<dialog id="customizer-modal" class="customer-dialog" aria-labelledby="customizer-title" data-testid="customizer"><img id="customizer-image" class="custom-image" alt=""><div class="dialog-header"><h2 id="customizer-title"></h2><button class="icon-button" type="button" data-close="customizer-modal" aria-label="Close customization">✕</button></div><div class="dialog-body"><p id="customizer-price" class="custom-price"></p><p id="customizer-description" class="muted"></p><fieldset><legend class="option-heading">Choose your masa</legend><p class="muted">Choose 1 · Required</p><div id="masa-options" data-testid="masa-options"></div></fieldset><fieldset><legend class="option-heading">Extra add-ons</legend><p class="muted">Choose up to 2 · Optional</p><div id="extra-options" data-testid="extra-options"></div></fieldset><label class="field-label" for="item-notes">Special instructions</label><textarea id="item-notes" class="field" placeholder="For example, no onions" maxlength="300" data-testid="item-notes"></textarea><p id="customizer-error" class="error" role="alert"></p></div><div class="custom-footer"><div class="stepper"><button id="quantity-minus" type="button" aria-label="Decrease quantity" data-testid="quantity-minus">−</button><output id="item-quantity" aria-live="polite">1</output><button id="quantity-plus" type="button" aria-label="Increase quantity" data-testid="quantity-plus">+</button></div><button id="add-to-cart" class="primary" type="button" data-testid="add-to-cart">Add to Order</button></div></dialog>
-<dialog id="checkout-modal" class="customer-dialog" aria-labelledby="checkout-title" data-testid="cart-dialog"><div class="dialog-header"><h2 id="checkout-title">Your Order</h2><button class="icon-button" type="button" data-close="checkout-modal" aria-label="Close cart">✕</button></div><div class="dialog-body"><p class="muted">Review your dishes, then pay cash at the counter.</p><div id="cart-items" data-testid="cart-items"></div><form id="checkout-form"><label class="field-label" for="customer-name">Your name</label><input id="customer-name" name="customerName" class="field" placeholder="Your name for the order" required maxlength="80" autocomplete="given-name" data-testid="customer-name"><label class="field-label" for="order-type">Order for</label><select id="order-type" class="field" data-testid="order-type"><option value="counter">Counter pickup</option><option value="takeout">Takeout</option><option value="dine_in">Dine in</option></select><div id="table-field" hidden><label class="field-label" for="table-number">Table number</label><input id="table-number" class="field" type="number" min="1" max="999" inputmode="numeric" data-testid="table-number"></div><div class="totals"><div class="total-row"><span>Subtotal</span><span id="checkout-subtotal" data-testid="checkout-subtotal">$0.00</span></div><div class="total-row"><span>Tax</span><span id="checkout-tax" data-testid="checkout-tax">$0.00</span></div><p id="tax-note" class="muted">Tax unconfigured · 0%</p><div class="total-row grand"><span>Total</span><span id="checkout-total" data-testid="checkout-total">$0.00</span></div></div><div class="checkout-note"><strong>Pay cash at the counter.</strong><br>Your order waits for payment. The cashier records your cash before the kitchen starts your order.</div><p id="checkout-error" class="error" role="alert" data-testid="checkout-error"></p><button id="place-order" class="primary" style="width:100%" type="submit" data-testid="place-order">Place Order · Pay Cash at Counter</button></form></div></dialog>
-<script src="/assets/masaflow-store.js"></script><script src="/assets/masaflow-i18n.js"></script><script src="/assets/masaflow-ui.js"></script>
-<script>
-(() => {
-  'use strict';
-  const $ = id => document.getElementById(id);
-  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const read = key => {try{return JSON.parse(sessionStorage.getItem(key));}catch{return null;}};
-  const write = (key,value) => {try{sessionStorage.setItem(key,JSON.stringify(value));}catch{}};
-  const cartKey='masaflow.customer.cart.v1',contextKey='masaflow.customer.context.v1',lastKey='masaflow.customer.lastOrder', submissionKey='masaflow.customer.submission.v1';
-  let pendingSubmission=read(submissionKey);
-  if(!pendingSubmission||typeof pendingSubmission.id!=='string'||!pendingSubmission.payload)pendingSubmission=null;
-  let confirmed=false,loadError='',navigating=false;
-  let cart=read(cartKey);
-  cart=Array.isArray(cart)?cart.filter(x=>x && typeof x.menuItemId==='string' && Number.isInteger(x.quantity) && x.quantity>0 && x.quantity<=99 && Array.isArray(x.optionIds)).map(x=>({menuItemId:x.menuItemId,quantity:x.quantity,optionIds:x.optionIds.filter(id=>typeof id==='string'),notes:String(x.notes||'').slice(0,300)})):[];
-  const params=new URLSearchParams(location.search),saved=read(contextKey)||{},types=['counter','takeout','dine_in'];
-  const requestedType=params.has('type')?params.get('type'):saved.orderType;
-  const requestedTable=Number(params.has('table')?params.get('table'):saved.tableNumber);
-  const context={orderType:types.includes(requestedType)?requestedType:'counter',tableNumber:Number.isInteger(requestedTable)&&requestedTable>0&&requestedTable<=999?requestedTable:null};
-  let category='All',search='',custom=null,submitting=false;
-  const menu=()=>MasaFlow.getState().menu||[];
-  const item=id=>menu().find(x=>x.id===id);
-  const money=(cents,currency)=>MasaFlow.money(cents,currency||MasaFlow.getState().settings.currency,MasaFlowI18n.getLocale());
-  function resolve(line){
-    const dish=item(line.menuItemId),options=(dish?.options||[]).filter(x=>line.optionIds.includes(x.id));
-    const valid=Boolean(dish?.available)&&dish.currency===MasaFlow.getState().settings.currency&&options.length===line.optionIds.length&&options.filter(x=>x.group==='masa').length===1&&options.filter(x=>x.group==='extras').length<=2&&options.every(x=>x.available&&x.currency===MasaFlow.getState().settings.currency);
-    const totalCents=((dish?.priceCents||0)+options.reduce((sum,x)=>sum+x.priceCents,0))*line.quantity;
-    return {dish,options,valid,totalCents};
-  }
-  function summary(){const sum=cart.reduce((sum,line)=>{const x=resolve(line);return{count:sum.count+line.quantity,subtotalCents:sum.subtotalCents+x.totalCents,valid:sum.valid&&x.valid};},{count:0,subtotalCents:0,valid:true});const basis=MasaFlow.getState().settings.taxBasisPoints||0;sum.taxCents=Math.round(sum.subtotalCents*basis/10000);sum.totalCents=sum.subtotalCents+sum.taxCents;return sum;}
-  function saveCart(){write(cartKey,cart);}
-  function renderCategories(){const names=['All',...new Set(menu().map(x=>x.category))];if(!names.includes(category))category='All';$('categories').innerHTML=names.map(x=>`<button type="button" class="category" data-category="${esc(x)}" aria-pressed="${x===category}" data-testid="category-${esc(x.toLowerCase().replace(/[^a-z0-9]+/g,'-'))}">${esc(x)}</button>`).join('');}
-  function renderMenu(){const dishes=menu().filter(x=>(category==='All'||x.category===category)&&`${x.name} ${x.description||''}`.toLowerCase().includes(search));$('menu-items').innerHTML=dishes.length?dishes.map(x=>{const available=x.available&&x.currency===MasaFlow.getState().settings.currency&&(x.options||[]).some(o=>o.group==='masa'&&o.available&&o.currency===MasaFlow.getState().settings.currency);return`<article class="menu-card" data-testid="menu-item-${esc(x.id)}">${x.imageUrl?`<img class="dish-image" src="${esc(x.imageUrl)}" alt="${esc(x.name)}" loading="lazy">`:''}<div class="dish-info"><h3>${esc(x.name)}</h3><p>${esc(x.description||'')}</p><div class="dish-footer"><span class="price">${esc(money(x.priceCents,x.currency))}</span>${available?`<button class="add" type="button" data-customize="${esc(x.id)}" data-testid="customize-${esc(x.id)}" aria-label="Customize ${esc(x.name)}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>`:'<span class="sold-out">Sold out</span><button class="add" disabled aria-label="Sold out">+</button>'}</div></div></article>`;}).join(''):'<div class="empty">No dishes match this search.</div>';}
-  function renderCart(){
-    const sum=summary();$('cart-count').textContent=`${sum.count} ${sum.count===1?'item':'items'}`;$('cart-total').textContent=money(sum.totalCents);$('checkout-subtotal').textContent=money(sum.subtotalCents);$('checkout-tax').textContent=money(sum.taxCents);$('tax-note').textContent=MasaFlow.getState().settings.taxConfigured?'Tax':'Tax unconfigured · 0%';$('checkout-total').textContent=money(sum.totalCents);$('view-cart').setAttribute('aria-label',`View your cart, ${sum.count} items, ${money(sum.totalCents)}`);
-    $('cart-items').innerHTML=cart.length?cart.map((line,index)=>{const x=resolve(line);return`<div class="cart-line" data-testid="cart-line-${index}"><div class="cart-line-top"><div><h3>${esc(x.dish?.name||'Unavailable dish')}</h3><p>${esc(x.options.map(o=>o.name).join(' · '))}</p>${line.notes?`<p>${esc(line.notes)}</p>`:''}${x.valid?'':'<p class="sold-out">A dish or option is sold out. Remove it and choose again.</p>'}</div><strong>${esc(money(x.totalCents))}</strong></div><div class="cart-line-actions"><div class="small-stepper"><button type="button" data-change="${index}" data-delta="-1" aria-label="Decrease ${esc(x.dish?.name||'dish')} quantity">−</button><span>${line.quantity}</span><button type="button" data-change="${index}" data-delta="1" aria-label="Increase ${esc(x.dish?.name||'dish')} quantity" ${!x.valid||line.quantity>=99?'disabled':''}>+</button></div><button class="remove" type="button" data-remove="${index}" aria-label="Remove ${esc(x.dish?.name||'dish')}">Remove</button></div></div>`;}).join(''):'<div class="empty">Your cart is empty. Add a freshly made dish to begin.</div>';
-    $('place-order').disabled=submitting||!confirmed||(!pendingSubmission&&(!cart.length||!sum.valid));$('place-order').textContent=submitting?'Placing order…':pendingSubmission?'Retry original order':'Place Order · Pay Cash at Counter';
-    ['customer-name','order-type','table-number'].forEach(id=>$(id).disabled=Boolean(pendingSubmission)||submitting||(id==='table-number'&&context.orderType!=='dine_in'));
-    $('cart-items').querySelectorAll('button').forEach(button=>button.disabled=Boolean(pendingSubmission)||submitting);
-    if(pendingSubmission&&!submitting)$('checkout-error').textContent='An earlier submission is unconfirmed. Retry the original order before editing it.';
-    if(!sum.valid)$('checkout-error').textContent='A cart item is no longer available. Remove it before placing your order.';else if(!submitting&&!pendingSubmission)$('checkout-error').textContent=loadError;
-  }
-  function renderCustomizer(){
-    if(!custom)return;const dish=item(custom.id);if(!dish){$('customizer-modal').close();custom=null;return;}
-    $('customizer-title').textContent=dish.name;$('customizer-price').textContent=`${money(dish.priceCents)} base price`;$('customizer-description').textContent=dish.description||'';
-    const options=dish.options||[],extraCount=options.filter(o=>o.group==='extras'&&custom.optionIds.includes(o.id)).length;
-    for(const [group,target]of[['masa','masa-options'],['extras','extra-options']]){$(target).innerHTML=options.filter(o=>o.group===group).map(o=>{const checked=custom.optionIds.includes(o.id),disabled=!o.available||(!checked&&group==='extras'&&extraCount>=2);return`<label class="option-row"><span>${esc(o.name)}${!o.available?' · Sold out':''}</span><span class="option-cost">${o.priceCents?'+'+esc(money(o.priceCents)):'Included'}</span><input type="${group==='masa'?'radio':'checkbox'}" name="${group}" value="${esc(o.id)}" data-option="${esc(o.id)}" data-group="${group}" aria-label="${esc(o.name)}" data-testid="option-${esc(o.id)}" ${checked?'checked':''} ${disabled?'disabled':''}></label>`;}).join('')||'<p class="muted">No extras available for this dish.</p>';}
-    const x=resolve({menuItemId:custom.id,quantity:custom.quantity,optionIds:custom.optionIds});$('item-quantity').value=custom.quantity;$('item-quantity').textContent=custom.quantity;$('quantity-minus').disabled=custom.quantity<=1;$('quantity-plus').disabled=custom.quantity>=99;$('add-to-cart').textContent=`Add to Order · ${money(x.totalCents)}`;$('add-to-cart').disabled=!x.valid;
-    $('customizer-error').textContent=!dish.available?'This dish is now sold out.':custom.optionIds.some(id=>!options.find(o=>o.id===id&&o.available))?'A selected option is sold out. Choose an available option.':'';
-  }
-  function openCustomizer(id){if(!confirmed)return MasaFlowUI.toast('Connecting to the local service…','error');if(pendingSubmission)return MasaFlowUI.toast('An earlier submission is unconfirmed. Retry the original order before editing it.','error');const dish=item(id);if(!dish?.available||!(dish.options||[]).some(o=>o.group==='masa'&&o.available)){MasaFlowUI.toast('This dish is currently sold out.','error');return;}custom={id,quantity:1,optionIds:[],notes:''};$('item-notes').value='';$('customizer-image').hidden=!dish.imageUrl;if(dish.imageUrl)$('customizer-image').src=dish.imageUrl;$('customizer-image').alt=dish.name;renderCustomizer();$('customizer-modal').showModal();}
-  function setContext(){context.orderType=$('order-type').value;const dineIn=context.orderType==='dine_in';$('table-field').hidden=!dineIn;$('table-number').required=dineIn;$('table-number').disabled=!dineIn;context.tableNumber=dineIn?Number($('table-number').value)||null:null;write(contextKey,context);$('order-context').textContent=dineIn?`Dine in${context.tableNumber?' · Table '+context.tableNumber:''}`:context.orderType==='takeout'?'Takeout · Pay cash at counter':'Counter pickup · Pay cash at counter';}
-  $('categories').addEventListener('click',e=>{const b=e.target.closest('[data-category]');if(b){category=b.dataset.category;renderCategories();renderMenu();}});
-  $('menu-items').addEventListener('click',e=>{const b=e.target.closest('[data-customize]');if(b)openCustomizer(b.dataset.customize);});
-  $('search-toggle').addEventListener('click',()=>{const show=$('menu-search').hidden;$('menu-search').hidden=!show;$('search-toggle').setAttribute('aria-expanded',show);if(show)$('menu-search').focus();else{search='';$('menu-search').value='';renderMenu();}});
-  $('menu-search').addEventListener('input',e=>{search=e.target.value.trim().toLowerCase();renderMenu();});
-  $('customizer-modal').addEventListener('change',e=>{const input=e.target.closest('[data-option]');if(!input||!custom)return;const dish=item(custom.id);if(input.dataset.group==='masa')custom.optionIds=custom.optionIds.filter(id=>dish.options.find(o=>o.id===id)?.group!=='masa');if(input.checked)custom.optionIds.push(input.value);else custom.optionIds=custom.optionIds.filter(id=>id!==input.value);custom.optionIds=[...new Set(custom.optionIds)];renderCustomizer();});
-  $('quantity-minus').addEventListener('click',()=>{if(custom&&custom.quantity>1){custom.quantity--;renderCustomizer();}});$('quantity-plus').addEventListener('click',()=>{if(custom&&custom.quantity<99){custom.quantity++;renderCustomizer();}});$('item-notes').addEventListener('input',e=>{if(custom)custom.notes=e.target.value;});
-  $('add-to-cart').addEventListener('click',()=>{if(!custom)return;const line={menuItemId:custom.id,quantity:custom.quantity,optionIds:[...custom.optionIds],notes:custom.notes.trim()};if(!resolve(line).valid){MasaFlowUI.toast('Choose an available masa and up to two extras.','error');renderCustomizer();return;}cart.push(line);saveCart();renderCart();$('customizer-modal').close();custom=null;MasaFlowUI.toast('Added to your order.','success');});
-  $('view-cart').addEventListener('click',()=>{renderCart();$('checkout-modal').showModal();});document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',()=>$(b.dataset.close).close()));
-  document.querySelectorAll('.customer-dialog').forEach(dialog=>dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}}));
-  $('cart-items').addEventListener('click',e=>{if(submitting||pendingSubmission)return;const remove=e.target.closest('[data-remove]'),change=e.target.closest('[data-change]');if(remove)cart.splice(Number(remove.dataset.remove),1);else if(change){const index=Number(change.dataset.change),next=cart[index].quantity+Number(change.dataset.delta);if(next<=0)cart.splice(index,1);else if(next<=99)cart[index].quantity=next;}else return;saveCart();renderCart();});
-  $('order-type').value=context.orderType;$('table-number').value=context.tableNumber||'';$('order-type').addEventListener('change',setContext);$('table-number').addEventListener('input',setContext);setContext();
-  function finishSubmission(order){if(navigating)return;navigating=true;write(lastKey,order.id);write(submissionKey,null);pendingSubmission=null;cart=[];saveCart();location.href=`readypickupUI.html?order=${encodeURIComponent(order.id)}&lang=${MasaFlowI18n.getLocale()}`;}
-  $('checkout-form').addEventListener('submit',async e=>{
-    e.preventDefault();if(submitting||!confirmed)return;
-    if(!pendingSubmission){
-      const customerName=$('customer-name').value.trim(),sum=summary(),tableNumber=context.orderType==='dine_in'?Number($('table-number').value):null;
-      if(!customerName){$('checkout-error').textContent='Enter your name so we can identify your order.';$('customer-name').focus();return;}
-      if(!cart.length||!sum.valid){$('checkout-error').textContent='Choose available dishes and options before placing your order.';return;}
-      if(context.orderType==='dine_in'&&(!Number.isInteger(tableNumber)||tableNumber<1||tableNumber>999)){$('checkout-error').textContent='Enter a valid table number.';return;}
-      const items=cart.map(line=>({menuItemId:line.menuItemId,quantity:line.quantity,optionIds:[...line.optionIds],notes:line.notes}));
-      pendingSubmission={id:crypto.randomUUID(),payload:{customerName,orderType:context.orderType,tableNumber,items}};write(submissionKey,pendingSubmission);
-    }
-    submitting=true;loadError='';$('checkout-error').textContent='';renderCart();
-    try {const order=await MasaFlow.createDraft({...pendingSubmission.payload,submissionId:pendingSubmission.id});finishSubmission(order);}
-    catch(error){
-      submitting=false;
-      if(error.statusCode&&error.statusCode>=400&&error.statusCode<500&&error.statusCode!==409){write(submissionKey,null);pendingSubmission=null;loadError=error.message||'Could not place this order. Please try again.';}
-      else loadError=error.statusCode===409?'This submission conflicts with the saved order. Reload to recover it.':'The result is unconfirmed. Reconnect and retry the original order; it will not create a duplicate.';
-      renderCart();$('checkout-error').textContent=loadError;
-    }
-  });
-  if(pendingSubmission){cart=pendingSubmission.payload.items.map(line=>({...line,optionIds:[...line.optionIds]}));saveCart();$('customer-name').value=pendingSubmission.payload.customerName||'';context.orderType=pendingSubmission.payload.orderType||'counter';context.tableNumber=pendingSubmission.payload.tableNumber;$('order-type').value=context.orderType;$('table-number').value=context.tableNumber||'';setContext();}
-  const lastOrder=read(lastKey);if(typeof lastOrder==='string'){$('last-order-link').href=`readypickupUI.html?order=${encodeURIComponent(lastOrder)}`;$('last-order-link').hidden=false;}
-  function refresh(){
-    const connection=MasaFlow.getConnection?.();confirmed=connection?connection.hasConfirmedState:confirmed;
-    const existing=pendingSubmission&&MasaFlow.getState().orders.find(order=>order.submissionId===pendingSubmission.id);
-    if(existing){finishSubmission(existing);return;}
-    if(!confirmed){$('menu-items').innerHTML='<div class="empty">'+esc(loadError||'Connecting to the local service…')+'</div>';$('categories').innerHTML='';renderCart();return;}
-    if(confirmed)loadError='';renderCategories();renderMenu();renderCart();if(custom&&$('customizer-modal').open)renderCustomizer();
-  }
-  MasaFlow.subscribe(()=>{confirmed=true;refresh();});MasaFlowI18n.subscribe(refresh);
-  document.addEventListener('masaflow:connection',e=>{if(e.detail.connected){confirmed=true;loadError='';}refresh();});
-  $('menu-items').innerHTML='<div class="empty">Connecting to the local service…</div>';
-  Promise.resolve(MasaFlow.ready).then(()=>{confirmed=true;refresh();}).catch(()=>{loadError='Menu service unavailable. Refresh this page to reconnect.';if(!confirmed)$('menu-items').innerHTML='<div class="empty">'+loadError+'</div>';renderCart();});
+<body class="bg-stone-50 text-stone-900 pb-24">
 
-})();
-</script>
+  <!-- Header -->
+  <header id="header" class="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-stone-100 px-4 py-4 flex justify-between items-center">
+    <div class="w-full max-w-[46rem] mx-auto flex justify-between items-center">
+      <a href="MenuUI.html" aria-label="MasaFlow menu" class="flex items-center gap-2">
+        <!-- flex + leading-none: the mockup file has no doctype, so its icon sits in a line box with no extra leading. -->
+        <div class="bg-orange-500 text-white p-2 rounded-xl shadow-lg shadow-orange-200 flex">
+          <i class="fa-solid fa-fire-flame-curved text-lg leading-none" aria-hidden="true"></i>
+        </div>
+        <div>
+          <h1 class="font-sans text-xl font-bold leading-none text-orange-600">MasaFlow</h1>
+          <p class="text-[10px] text-stone-400 font-medium tracking-widest uppercase">Mexican Kitchen</p>
+        </div>
+      </a>
+      <div class="flex items-center gap-3" data-mf-language-host>
+        <a id="last-order-link" hidden class="relative text-sm font-semibold text-orange-600 py-2.5 before:absolute before:inset-x-0 before:-inset-y-1 before:content-['']">Track order</a>
+        <a href="businessDashbord.html" class="relative text-xs font-medium text-stone-400 py-3 before:absolute before:-inset-x-2.5 before:-inset-y-1 before:content-['']">Staff</a>
+        <button id="search-toggle" type="button" aria-label="Search menu" aria-expanded="false" aria-controls="menu-search" class="relative w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 before:absolute before:-inset-0.5 before:content-['']">
+          <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto">
+    <div class="px-4">
+      <input id="menu-search" type="search" data-testid="menu-search" aria-label="Search dishes" placeholder="Search dishes" class="mf-input block mt-4" hidden>
+    </div>
+
+    <!-- Hero -->
+    <section class="px-4 mt-6" aria-label="Mexican kitchen">
+      <div class="relative rounded-3xl overflow-hidden h-48 bg-stone-900 group">
+        <img class="w-full h-full object-cover opacity-70 group-hover:scale-110 transition-transform duration-700" src="https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_61144eb2ce_200916290fd3f978.png" alt="Fresh Mexican street food platter">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent p-6 flex flex-col justify-end">
+          <span id="order-context" class="bg-orange-500 text-white text-[10px] font-bold px-2 py-1 rounded-md w-fit mb-2 uppercase">Counter pickup</span>
+          <h2 class="font-sans text-2xl text-white font-bold leading-tight">Authentic Masa<br>Crafted Daily</h2>
+        </div>
+      </div>
+    </section>
+
+    <!-- Categories -->
+    <section class="mt-8" aria-labelledby="categories-title">
+      <div class="flex items-center justify-between px-4 mb-4">
+        <h3 id="categories-title" class="font-sans text-lg font-bold">Categories</h3>
+        <button id="see-all" type="button" class="relative text-orange-500 text-sm font-semibold before:absolute before:-inset-3 before:content-['']">See All</button>
+      </div>
+      <!-- py-2 -my-2 leaves room for the focus ring, which the scroll container would otherwise clip. -->
+      <div id="categories" data-testid="categories" role="group" aria-label="Menu categories" class="flex gap-4 overflow-x-auto no-scrollbar px-4 py-2 -my-2 scroll-px-4"></div>
+    </section>
+
+    <!-- Menu items -->
+    <section class="mt-8 px-4" aria-labelledby="menu-title">
+      <h3 id="menu-title" class="font-sans text-lg font-bold mb-4">Our Menu</h3>
+      <div id="menu-items" data-testid="menu-items" class="grid grid-cols-1 gap-6 md:grid-cols-2">
+        <p class="md:col-span-2 p-6 border border-dashed border-stone-200 rounded-3xl text-center text-sm text-stone-400">Loading the menu…</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Floating cart bar -->
+  <div class="fixed bottom-6 left-4 right-4 z-50 md:left-1/2 md:right-auto md:w-full md:max-w-[46rem] md:-translate-x-1/2">
+    <button id="view-cart" type="button" data-testid="view-cart" aria-label="View your cart" class="w-full bg-stone-900 text-white py-4 px-6 rounded-2xl shadow-2xl flex items-center justify-between group active:scale-95 transition-all">
+      <div class="flex items-center gap-3">
+        <div class="bg-white/20 px-2 py-1 rounded text-sm font-bold" id="cart-count">0 Items</div>
+        <span class="font-bold tracking-wide uppercase text-sm">View Cart</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="font-bold" id="cart-total">$0.00</span>
+        <i class="fa-solid fa-chevron-right text-xs group-hover:translate-x-1 transition-transform" aria-hidden="true"></i>
+      </div>
+    </button>
+  </div>
+
+  <!-- Item customizer. The <dialog> is a transparent full-screen flex box, so the sheet sits at the bottom edge like the mockup overlay. -->
+  <dialog id="customizer-modal" data-testid="customizer" aria-labelledby="customizer-title" class="fixed inset-0 m-0 w-full h-full max-w-none max-h-none p-0 overflow-hidden bg-transparent open:flex items-end justify-center md:items-center backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+    <div class="relative bg-white w-full max-w-md h-[90vh] rounded-t-[40px] flex flex-col overflow-hidden animate-slide-up md:rounded-[40px]">
+      <div class="relative h-64 flex-shrink-0">
+        <img id="customizer-image" class="w-full h-full object-cover" alt="" data-photo>
+        <div id="customizer-placeholder" class="w-full h-full bg-orange-50 flex items-center justify-center text-orange-300" hidden>
+          <i class="fa-solid fa-utensils text-6xl" aria-hidden="true"></i>
+        </div>
+        <button type="button" data-close="customizer-modal" aria-label="Close customization" class="absolute top-6 right-6 z-10 w-10 h-10 bg-white/90 backdrop-blur shadow-lg rounded-full flex items-center justify-center text-stone-800 before:absolute before:-inset-0.5 before:content-['']">
+          <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+        <div class="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent"></div>
+        <div class="absolute bottom-0 left-0 p-8">
+          <h3 id="customizer-title" class="font-sans text-2xl font-bold"></h3>
+          <p id="customizer-price" class="text-orange-600 font-bold"></p>
+        </div>
+      </div>
+
+      <!-- pb-36 rather than the mockup pb-32: a three-digit total wraps the button, and the last field must still clear the footer. -->
+      <div id="customizer-scroll" class="flex-1 overflow-y-auto overscroll-contain px-8 pb-36 no-scrollbar">
+        <p id="customizer-description" class="text-sm text-stone-500 leading-relaxed"></p>
+
+        <div class="mt-6">
+          <div class="flex justify-between items-center mb-4">
+            <h4 id="masa-heading" class="text-sm font-bold text-stone-400 uppercase tracking-widest">Choose Your Masa</h4>
+            <span class="text-[10px] font-bold text-stone-400 uppercase">Required · choose 1</span>
+          </div>
+          <div id="masa-options" data-testid="masa-options" role="radiogroup" aria-labelledby="masa-heading" class="space-y-3"></div>
+        </div>
+
+        <div id="included-section" class="mt-8" hidden>
+          <div class="flex justify-between items-center gap-3 mb-4">
+            <h4 id="included-heading" class="text-sm font-bold text-stone-400 uppercase tracking-widest">Included Veggies &amp; Sides</h4>
+            <label class="flex items-center gap-2 flex-shrink-0 cursor-pointer">
+              <span class="text-[10px] font-bold text-stone-400 uppercase">On the side</span>
+              <button type="button" id="side-toggle" role="switch" aria-checked="false" aria-label="Toppings on the side" data-testid="side-toggle" class="w-8 h-4 bg-stone-200 rounded-full relative transition-colors disabled:opacity-50 before:absolute before:-inset-x-2 before:-inset-y-4 before:content-['']">
+                <span id="side-knob" class="absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform"></span>
+              </button>
+            </label>
+          </div>
+          <div id="included-options" data-testid="included-options" role="group" aria-labelledby="included-heading" class="space-y-3"></div>
+        </div>
+
+        <div id="extras-section" class="mt-8">
+          <div class="flex justify-between items-center mb-4">
+            <h4 id="extras-heading" class="text-sm font-bold text-stone-400 uppercase tracking-widest">Extra Add-Ons</h4>
+            <span class="text-[10px] font-bold text-stone-400 uppercase">Optional · up to 2</span>
+          </div>
+          <div id="extra-options" data-testid="extra-options" role="group" aria-labelledby="extras-heading" class="space-y-3"></div>
+        </div>
+
+        <div class="mt-8">
+          <label for="item-notes" class="block text-sm font-bold text-stone-400 uppercase tracking-widest mb-4">Special Instructions</label>
+          <textarea id="item-notes" data-testid="item-notes" maxlength="300" rows="3" placeholder="For example, no onions" class="mf-input"></textarea>
+        </div>
+
+        <p id="customizer-error" role="alert" class="text-sm font-medium text-red-600 mt-4 empty:hidden"></p>
+      </div>
+
+      <div class="absolute bottom-0 left-0 right-0 p-6 bg-white/80 backdrop-blur-md border-t border-stone-100">
+        <div class="flex items-center gap-3">
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <button id="quantity-minus" type="button" data-testid="quantity-minus" aria-label="Decrease quantity" class="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100">
+              <i class="fa-solid fa-minus text-xs" aria-hidden="true"></i>
+            </button>
+            <output id="item-quantity" aria-live="polite" class="min-w-[1.5rem] text-center font-bold">1</output>
+            <button id="quantity-plus" type="button" data-testid="quantity-plus" aria-label="Increase quantity" class="w-11 h-11 rounded-full bg-stone-100 flex items-center justify-center text-stone-600 active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100">
+              <i class="fa-solid fa-plus text-xs" aria-hidden="true"></i>
+            </button>
+          </div>
+          <button id="add-to-cart" type="button" data-testid="add-to-cart" class="w-full bg-orange-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:shadow-none disabled:active:scale-100">Add to Order</button>
+        </div>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Cart and checkout -->
+  <dialog id="checkout-modal" data-testid="cart-dialog" aria-labelledby="checkout-title" class="fixed inset-0 m-0 w-full h-full max-w-none max-h-none p-0 overflow-hidden bg-transparent open:flex items-end justify-center md:items-center backdrop:bg-black/60 backdrop:backdrop-blur-sm">
+    <div class="bg-white w-full max-w-md rounded-t-[40px] p-8 animate-slide-up max-h-[92dvh] overflow-y-auto overscroll-contain no-scrollbar md:rounded-[40px]">
+      <!-- autofocus: without it the scrollable sheet itself takes the dialog's initial focus and draws a ring around the whole sheet. -->
+      <button type="button" data-close="checkout-modal" aria-label="Close cart" autofocus class="relative block w-12 h-1.5 bg-stone-200 rounded-full mx-auto mb-8 before:absolute before:-inset-x-4 before:-inset-y-5 before:content-['']"></button>
+      <h3 id="checkout-title" class="font-sans text-2xl font-bold mb-6">Complete Order</h3>
+
+      <div id="cart-items" data-testid="cart-items" class="space-y-3 mb-8"></div>
+
+      <form id="checkout-form">
+        <div class="space-y-4 mb-8">
+          <div>
+            <label for="customer-name" class="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Your Name</label>
+            <input id="customer-name" name="customerName" type="text" data-testid="customer-name" required maxlength="80" autocomplete="given-name" placeholder="Name for your order" class="w-full bg-stone-100 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-orange-500 outline-none transition-all">
+          </div>
+          <div>
+            <label for="customer-phone" class="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Phone Number (Optional)</label>
+            <input id="customer-phone" name="customerPhone" type="tel" data-testid="customer-phone" autocomplete="tel" maxlength="24" placeholder="(555) 000-0000" class="w-full bg-stone-100 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-orange-500 outline-none transition-all">
+          </div>
+          <div>
+            <label for="order-type" class="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Order For</label>
+            <div class="relative">
+              <select id="order-type" data-testid="order-type" class="w-full appearance-none bg-stone-100 border-none rounded-2xl px-5 py-4 pr-12 focus:ring-2 focus:ring-orange-500 outline-none transition-all">
+                <option value="counter">Counter pickup</option>
+                <option value="takeout">Takeout</option>
+                <option value="dine_in">Dine in</option>
+              </select>
+              <i class="fa-solid fa-chevron-down text-xs text-stone-400 absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true"></i>
+            </div>
+          </div>
+          <div id="table-field" hidden>
+            <label for="table-number" class="block text-xs font-bold text-stone-400 uppercase tracking-widest mb-2">Table Number</label>
+            <input id="table-number" type="number" data-testid="table-number" min="1" max="999" inputmode="numeric" class="w-full bg-stone-100 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-orange-500 outline-none transition-all">
+          </div>
+        </div>
+
+        <div class="bg-stone-50 rounded-3xl p-6 mb-8">
+          <div class="flex justify-between items-center mb-2">
+            <span class="text-stone-500 text-sm">Subtotal</span>
+            <span id="checkout-subtotal" data-testid="checkout-subtotal" class="font-semibold">$0.00</span>
+          </div>
+          <div id="tax-row" class="flex justify-between items-center mb-2" hidden>
+            <span class="text-stone-500 text-sm">Tax</span>
+            <span id="checkout-tax" data-testid="checkout-tax" class="font-semibold">$0.00</span>
+          </div>
+          <div class="border-t border-stone-200 pt-4 flex justify-between items-center">
+            <span class="font-bold">Total</span>
+            <span id="checkout-total" data-testid="checkout-total" class="text-2xl font-bold text-orange-600">$0.00</span>
+          </div>
+          <p class="text-center text-stone-400 text-[10px] mt-4 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-circle-info" aria-hidden="true"></i> Pay in Cash at the Counter
+          </p>
+          <p class="text-center text-stone-400 text-[10px] mt-1">The kitchen starts once the cashier records your cash.</p>
+        </div>
+
+        <p id="checkout-error" role="alert" data-testid="checkout-error" class="text-sm font-medium text-red-600 text-center mb-4 empty:hidden"></p>
+        <button id="place-order" type="submit" data-testid="place-order" class="w-full bg-orange-600 text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-orange-200 active:scale-95 transition-all disabled:opacity-50 disabled:shadow-none disabled:active:scale-100">Place Order</button>
+        <button type="button" data-close="checkout-modal" class="relative w-full mt-4 text-stone-400 font-semibold text-sm before:absolute before:inset-x-0 before:-inset-y-3 before:content-['']">Cancel</button>
+      </form>
+    </div>
+  </dialog>
+
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    'use strict';
+    const $ = id => document.getElementById(id);
+    const esc = MasaFlowUI.escape;
+    const money = cents => MasaFlow.money(cents);
+    const read = key => { try { return JSON.parse(sessionStorage.getItem(key)); } catch { return null; } };
+    const write = (key, value) => { try { sessionStorage.setItem(key, JSON.stringify(value)); } catch {} };
+    const slug = text => String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const strings = list => Array.isArray(list) ? [...new Set(list.filter(value => typeof value === 'string'))] : [];
+
+    const cartKey = 'masaflow.customer.cart.v1', contextKey = 'masaflow.customer.context.v1', lastKey = 'masaflow.customer.lastOrder', submissionKey = 'masaflow.customer.submission.v1';
+    const PHONE = /^[0-9+() .-]{7,24}$/; // same rule as the engine's createDraft
+    const ORDER_TYPES = { counter: 'Counter pickup', takeout: 'Takeout', dine_in: 'Dine in' };
+
+    // Full class strings only: the CSS build cannot see class names assembled at runtime.
+    const CATEGORY_ICONS = {
+      huaraches: 'fa-solid fa-wheat-awn text-2xl',
+      sopes: 'fa-solid fa-circle text-2xl',
+      pambazos: 'fa-solid fa-bread-slice text-2xl',
+      gorditas: 'fa-solid fa-burger text-2xl',
+      quesadillas: 'fa-solid fa-cheese text-2xl',
+      tacos: 'fa-solid fa-pepper-hot text-2xl',
+      beverages: 'fa-solid fa-mug-hot text-2xl',
+      drinks: 'fa-solid fa-mug-hot text-2xl'
+    };
+    const ALL_ICON = 'fa-solid fa-utensils text-2xl';
+    const OTHER_ICON = 'fa-solid fa-bowl-food text-2xl';
+    const TILE = {
+      true: 'w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-orange-600 group-focus:bg-orange-500 group-focus:text-white transition-colors duration-300',
+      false: 'w-16 h-16 rounded-2xl bg-stone-100 flex items-center justify-center text-stone-400 group-focus:bg-orange-500 group-focus:text-white transition-colors duration-300'
+    };
+    const TILE_LABEL = { true: 'text-xs font-semibold text-stone-900', false: 'text-xs font-semibold text-stone-500' };
+    const CARD = {
+      true: 'bg-white rounded-3xl p-4 shadow-sm border border-stone-100 flex gap-4 items-center cursor-pointer',
+      false: 'bg-white rounded-3xl p-4 shadow-sm border border-stone-100 flex gap-4 items-center'
+    };
+    const PHOTO = { true: 'w-full h-full object-cover', false: 'w-full h-full object-cover grayscale' };
+    const NO_PHOTO = {
+      true: '<div class="w-24 h-24 rounded-2xl flex-shrink-0 bg-orange-50 flex items-center justify-center text-orange-300"><i class="fa-solid fa-utensils text-2xl" aria-hidden="true"></i></div>',
+      false: '<div class="w-24 h-24 rounded-2xl flex-shrink-0 bg-stone-100 flex items-center justify-center text-stone-300"><i class="fa-solid fa-utensils text-2xl" aria-hidden="true"></i></div>'
+    };
+    const NOTE = 'p-6 border border-dashed border-stone-200 rounded-3xl text-center text-sm text-stone-400';
+    const PLAIN_ROW = {
+      true: 'flex items-center justify-between gap-3 p-4 bg-stone-50 rounded-2xl cursor-pointer active:bg-stone-100 transition-colors',
+      false: 'flex items-center justify-between gap-3 p-4 bg-stone-50 rounded-2xl cursor-not-allowed'
+    };
+    const ADDON_ROW = {
+      open: 'flex items-center justify-between gap-3 p-4 bg-white border border-stone-100 rounded-2xl cursor-pointer shadow-sm active:bg-orange-50 transition-colors',
+      limit: 'flex items-center justify-between gap-3 p-4 bg-white border border-stone-100 rounded-2xl cursor-not-allowed shadow-sm opacity-50',
+      soldOut: 'flex items-center justify-between gap-3 p-4 bg-white border border-stone-100 rounded-2xl cursor-not-allowed shadow-sm'
+    };
+    const OPTION_NAME = { true: 'font-medium', false: 'font-medium text-stone-400' };
+    const SWITCH = {
+      true: "w-8 h-4 bg-orange-500 rounded-full relative transition-colors disabled:opacity-50 before:absolute before:-inset-x-2 before:-inset-y-4 before:content-['']",
+      false: "w-8 h-4 bg-stone-200 rounded-full relative transition-colors disabled:opacity-50 before:absolute before:-inset-x-2 before:-inset-y-4 before:content-['']"
+    };
+    const KNOB = {
+      true: 'absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform translate-x-4',
+      false: 'absolute left-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm transition-transform'
+    };
+    const CART_STEP = "relative w-8 h-8 rounded-full bg-white border border-stone-200 text-stone-600 flex items-center justify-center active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100 before:absolute before:-inset-1.5 before:content-['']";
+
+    function loadCart() {
+      const stored = read(cartKey);
+      if (!Array.isArray(stored)) return [];
+      return stored
+        .filter(line => line && typeof line.menuItemId === 'string' && Number.isInteger(line.quantity) && line.quantity > 0 && line.quantity <= 99 && Array.isArray(line.optionIds))
+        .map(line => ({
+          menuItemId: line.menuItemId,
+          quantity: line.quantity,
+          optionIds: strings(line.optionIds),
+          // Carts saved before toppings existed have neither field.
+          removed: strings(line.removed),
+          onTheSide: line.onTheSide === true,
+          notes: String(line.notes || '').slice(0, 300)
+        }));
+    }
+    function loadContext() {
+      const params = new URLSearchParams(location.search), saved = read(contextKey) || {};
+      const type = params.has('type') ? params.get('type') : saved.orderType;
+      const table = Number(params.has('table') ? params.get('table') : saved.tableNumber);
+      return {
+        orderType: Object.keys(ORDER_TYPES).includes(type) ? type : 'counter',
+        tableNumber: Number.isInteger(table) && table > 0 && table <= 999 ? table : null
+      };
+    }
+
+    let cart = loadCart();
+    const context = loadContext();
+    let category = 'All', search = '', custom = null, submitting = false, formError = '', navigating = false;
+    // An order whose result never came back (connection dropped mid-submit). It is retried with the same
+    // submission id, so the service returns the saved order instead of creating a second one.
+    let pendingSubmission = read(submissionKey);
+    if (!pendingSubmission || typeof pendingSubmission.id !== 'string' || !pendingSubmission.payload) pendingSubmission = null;
+
+    const menu = () => MasaFlow.getState().menu || [];
+    const currency = () => MasaFlow.getState().settings.currency;
+    const dishById = id => menu().find(dish => dish.id === id);
+    // A dish still priced in a legacy currency cannot be ordered until staff reprice it.
+    const current = record => record?.currency === undefined || record.currency === currency();
+    const canOrder = dish => Boolean(dish?.available) && current(dish) && (dish.options || []).some(option => option.group === 'masa' && option.available && current(option));
+    const saveCart = () => write(cartKey, cart);
+
+    // Rebuilding a list with innerHTML drops keyboard focus; put it back on the same control.
+    const FOCUS_KEYS = ['data-testid', 'data-change', 'data-delta', 'data-remove'];
+    const rendered = new WeakMap();
+    function renderInto(host, html) {
+      if (rendered.get(host) === html) return;
+      rendered.set(host, html);
+      const active = host.contains(document.activeElement) ? document.activeElement : null;
+      const selector = active ? FOCUS_KEYS.filter(name => active.hasAttribute(name)).map(name => `[${name}="${CSS.escape(active.getAttribute(name))}"]`).join('') : '';
+      host.innerHTML = html;
+      if (selector) host.querySelector(selector)?.focus();
+    }
+
+    function resolve(line) {
+      const dish = dishById(line.menuItemId);
+      const options = (dish?.options || []).filter(option => line.optionIds.includes(option.id));
+      const included = dish?.included || [];
+      // The engine rejects a removed topping the dish does not include, so stale names are dropped here.
+      const removed = (line.removed || []).filter(name => included.includes(name));
+      const valid = Boolean(dish?.available) && current(dish)
+        && options.length === line.optionIds.length
+        && options.filter(option => option.group === 'masa').length === 1
+        && options.filter(option => option.group === 'extras').length <= 2
+        && options.every(option => option.available && current(option));
+      const totalCents = ((dish?.priceCents || 0) + options.reduce((sum, option) => sum + option.priceCents, 0)) * line.quantity;
+      return { dish, options, removed, onTheSide: line.onTheSide === true && removed.length < included.length, valid, totalCents };
+    }
+    function summary() {
+      return cart.reduce((sum, line) => {
+        const item = resolve(line);
+        return { count: sum.count + line.quantity, totalCents: sum.totalCents + item.totalCents, valid: sum.valid && item.valid };
+      }, { count: 0, totalCents: 0, valid: true });
+    }
+
+    /* ---------- Menu ---------- */
+
+    function categoryTile(name) {
+      const selected = name === category;
+      const icon = name === 'All' ? ALL_ICON : CATEGORY_ICONS[name.trim().toLowerCase()] || OTHER_ICON;
+      return `<button type="button" data-category="${esc(name)}" aria-pressed="${selected}" data-testid="category-${esc(slug(name))}" class="flex-shrink-0 flex flex-col items-center gap-2 group">
+        <div class="${TILE[selected]}"><i class="${icon}" aria-hidden="true"></i></div>
+        <span class="${TILE_LABEL[selected]}">${esc(name)}</span>
+      </button>`;
+    }
+    function renderCategories() {
+      const names = ['All', ...new Set(menu().map(dish => dish.category))];
+      if (!names.includes(category)) category = 'All';
+      renderInto($('categories'), names.map(categoryTile).join(''));
+      $('menu-title').textContent = category === 'All' ? 'Our Menu' : category;
+    }
+    function dishCard(dish) {
+      const open = canOrder(dish), id = esc(dish.id), name = esc(dish.name);
+      const photo = dish.imageUrl
+        ? `<div class="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0"><img class="${PHOTO[open]}" src="${esc(dish.imageUrl)}" alt="${name}" loading="lazy" data-photo="${open}"></div>`
+        : NO_PHOTO[open];
+      const price = open
+        ? `<span class="text-orange-600 font-bold">${esc(money(dish.priceCents))}</span>`
+        : `<span class="flex items-center gap-2"><span class="text-stone-400 font-bold">${esc(money(dish.priceCents))}</span><span class="sold-out bg-red-50 text-red-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Sold out</span></span>`;
+      return `<article data-testid="menu-item-${id}" data-item="${id}" class="${CARD[open]}">
+        ${photo}
+        <div class="flex-1 min-w-0">
+          <h4 class="font-bold text-stone-800">${name}</h4>
+          <p class="text-xs text-stone-400 mt-1 line-clamp-1">${esc(dish.description || '')}</p>
+          <div class="flex items-center justify-between mt-3">
+            ${price}
+            <button type="button" data-customize="${id}" data-testid="customize-${id}" aria-label="Customize ${name}" ${open ? '' : 'disabled'} class="relative w-8 h-8 rounded-full bg-stone-900 text-white flex items-center justify-center shadow-lg active:scale-90 transition-transform disabled:opacity-40 disabled:active:scale-100 before:absolute before:-inset-2 before:content-['']">
+              <i class="fa-solid fa-plus text-xs" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+      </article>`;
+    }
+    function renderMenu() {
+      const dishes = menu().filter(dish => (category === 'All' || dish.category === category) && `${dish.name} ${dish.description || ''}`.toLowerCase().includes(search));
+      const empty = search ? 'No dishes match this search.' : 'No dishes on the menu yet.';
+      renderInto($('menu-items'), dishes.length ? dishes.map(dishCard).join('') : `<p class="md:col-span-2 ${NOTE}">${empty}</p>`);
+    }
+
+    /* ---------- Cart and checkout ---------- */
+
+    function cartLine(line, index) {
+      const item = resolve(line), name = esc(item.dish?.name || 'Unavailable dish'), label = esc(item.dish?.name || 'dish');
+      const details = MasaFlowUI.lineDetails(item).join(' · ');
+      return `<div data-testid="cart-line-${index}" class="p-4 bg-stone-50 rounded-2xl">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h4 class="font-bold text-stone-800">${name}</h4>
+            ${details ? `<p class="text-xs text-stone-400 mt-1 break-words">${esc(details)}</p>` : ''}
+            ${line.notes ? `<p class="text-xs text-stone-400 mt-1 break-words"><span>Note:</span> <span data-i18n-skip>${esc(line.notes)}</span></p>` : ''}
+            ${item.valid ? '' : '<p class="sold-out text-xs font-bold text-red-600 mt-1">A dish or option is sold out. Remove it and choose again.</p>'}
+          </div>
+          <span class="font-bold flex-shrink-0">${esc(money(item.totalCents))}</span>
+        </div>
+        <div class="flex items-center justify-between mt-3">
+          <div class="flex items-center gap-3">
+            <button type="button" data-change="${index}" data-delta="-1" aria-label="Decrease ${label} quantity" class="${CART_STEP}"><i class="fa-solid fa-minus text-[10px]" aria-hidden="true"></i></button>
+            <span class="min-w-[1.25rem] text-center text-sm font-bold">${line.quantity}</span>
+            <button type="button" data-change="${index}" data-delta="1" aria-label="Increase ${label} quantity" ${!item.valid || line.quantity >= 99 ? 'disabled' : ''} class="${CART_STEP}"><i class="fa-solid fa-plus text-[10px]" aria-hidden="true"></i></button>
+          </div>
+          <button type="button" data-remove="${index}" aria-label="Remove ${label}" class="relative text-xs font-semibold text-stone-400 hover:text-red-600 transition-colors before:absolute before:-inset-3 before:content-['']">Remove</button>
+        </div>
+      </div>`;
+    }
+    function renderCart() {
+      const sum = summary();
+      const taxBasisPoints = MasaFlow.getState().settings?.taxBasisPoints || 0;
+      const taxCents = Math.round(sum.totalCents * taxBasisPoints / 10000); // same rounding as the engine
+      $('cart-count').textContent = `${sum.count} ${sum.count === 1 ? 'Item' : 'Items'}`;
+      $('cart-total').textContent = money(sum.totalCents);
+      $('view-cart').setAttribute('aria-label', `View your cart, ${sum.count} ${sum.count === 1 ? 'item' : 'items'}, ${money(sum.totalCents)}`);
+      $('checkout-subtotal').textContent = money(sum.totalCents);
+      $('tax-row').hidden = taxBasisPoints <= 0;
+      $('checkout-tax').textContent = money(taxCents);
+      $('checkout-total').textContent = money(sum.totalCents + taxCents);
+      renderInto($('cart-items'), cart.length ? cart.map(cartLine).join('') : `<p class="${NOTE}">Your cart is empty. Add a freshly made dish to begin.</p>`);
+      $('place-order').disabled = submitting || (!pendingSubmission && (!cart.length || !sum.valid));
+      $('place-order').textContent = submitting ? 'Placing Order…' : pendingSubmission ? 'Retry original order' : 'Place Order';
+      // While an earlier submission is unconfirmed, its details are frozen so the retry matches it exactly.
+      ['customer-name', 'customer-phone', 'order-type', 'table-number'].forEach(id => { $(id).disabled = Boolean(pendingSubmission) || submitting || (id === 'table-number' && context.orderType !== 'dine_in'); });
+      $('cart-items').querySelectorAll('button').forEach(button => { button.disabled = Boolean(pendingSubmission) || submitting; });
+      $('checkout-error').textContent = !sum.valid && !pendingSubmission ? 'A cart item is no longer available. Remove it before placing your order.'
+        : formError || (pendingSubmission && !submitting ? 'An earlier submission is unconfirmed. Retry the original order before editing it.' : '');
+    }
+    function showFormError(message, field) {
+      formError = message;
+      renderCart();
+      if (field) field.focus();
+    }
+    function setContext() {
+      context.orderType = $('order-type').value;
+      const dineIn = context.orderType === 'dine_in';
+      $('table-field').hidden = !dineIn;
+      $('table-number').required = dineIn;
+      $('table-number').disabled = !dineIn;
+      context.tableNumber = dineIn ? Number($('table-number').value) || null : null;
+      write(contextKey, context);
+      $('order-context').textContent = dineIn && context.tableNumber ? `Dine in · Table ${context.tableNumber}` : ORDER_TYPES[context.orderType];
+    }
+    function finishSubmission(order) {
+      if (navigating) return;
+      navigating = true;
+      write(lastKey, order.id); write(submissionKey, null); pendingSubmission = null;
+      cart = []; saveCart();
+      location.href = `readypickupUI.html?order=${encodeURIComponent(order.id)}&lang=${MasaFlowI18n.getLocale()}`;
+    }
+    async function placeOrder(event) {
+      event.preventDefault();
+      if (submitting || !MasaFlow.getConnection().hasConfirmedState) return;
+      if (!pendingSubmission) {
+        const customerName = $('customer-name').value.trim(), customerPhone = $('customer-phone').value.trim();
+        const tableNumber = context.orderType === 'dine_in' ? Number($('table-number').value) : null;
+        if (!customerName) return showFormError('Enter your name so we can identify your order.', $('customer-name'));
+        if (customerPhone && !PHONE.test(customerPhone)) return showFormError('Enter a valid phone number, for example (555) 000-0000, or leave it blank.', $('customer-phone'));
+        if (!cart.length || !summary().valid) return showFormError('Choose available dishes and options before placing your order.');
+        if (context.orderType === 'dine_in' && (!Number.isInteger(tableNumber) || tableNumber < 1 || tableNumber > 999)) return showFormError('Enter a valid table number.', $('table-number'));
+        const items = cart.map(line => {
+          const item = resolve(line);
+          return { menuItemId: line.menuItemId, quantity: line.quantity, optionIds: [...line.optionIds], removed: item.removed, onTheSide: item.onTheSide, notes: line.notes };
+        });
+        pendingSubmission = { id: crypto.randomUUID(), payload: { customerName, customerPhone, orderType: context.orderType, tableNumber, items } };
+        write(submissionKey, pendingSubmission);
+      }
+      submitting = true; formError = '';
+      renderCart();
+      try {
+        finishSubmission(await MasaFlow.createDraft({ ...pendingSubmission.payload, submissionId: pendingSubmission.id }));
+      } catch (error) {
+        submitting = false;
+        const rejected = error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 409;
+        // A rejected order was never saved, so it can be edited and sent again. Anything else may have been saved.
+        if (rejected) { write(submissionKey, null); pendingSubmission = null; }
+        showFormError(rejected ? error.message || 'Could not place this order. Please try again.'
+          : error.statusCode === 409 ? 'This submission conflicts with the saved order. Reload to recover it.'
+          : 'The result is unconfirmed. Reconnect and retry the original order; it will not create a duplicate.');
+      }
+    }
+
+    /* ---------- Customizer ---------- */
+
+    function masaRow(option, checked) {
+      const open = option.available;
+      const hint = !open ? '<span class="block text-xs font-bold text-red-600">Sold out</span>'
+        : option.description ? `<span class="block text-xs text-stone-400">${esc(option.description)}</span>` : '';
+      const price = option.priceCents ? `<span class="text-sm font-bold text-orange-600">+${esc(money(option.priceCents))}</span>` : '';
+      return `<label class="${PLAIN_ROW[open]}">
+        <span class="block"><span class="${OPTION_NAME[open]}">${esc(option.name)}</span>${hint}</span>
+        <span class="flex items-center gap-3 flex-shrink-0">${price}<input type="radio" name="masa" value="${esc(option.id)}" data-option="${esc(option.id)}" data-group="masa" data-testid="option-${esc(option.id)}" class="w-5 h-5 accent-orange-600" ${checked ? 'checked' : ''} ${open ? '' : 'disabled'}></span>
+      </label>`;
+    }
+    function includedRow(name, kept) {
+      return `<label class="${PLAIN_ROW.true}">
+        <span class="font-medium">${esc(name)}</span>
+        <input type="checkbox" data-included="${esc(name)}" data-testid="included-${esc(slug(name))}" class="w-5 h-5 accent-orange-600 rounded flex-shrink-0" ${kept ? 'checked' : ''}>
+      </label>`;
+    }
+    function extraRow(option, checked, limitReached) {
+      const state = !option.available ? 'soldOut' : limitReached && !checked ? 'limit' : 'open';
+      const hint = !option.available ? '<span class="block text-xs font-bold text-red-600">Sold out</span>'
+        : option.description ? `<span class="block text-xs text-stone-400">${esc(option.description)}</span>` : '';
+      return `<label class="${ADDON_ROW[state]}">
+        <span class="block"><span class="${OPTION_NAME[option.available]}">${esc(option.name)}</span>${hint}</span>
+        <span class="flex items-center gap-3 flex-shrink-0">
+          <span class="text-sm font-bold text-orange-600">${option.priceCents ? `+${esc(money(option.priceCents))}` : 'Free'}</span>
+          <input type="checkbox" name="extras" value="${esc(option.id)}" data-option="${esc(option.id)}" data-group="extras" data-testid="option-${esc(option.id)}" class="w-5 h-5 accent-orange-600 rounded" ${checked ? 'checked' : ''} ${state === 'open' ? '' : 'disabled'}>
+        </span>
+      </label>`;
+    }
+    function showPhoto(dish) {
+      const image = $('customizer-image');
+      if (dish.imageUrl && image.getAttribute('src') !== dish.imageUrl) { image.src = dish.imageUrl; image.dataset.failed = ''; }
+      image.alt = dish.name;
+      const usable = Boolean(dish.imageUrl) && image.dataset.failed !== 'true';
+      image.hidden = !usable;
+      $('customizer-placeholder').hidden = usable;
+    }
+    function renderCustomizer() {
+      if (!custom) return;
+      const dish = dishById(custom.id);
+      if (!dish) { $('customizer-modal').close(); return; }
+      const options = dish.options || [], included = dish.included || [];
+      // A pick that sold out while the sheet was open is dropped, so nobody is stuck on a checked, disabled box.
+      const stillThere = custom.optionIds.filter(id => options.some(option => option.id === id && option.available));
+      if (stillThere.length !== custom.optionIds.length) { custom.optionIds = stillThere; custom.notice = 'A selected option is sold out. Choose an available option.'; }
+      custom.removed = custom.removed.filter(name => included.includes(name));
+      const canSide = custom.removed.length < included.length;
+      if (!canSide) custom.onTheSide = false;
+
+      $('customizer-title').textContent = dish.name;
+      $('customizer-price').textContent = `${money(dish.priceCents)} Base Price`;
+      $('customizer-description').textContent = dish.description || '';
+      showPhoto(dish);
+
+      const picked = id => custom.optionIds.includes(id);
+      const extras = options.filter(option => option.group === 'extras');
+      const limitReached = extras.filter(option => picked(option.id)).length >= 2;
+      renderInto($('masa-options'), options.filter(option => option.group === 'masa').map(option => masaRow(option, picked(option.id))).join(''));
+      renderInto($('included-options'), included.map(name => includedRow(name, !custom.removed.includes(name))).join(''));
+      renderInto($('extra-options'), extras.map(option => extraRow(option, picked(option.id), limitReached)).join(''));
+      $('included-section').hidden = !included.length;
+      $('extras-section').hidden = !extras.length;
+      $('side-toggle').className = SWITCH[custom.onTheSide];
+      $('side-knob').className = KNOB[custom.onTheSide];
+      $('side-toggle').setAttribute('aria-checked', custom.onTheSide);
+      $('side-toggle').disabled = !canSide;
+
+      const line = resolve({ menuItemId: custom.id, quantity: custom.quantity, optionIds: custom.optionIds });
+      $('item-quantity').value = custom.quantity;
+      $('quantity-minus').disabled = custom.quantity <= 1;
+      $('quantity-plus').disabled = custom.quantity >= 99;
+      $('add-to-cart').textContent = `Add to Order - ${money(line.totalCents)}`;
+      $('add-to-cart').disabled = !line.valid;
+      showCustomizerError(!canOrder(dish) ? 'This dish is now sold out.' : custom.notice);
+    }
+    function showCustomizerError(message) {
+      const error = $('customizer-error');
+      if (error.textContent === message) return;
+      error.textContent = message;
+      // The message sits at the end of the sheet; bring it into view when it appears.
+      if (message) $('customizer-scroll').scrollTop = $('customizer-scroll').scrollHeight;
+    }
+    function openDialog(dialog) {
+      dialog.showModal();
+      document.documentElement.classList.add('overflow-hidden'); // the page behind must not scroll
+    }
+    function openCustomizer(id) {
+      if (pendingSubmission) { MasaFlowUI.toast('An earlier submission is unconfirmed. Retry the original order before editing it.', 'error'); return; }
+      const dish = dishById(id);
+      if (!canOrder(dish)) { MasaFlowUI.toast('This dish is currently sold out.', 'error'); return; }
+      custom = { id, quantity: 1, optionIds: [], removed: [], onTheSide: false, notes: '', notice: '' };
+      $('item-notes').value = '';
+      renderCustomizer();
+      openDialog($('customizer-modal'));
+      $('customizer-scroll').scrollTop = 0;
+    }
+    function onCustomizerChange(event) {
+      const input = event.target, dish = custom && dishById(custom.id);
+      if (!dish) return;
+      if (input.dataset.option) {
+        const groupOf = id => dish.options.find(option => option.id === id)?.group;
+        if (input.dataset.group === 'masa') custom.optionIds = custom.optionIds.filter(id => groupOf(id) !== 'masa');
+        const extrasPicked = custom.optionIds.filter(id => groupOf(id) === 'extras').length;
+        if (input.checked && !(input.dataset.group === 'extras' && extrasPicked >= 2)) custom.optionIds.push(input.value);
+        else custom.optionIds = custom.optionIds.filter(id => id !== input.value);
+        custom.optionIds = [...new Set(custom.optionIds)];
+      } else if (input.dataset.included !== undefined) {
+        const name = input.dataset.included;
+        custom.removed = custom.removed.filter(other => other !== name);
+        if (!input.checked) custom.removed.push(name);
+      } else return;
+      custom.notice = '';
+      renderCustomizer();
+    }
+    function addToCart() {
+      if (!custom) return;
+      const line = { menuItemId: custom.id, quantity: custom.quantity, optionIds: [...custom.optionIds], removed: [...custom.removed], onTheSide: custom.onTheSide, notes: custom.notes.trim() };
+      if (!resolve(line).valid) { custom.notice = 'Choose an available masa and up to two extras.'; renderCustomizer(); return; }
+      cart.push(line); saveCart();
+      formError = '';
+      renderCart();
+      $('customizer-modal').close();
+      MasaFlowUI.toast('Added to your order.');
+    }
+
+    /* ---------- Events ---------- */
+
+    function selectCategory(name) {
+      category = name;
+      renderCategories();
+      renderMenu();
+      // A tile tapped at the edge of the strip is only half visible; bring it fully in.
+      $('categories').querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+    $('categories').addEventListener('click', event => {
+      const button = event.target.closest('[data-category]');
+      if (button) selectCategory(button.dataset.category);
+    });
+    $('see-all').addEventListener('click', () => selectCategory('All'));
+    $('menu-items').addEventListener('click', event => {
+      const target = event.target.closest('[data-customize]') || event.target.closest('[data-item]');
+      if (!target) return;
+      const id = target.dataset.customize || target.dataset.item;
+      if (canOrder(dishById(id))) openCustomizer(id);
+    });
+    $('search-toggle').addEventListener('click', () => {
+      const show = $('menu-search').hidden;
+      $('menu-search').hidden = !show;
+      $('search-toggle').setAttribute('aria-expanded', show);
+      if (show) $('menu-search').focus();
+      else { search = ''; $('menu-search').value = ''; renderMenu(); }
+    });
+    $('menu-search').addEventListener('input', event => { search = event.target.value.trim().toLowerCase(); renderMenu(); });
+
+    $('customizer-modal').addEventListener('change', onCustomizerChange);
+    $('side-toggle').addEventListener('click', () => { if (custom) { custom.onTheSide = !custom.onTheSide; renderCustomizer(); } });
+    $('quantity-minus').addEventListener('click', () => { if (custom && custom.quantity > 1) { custom.quantity--; renderCustomizer(); } });
+    $('quantity-plus').addEventListener('click', () => { if (custom && custom.quantity < 99) { custom.quantity++; renderCustomizer(); } });
+    $('item-notes').addEventListener('input', event => { if (custom) custom.notes = event.target.value; });
+    $('add-to-cart').addEventListener('click', addToCart);
+    // The close event arrives a moment after close(); by then the sheet may already be open again for another dish.
+    $('customizer-modal').addEventListener('close', event => { if (!event.target.open) custom = null; });
+
+    $('view-cart').addEventListener('click', () => { renderCart(); openDialog($('checkout-modal')); });
+    $('cart-items').addEventListener('click', event => {
+      if (submitting) return;
+      const remove = event.target.closest('[data-remove]'), change = event.target.closest('[data-change]');
+      if (remove) cart.splice(Number(remove.dataset.remove), 1);
+      else if (change) {
+        const index = Number(change.dataset.change), next = cart[index].quantity + Number(change.dataset.delta);
+        if (next <= 0) cart.splice(index, 1);
+        else if (next <= 99) cart[index].quantity = next;
+      } else return;
+      saveCart();
+      formError = '';
+      renderCart();
+    });
+    $('order-type').value = context.orderType;
+    $('table-number').value = context.tableNumber || '';
+    $('order-type').addEventListener('change', setContext);
+    $('table-number').addEventListener('input', setContext);
+    setContext();
+    $('checkout-form').addEventListener('input', () => { if (formError && !submitting) { formError = ''; renderCart(); } });
+    $('checkout-form').addEventListener('submit', placeOrder);
+
+    document.querySelectorAll('[data-close]').forEach(button => button.addEventListener('click', () => $(button.dataset.close).close()));
+    document.querySelectorAll('dialog').forEach(dialog => {
+      // The dialog box is the full-screen dimmed area, so a click that lands on it missed the sheet.
+      dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+      dialog.addEventListener('close', () => { if (!document.querySelector('dialog[open]')) document.documentElement.classList.remove('overflow-hidden'); });
+    });
+
+    // A photo that fails to load falls back to the no-photo tile.
+    document.addEventListener('error', event => {
+      const image = event.target;
+      if (!(image instanceof HTMLImageElement) || !image.hasAttribute('data-photo')) return;
+      if (image.id === 'customizer-image') { image.dataset.failed = 'true'; image.hidden = true; $('customizer-placeholder').hidden = false; }
+      else image.parentElement.outerHTML = NO_PHOTO[image.dataset.photo === 'true'];
+    }, true);
+
+    const lastOrder = read(lastKey);
+    if (typeof lastOrder === 'string') {
+      $('last-order-link').href = `readypickupUI.html?order=${encodeURIComponent(lastOrder)}&lang=${MasaFlowI18n.getLocale()}`;
+      $('last-order-link').hidden = false;
+    }
+
+    // Drops toppings a dish no longer includes from the stored cart. Lines whose dish is gone are left for the sold-out hint.
+    function tidyCart() {
+      let changed = false;
+      cart.forEach(line => {
+        const item = resolve(line);
+        if (!item.dish || (item.removed.length === line.removed.length && item.onTheSide === line.onTheSide)) return;
+        line.removed = item.removed; line.onTheSide = item.onTheSide; changed = true;
+      });
+      if (changed) saveCart();
+    }
+    // Put an unconfirmed order back in the cart and form, so the customer can retry it after a reload.
+    if (pendingSubmission) {
+      const payload = pendingSubmission.payload;
+      cart = payload.items.map(line => ({ ...line, optionIds: [...line.optionIds], removed: strings(line.removed), onTheSide: line.onTheSide === true }));
+      saveCart();
+      $('customer-name').value = payload.customerName || '';
+      $('customer-phone').value = payload.customerPhone || '';
+      $('order-type').value = payload.orderType || 'counter';
+      $('table-number').value = payload.tableNumber || '';
+      setContext();
+    }
+    function refresh() {
+      if (!MasaFlow.getConnection().hasConfirmedState) return;
+      // The retried order may already be saved (the reply was lost, not the request): go straight to tracking.
+      const saved = pendingSubmission && MasaFlow.getState().orders.find(order => order.submissionId === pendingSubmission.id);
+      if (saved) { finishSubmission(saved); return; }
+      tidyCart();
+      renderCategories();
+      renderMenu();
+      renderCart();
+      if (custom && $('customizer-modal').open) renderCustomizer();
+    }
+    // The store holds a built-in sample menu until the service answers, so nothing is drawn before that.
+    MasaFlow.subscribe(refresh);
+    MasaFlowI18n.subscribe(refresh);
+    Promise.resolve(MasaFlow.ready).then(refresh).catch(() => {
+      renderInto($('menu-items'), `<p class="md:col-span-2 ${NOTE}" role="alert">The menu could not be loaded. It will appear as soon as the connection is back.</p>`);
+    });
+  });
+  </script>
 </body>
 </html>

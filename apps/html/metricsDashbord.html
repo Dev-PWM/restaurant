@@ -1,4 +1,544 @@
 <!DOCTYPE html>
-<html lang="es"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>MasaFlow — Analytics</title><script>
-(function(){const source=new URLSearchParams(location.search),params=new URLSearchParams();const aliases={operations:'operations',operator:'operations',kitchen:'operations',cash:'operations',sales:'owner',owner:'owner',business:'owner'};params.set('tab',aliases[source.get('tab')||source.get('view')]||'owner');for(const key of ['period','date','lang'])if(source.has(key))params.set(key,source.get(key));location.replace('/analytics/?'+params.toString());})();
-</script></head><body><p><a href="/analytics/?tab=owner">Ver indicadores / View analytics</a></p></body></html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasaFlow — Business Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/assets/masaflow.css">
+  <script>window.FontAwesomeConfig = { autoReplaceSvg: 'nest' };</script>
+  <script defer src="/assets/vendor/fa-solid.min.js"></script>
+  <script defer src="/assets/vendor/fontawesome.min.js"></script>
+  <script defer src="/assets/vendor/plotly-basic.min.js"></script>
+  <script defer src="/assets/masaflow-store.js"></script>
+  <script defer src="/assets/masaflow-i18n.js"></script>
+  <script defer src="/assets/masaflow-ui.js"></script>
+</head>
+<body data-mf-shell class="bg-stone-50 text-stone-900 min-h-screen md:flex md:h-screen md:overflow-hidden">
+
+  <!-- Phone top bar -->
+  <header id="mobile-header" data-mf-noprint class="md:hidden fixed top-0 left-0 right-0 z-50 bg-stone-900 text-white px-4 py-3 flex items-center justify-between border-b border-stone-800 shadow-lg">
+    <a href="businessDashbord.html" class="flex items-center gap-3" aria-label="MasaFlow order queue">
+      <span class="bg-orange-600 p-2 rounded-xl"><i class="fa-solid fa-fire-flame-curved text-lg" aria-hidden="true"></i></span>
+      <span class="text-xl font-bold tracking-tight">MasaFlow</span>
+    </a>
+    <div class="flex items-center gap-4">
+      <a data-mf-bell href="businessDashbord.html#awaiting-cash" class="relative w-10 h-10 flex items-center justify-center text-stone-400" aria-label="Orders awaiting cash">
+        <i class="fa-solid fa-bell text-xl" aria-hidden="true"></i>
+        <span data-mf-bell-dot hidden class="absolute top-2 right-2 w-2.5 h-2.5 bg-orange-600 rounded-full border-2 border-stone-900"></span>
+      </a>
+      <a data-mf-cashier href="history.html#drawer" class="w-10 h-10 rounded-full border border-stone-700 flex items-center justify-center text-[11px] font-bold text-stone-300" aria-label="Cash drawer"><i class="fa-solid fa-cash-register text-sm" aria-hidden="true"></i></a>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside id="sidebar" data-mf-noprint class="hidden md:flex w-20 bg-stone-900 flex-col items-center py-8 gap-10 border-r border-stone-800 flex-shrink-0" aria-label="MasaFlow navigation">
+    <a href="businessDashbord.html" class="bg-orange-500 text-white p-3 rounded-2xl shadow-lg shadow-orange-900/50" aria-label="MasaFlow order queue"><i class="fa-solid fa-fire-flame-curved text-xl" aria-hidden="true"></i></a>
+    <nav class="flex flex-col gap-8 flex-1" aria-label="Main navigation">
+      <a href="businessDashbord.html" class="mf-nav-link"><i class="fa-solid fa-receipt text-xl" aria-hidden="true"></i><span class="mf-nav-label">Orders</span></a>
+      <a href="metricsDashbord.html" class="mf-nav-link" aria-current="page"><i class="fa-solid fa-chart-pie text-xl" aria-hidden="true"></i><span class="mf-nav-label">Metrics</span></a>
+      <a href="MenuManagment.html" class="mf-nav-link"><i class="fa-solid fa-utensils text-xl" aria-hidden="true"></i><span class="mf-nav-label">Menu</span></a>
+      <a href="history.html" class="mf-nav-link"><i class="fa-solid fa-clock-rotate-left text-xl" aria-hidden="true"></i><span class="mf-nav-label">History</span></a>
+    </nav>
+    <div class="mt-auto flex flex-col items-center gap-8">
+      <a href="MenuUI.html" class="mf-nav-link"><i class="fa-solid fa-plus text-xl" aria-hidden="true"></i><span class="mf-nav-label">New</span></a>
+      <a href="readypickupUI.html" class="mf-nav-link"><i class="fa-solid fa-bell-concierge text-xl" aria-hidden="true"></i><span class="mf-nav-label">Pickup</span></a>
+      <a data-mf-cashier href="history.html#drawer" class="w-10 h-10 rounded-full border-2 border-stone-700 flex items-center justify-center text-[11px] font-bold text-stone-300 hover:border-orange-500 hover:text-white transition-colors" aria-label="Cash drawer"><i class="fa-solid fa-cash-register text-sm" aria-hidden="true"></i></a>
+    </div>
+  </aside>
+
+  <main class="flex-1 min-w-0 flex flex-col md:h-screen md:overflow-y-auto no-scrollbar pt-20 pb-24 md:pt-0 md:pb-0">
+    <!-- The shell owns main's vertical padding, so the mockup's p-8 (desktop) and max-w-xl (phone) sit on this wrapper. -->
+    <div class="w-full max-w-xl mx-auto px-4 md:max-w-none md:mx-0 md:p-8">
+
+      <!-- Header -->
+      <section id="hero-section" class="mb-8 md:mb-10">
+        <header class="flex flex-col lg:flex-row lg:items-center justify-between gap-6 md:gap-4">
+          <div class="lg:flex-shrink-0">
+            <h1 class="text-3xl font-bold text-stone-900 leading-tight md:text-stone-800 md:leading-9">Business Analytics</h1>
+            <p class="text-stone-500 text-sm mt-1 md:mt-0 md:text-stone-400 md:font-medium">Real-time performance metrics for MasaFlow</p>
+            <a href="/analytics/?tab=owner" data-testid="advanced-analytics" class="inline-flex items-center gap-2 mt-2 text-orange-600 text-sm font-bold hover:text-orange-700 transition-colors">Open advanced analytics and AI summary <i class="fa-solid fa-arrow-right text-xs" aria-hidden="true"></i></a>
+          </div>
+          <div class="flex flex-wrap items-center gap-3 lg:justify-end" data-mf-language-host>
+            <div role="group" aria-label="Analytics period" class="flex items-center w-full md:w-auto md:gap-3 bg-white p-1 md:p-1.5 rounded-2xl border border-stone-200 md:border-stone-100 shadow-sm">
+              <button type="button" data-period="day" aria-pressed="true" data-testid="period-day" class="flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl bg-orange-600 text-white font-bold text-sm shadow-md md:shadow-lg md:shadow-orange-100 transition-all">Daily</button>
+              <button type="button" data-period="week" aria-pressed="false" data-testid="period-week" class="flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl text-stone-400 font-bold text-sm hover:bg-stone-50 transition-all">Weekly</button>
+              <button type="button" data-period="month" aria-pressed="false" data-testid="period-month" class="flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl text-stone-400 font-bold text-sm hover:bg-stone-50 transition-all">Monthly</button>
+              <button type="button" data-period="year" aria-pressed="false" data-testid="period-year" class="flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl text-stone-400 font-bold text-sm hover:bg-stone-50 transition-all">Yearly</button>
+            </div>
+            <label for="metrics-date" class="flex items-center justify-between gap-3 w-full md:w-auto bg-white pl-4 pr-1 py-1 md:pr-1.5 md:py-1.5 rounded-2xl border border-stone-200 md:border-stone-100 shadow-sm">
+              <span class="text-[10px] font-bold text-stone-400 uppercase tracking-widest whitespace-nowrap">Date in period</span>
+              <input type="date" id="metrics-date" data-testid="metrics-date" class="min-h-[44px] md:min-h-0 md:h-9 bg-stone-50 rounded-xl px-3 text-sm font-bold text-stone-700 outline-none focus:ring-2 focus:ring-orange-500 transition-all">
+            </label>
+          </div>
+        </header>
+        <p class="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 mt-4 text-xs">
+          <span id="period-label" data-testid="period-label" class="font-medium text-stone-500"></span>
+          <span id="updated-label" class="text-stone-400"></span>
+        </p>
+        <p id="metrics-error" role="alert" class="empty:hidden mt-4 bg-red-50 border border-red-100 text-red-700 text-sm font-medium rounded-2xl px-5 py-4"></p>
+      </section>
+
+      <!-- Stats Overview Row -->
+      <section id="metrics-grid" aria-label="Cash sales summary" aria-live="polite" class="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-4 md:mb-6">
+        <div class="col-span-2 md:col-span-1 bg-white p-6 rounded-[24px] md:p-8 md:rounded-[32px] border border-stone-100 shadow-sm">
+          <div class="flex justify-between items-start mb-2">
+            <p class="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Total Revenue</p>
+            <span data-trend="revenue" data-trend-layout="phone" hidden></span>
+          </div>
+          <div class="flex flex-wrap items-end gap-x-2">
+            <h3 id="receipt-total" data-testid="cash-receipts" class="text-2xl md:text-3xl font-bold text-stone-900">$0.00</h3>
+            <span data-trend="revenue" data-trend-layout="desktop" hidden></span>
+          </div>
+          <p class="text-[10px] text-stone-400 mt-2 md:text-stone-300 md:mt-4">Net <span id="net-sales" data-testid="net-sales">$0.00</span> · <span id="tax-detail">$0.00 tax collected</span></p>
+        </div>
+        <div class="col-span-2 md:col-span-1 bg-white p-6 rounded-[24px] md:p-8 md:rounded-[32px] border border-stone-100 shadow-sm">
+          <div class="flex justify-between items-start mb-2">
+            <p class="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Total Orders</p>
+            <span data-trend="orders" data-trend-layout="phone" hidden></span>
+          </div>
+          <div class="flex flex-wrap items-end gap-x-2">
+            <h3 id="transaction-count" data-testid="transaction-count" class="text-2xl md:text-3xl font-bold text-stone-900">0</h3>
+            <span data-trend="orders" data-trend-layout="desktop" hidden></span>
+          </div>
+          <p class="text-[10px] text-stone-400 mt-2 md:text-stone-300 md:mt-4">Avg. ticket <span id="average-ticket" data-testid="average-ticket">$0.00</span></p>
+        </div>
+        <div class="bg-white p-5 rounded-[24px] md:p-8 md:rounded-[32px] border border-stone-100 shadow-sm">
+          <p class="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1 md:mb-2">Peak Hour</p>
+          <div class="md:flex md:flex-wrap md:items-end md:gap-x-2">
+            <h3 id="peak-hour" class="text-xl md:text-3xl font-bold text-stone-900 whitespace-nowrap">—</h3>
+            <span id="peak-share" hidden class="block text-[10px] text-orange-500 font-bold mt-1 uppercase md:flex md:items-center md:gap-1 md:text-xs md:text-orange-400 md:mt-0 md:mb-1.5 md:normal-case"></span>
+          </div>
+          <p class="hidden md:block text-[10px] text-stone-300 mt-4">Most activity recorded</p>
+        </div>
+        <div class="bg-white p-5 rounded-[24px] md:p-8 md:rounded-[32px] border border-stone-100 shadow-sm">
+          <p class="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1 md:mb-2"><span class="md:hidden">Avg. Prep</span><span class="hidden md:inline">Avg. Prep Time</span></p>
+          <div class="md:flex md:flex-wrap md:items-end md:gap-x-2">
+            <h3 id="avg-prep" class="text-xl md:text-3xl font-bold text-stone-900 whitespace-nowrap">—</h3>
+            <span id="prep-count" class="flex items-center gap-1 text-[10px] text-stone-400 font-bold mt-1 uppercase md:text-xs md:mt-0 md:mb-1.5 md:normal-case"><i class="fa-solid fa-clock" aria-hidden="true"></i> 0 completed</span>
+          </div>
+          <p class="hidden md:block text-[10px] text-stone-300 mt-4">From payment to pickup</p>
+        </div>
+      </section>
+
+      <div id="fulfillment-summary" role="group" aria-label="Fulfillment of paid orders" class="empty:hidden flex flex-wrap items-center gap-x-4 gap-y-1 sm:gap-x-3 bg-white px-6 py-4 rounded-2xl border border-stone-100 shadow-sm text-sm text-stone-500 mb-8 md:px-8 md:mb-10"></div>
+
+      <!-- Charts Section -->
+      <section id="charts-section" aria-label="Sales trends and top items" class="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-10">
+        <div class="min-w-0 bg-white p-5 rounded-[32px] md:p-8 md:rounded-[40px] border border-stone-100 shadow-sm flex flex-col">
+          <div class="mb-4 md:mb-8">
+            <h3 id="trend-title" class="text-lg md:text-xl font-bold text-stone-800">Hourly Revenue Trend</h3>
+            <p id="trend-subtitle" class="text-xs text-stone-400 mt-1">Amounts by payment time.</p>
+          </div>
+          <div id="trend-chart" data-testid="revenue-chart" role="img" aria-label="Revenue trend" aria-describedby="cash-chart-desc" class="w-full h-[280px] md:h-[400px]"></div>
+          <p id="cash-chart-desc" hidden>Exact amounts and transaction counts are available in the table below.</p>
+          <details id="trend-data" class="group mt-4 border-t border-stone-50 pt-1">
+            <summary class="flex items-center justify-between gap-3 min-h-[44px] cursor-pointer list-none [&::-webkit-details-marker]:hidden text-[10px] font-bold text-stone-400 uppercase tracking-widest hover:text-stone-600 transition-colors">View exact totals <i class="fa-solid fa-chevron-down inline-block transition-transform group-open:rotate-180" aria-hidden="true"></i></summary>
+            <table class="w-full text-left mb-2">
+              <caption class="sr-only">Cash receipts by payment time</caption>
+              <thead class="border-b border-stone-50">
+                <tr>
+                  <th scope="col" class="pb-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Period</th>
+                  <th scope="col" class="pb-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-right">Receipts</th>
+                  <th scope="col" class="pb-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest text-right">Transactions</th>
+                </tr>
+              </thead>
+              <tbody id="trend-rows" class="divide-y divide-stone-50"></tbody>
+            </table>
+          </details>
+        </div>
+
+        <div class="min-w-0 bg-white p-5 rounded-[32px] md:p-8 md:rounded-[40px] border border-stone-100 shadow-sm flex flex-col">
+          <div class="mb-4 md:mb-8">
+            <h3 class="text-lg md:text-xl font-bold text-stone-800">Top Selling Items</h3>
+            <p class="text-xs text-stone-400 mt-1">Quantity on paid orders, including orders still being prepared.</p>
+          </div>
+          <div id="top-items" data-testid="top-items" role="img" aria-label="Top selling items" class="w-full h-[280px] md:h-[400px]"></div>
+          <ol id="top-items-list" class="sr-only"></ol>
+          <p id="other-items" class="empty:hidden text-xs text-stone-400 mt-4"></p>
+        </div>
+      </section>
+
+      <!-- Recent paid orders -->
+      <section id="history-section" aria-labelledby="recent-title" class="bg-white p-6 rounded-[32px] md:p-8 md:rounded-[40px] border border-stone-100 shadow-sm">
+        <div class="flex justify-between items-center gap-4 mb-6 md:mb-8">
+          <h3 id="recent-title" class="text-lg md:text-xl font-bold text-stone-800">Recent Paid Orders</h3>
+          <a href="history.html" class="inline-flex items-center min-h-[44px] -my-3 md:min-h-0 md:my-0 text-orange-600 text-xs font-bold uppercase tracking-wider whitespace-nowrap md:text-sm md:normal-case md:tracking-normal hover:text-orange-700 transition-colors"><span class="hidden md:inline">View&nbsp;</span>Full Ledger</a>
+        </div>
+        <div class="hidden md:block overflow-x-auto">
+          <table class="w-full text-left">
+            <caption class="sr-only">Recent verified paid cash orders</caption>
+            <thead class="border-b border-stone-50">
+              <tr>
+                <th scope="col" class="pb-4 pr-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Order ID</th>
+                <th scope="col" class="pb-4 pr-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Customer</th>
+                <th scope="col" class="pb-4 pr-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Items</th>
+                <th scope="col" class="pb-4 pr-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Amount</th>
+                <th scope="col" class="pb-4 pr-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Status</th>
+                <th scope="col" class="pb-4 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Time</th>
+              </tr>
+            </thead>
+            <tbody id="recent-orders" data-testid="recent-paid-orders" class="divide-y divide-stone-50"></tbody>
+          </table>
+        </div>
+        <ul id="recent-orders-list" aria-labelledby="recent-title" class="md:hidden space-y-5"></ul>
+      </section>
+
+      <p id="source-note" class="text-xs text-stone-400 leading-relaxed mt-6 md:mt-8 md:max-w-4xl">Based on paid cash receipts. Draft orders, starting float, and cash drops are excluded from sales.</p>
+
+      <footer id="footer" class="md:hidden mt-8 text-center text-stone-400 py-4">
+        <p class="text-xs">MasaFlow Analytics</p>
+      </footer>
+    </div>
+  </main>
+
+  <!-- Phone tab bar -->
+  <nav id="mobile-nav" data-mf-noprint class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-stone-100 px-6 py-2 flex justify-between items-center shadow-[0_-4px_20px_rgba(0,0,0,0.05)]" aria-label="Main navigation">
+    <a href="businessDashbord.html" class="mf-tab-link"><i class="fa-solid fa-receipt text-xl" aria-hidden="true"></i><span class="mf-tab-label">Orders</span></a>
+    <a href="metricsDashbord.html" class="mf-tab-link" aria-current="page"><i class="fa-solid fa-chart-pie text-xl" aria-hidden="true"></i><span class="mf-tab-label">Metrics</span></a>
+    <a href="MenuManagment.html" class="mf-tab-link"><i class="fa-solid fa-utensils text-xl" aria-hidden="true"></i><span class="mf-tab-label">Menu</span></a>
+    <a href="history.html" class="mf-tab-link"><i class="fa-solid fa-clock-rotate-left text-xl" aria-hidden="true"></i><span class="mf-tab-label">History</span></a>
+    <a href="MenuUI.html" class="mf-tab-link"><i class="fa-solid fa-plus text-xl" aria-hidden="true"></i><span class="mf-tab-label">New</span></a>
+  </nav>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', async () => {
+      const M = window.MasaFlow, UI = window.MasaFlowUI;
+      const el = id => document.getElementById(id);
+      if (!M || !UI) { el('metrics-error').textContent = 'Analytics service unavailable. Refresh this page to reconnect.'; return; }
+
+      const esc = UI.escape;
+      const DAY = 86400000;
+      const PERIODS = ['day', 'week', 'month', 'year'];
+      const TREND_TITLES = { day: 'Hourly Revenue Trend', week: 'Daily Revenue Trend', month: 'Daily Revenue Trend', year: 'Monthly Revenue Trend' };
+      const SEGMENT = {
+        on: 'flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl bg-orange-600 text-white font-bold text-sm shadow-md md:shadow-lg md:shadow-orange-100 transition-all',
+        off: 'flex-1 md:flex-none min-h-[44px] md:min-h-0 py-2.5 md:px-6 md:py-2 rounded-xl text-stone-400 font-bold text-sm hover:bg-stone-50 transition-all'
+      };
+      // The phone mockup pins the chip to the card's top-right corner; the desktop mockup sets it beside the value.
+      const TREND = {
+        up: { icon: 'fa-arrow-trend-up', word: 'Up', phone: 'md:hidden text-green-600 bg-green-50 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1', desktop: 'hidden md:flex text-green-500 text-xs font-bold mb-1.5 items-center gap-1' },
+        down: { icon: 'fa-arrow-trend-down', word: 'Down', phone: 'md:hidden text-red-600 bg-red-50 px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1', desktop: 'hidden md:flex text-red-500 text-xs font-bold mb-1.5 items-center gap-1' }
+      };
+      const PREP_TAG = {
+        some: 'flex items-center gap-1 text-[10px] text-green-500 font-bold mt-1 uppercase md:text-xs md:mt-0 md:mb-1.5 md:normal-case',
+        none: 'flex items-center gap-1 text-[10px] text-stone-400 font-bold mt-1 uppercase md:text-xs md:mt-0 md:mb-1.5 md:normal-case'
+      };
+      const STATUS = {
+        completed: { label: 'Completed', table: 'bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase', list: 'text-[9px] font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded uppercase tracking-tighter' },
+        ready: { label: 'Ready', table: 'bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase', list: 'text-[9px] font-bold bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded uppercase tracking-tighter' },
+        preparing: { label: 'Preparing', table: 'bg-blue-100 text-blue-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase', list: 'text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded uppercase tracking-tighter' },
+        pending: { label: 'New', table: 'bg-stone-100 text-stone-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase', list: 'text-[9px] font-bold bg-stone-100 text-stone-600 px-1.5 py-0.5 rounded uppercase tracking-tighter' }
+      };
+      const CHART_NOTE = 'h-full flex items-center justify-center text-center px-6 border border-dashed border-stone-200 rounded-3xl text-sm text-stone-400 leading-relaxed';
+      const BAR_COLORS = ['#ea580c', '#f97316', '#fb923c', '#fdba74', '#fed7aa'];
+      const PLOT_CONFIG = { responsive: true, displayModeBar: false };
+      const desktop = window.matchMedia('(min-width: 768px)');
+
+      const url = new URL(window.location.href);
+      let period = PERIODS.includes(url.searchParams.get('period')) ? url.searchParams.get('period') : 'day';
+      let anchor = url.searchParams.get('date');
+      let started = false;
+      let view = { rows: [], total: 0, top: [] };
+      let drawnFor = '';
+
+      // Only touch the DOM when the markup changed, so the live region and the icons stay quiet between orders.
+      const painted = new WeakMap();
+      function paint(node, html) { if (painted.get(node) === html) return; painted.set(node, html); node.innerHTML = html; }
+      function setText(node, text) { if (node.textContent !== text) node.textContent = text; }
+
+      function dayOrdinal(key) { return Date.parse(`${key}T00:00:00Z`) / DAY; }
+      function ordinalKey(day) { return new Date(day * DAY).toISOString().slice(0, 10); }
+      function validKey(key) { const number = dayOrdinal(key); return /^\d{4}-\d{2}-\d{2}$/.test(key || '') && Number.isFinite(number) && ordinalKey(number) === key; }
+      function localParts(at) {
+        const date = new Date(at); if (!Number.isFinite(date.getTime())) return null;
+        const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: M.getState().settings.timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hourCycle: 'h23' }).formatToParts(date).map(part => [part.type, part.value]));
+        return { key: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+      }
+      function periodRange() {
+        const selected = dayOrdinal(anchor), date = new Date(selected * DAY), year = date.getUTCFullYear(), month = date.getUTCMonth();
+        if (period === 'week') { const start = selected - ((date.getUTCDay() + 6) % 7); return { start, end: start + 7 }; }
+        if (period === 'month') return { start: Date.UTC(year, month, 1) / DAY, end: Date.UTC(year, month + 1, 1) / DAY };
+        if (period === 'year') return { start: Date.UTC(year, 0, 1) / DAY, end: Date.UTC(year + 1, 0, 1) / DAY };
+        return { start: selected, end: selected + 1 };
+      }
+      // The day, Monday–Sunday week, calendar month or calendar year right before the selected one.
+      function previousRange(range) {
+        const date = new Date(range.start * DAY), year = date.getUTCFullYear(), month = date.getUTCMonth();
+        if (period === 'month') return { start: Date.UTC(year, month - 1, 1) / DAY, end: range.start };
+        if (period === 'year') return { start: Date.UTC(year - 1, 0, 1) / DAY, end: range.start };
+        return { start: range.start - (range.end - range.start), end: range.start };
+      }
+      const LOCALE = () => (window.MasaFlowI18n?.getLocale() === 'en' ? 'en-US' : 'es-MX');
+      function dateLabel(key, options = { month: 'short', day: 'numeric', year: 'numeric' }) { return new Intl.DateTimeFormat(LOCALE(), { ...options, timeZone: 'UTC' }).format(new Date(`${key}T12:00:00Z`)); }
+      function hourLabel(hour, options = { hour: 'numeric' }) { return new Intl.DateTimeFormat(LOCALE(), { ...options, timeZone: 'UTC' }).format(new Date(Date.UTC(2020, 0, 1, hour))); }
+      const sum = (list, pick) => list.reduce((total, entry) => total + pick(entry), 0);
+      const plural = (count, one, many) => `${count.toLocaleString(LOCALE())} ${count === 1 ? one : many}`;
+
+      // The store's shared validator decides what counts as a sale. Totals only add up within one
+      // currency, so receipts kept in a legacy currency are counted as excluded rather than mixed in.
+      function paidReceipts(state) {
+        const verified = M.verifiedReceipts(), receipts = [];
+        let excluded = verified.excluded;
+        for (const { order, payment } of verified.receipts) {
+          const paid = localParts(payment.paidAt);
+          if (!paid || payment.currency !== state.settings.currency) { excluded++; continue; }
+          receipts.push({ payment, order, paid });
+        }
+        return { receipts, excluded };
+      }
+      function within(receipts, range) { return receipts.filter(receipt => { const day = dayOrdinal(receipt.paid.key); return day >= range.start && day < range.end; }); }
+
+      // label is the exact wording for the table; tick and short are the axis labels on desktop and phone.
+      function makeBins(range) {
+        const bin = (key, label, tick, short) => ({ key, label, tick, short, amount: 0, count: 0 });
+        if (period === 'day') return Array.from({ length: 24 }, (_, hour) => { const label = hourLabel(hour), compact = label.replace(' ', '').toLowerCase(); return bin(hour, label, compact, compact.slice(0, -1)); });
+        if (period === 'year') return Array.from({ length: 12 }, (_, month) => { const label = new Intl.DateTimeFormat(LOCALE(), { month: 'short', timeZone: 'UTC' }).format(new Date(Date.UTC(2020, month, 1))); return bin(month, label, label, label); });
+        return Array.from({ length: range.end - range.start }, (_, index) => {
+          const key = ordinalKey(range.start + index);
+          if (period === 'week') { const weekday = dateLabel(key, { weekday: 'short' }); return bin(key, dateLabel(key, { weekday: 'short', month: 'short', day: 'numeric' }), weekday, weekday); }
+          const label = dateLabel(key, { month: 'short', day: 'numeric' });
+          return bin(key, label, label, String(Number(key.slice(8))));
+        });
+      }
+      // A day is shown from one hour before the first receipt to one hour after the last, not as 24 mostly empty hours.
+      function trimHours(bins) {
+        const busy = bins.filter(bin => bin.count);
+        if (!busy.length) return bins;
+        return bins.slice(Math.max(0, busy[0].key - 1), Math.min(24, busy[busy.length - 1].key + 2));
+      }
+      function trendRows(range, receipts) {
+        const bins = makeBins(range), byKey = new Map(bins.map(bin => [bin.key, bin]));
+        for (const receipt of receipts) {
+          const key = period === 'day' ? receipt.paid.hour : period === 'year' ? Number(receipt.paid.key.slice(5, 7)) - 1 : receipt.paid.key;
+          const bin = byKey.get(key); if (bin) { bin.amount += receipt.payment.totalCents; bin.count++; }
+        }
+        return period === 'day' ? trimHours(bins) : bins;
+      }
+      function peakHour(receipts, total) {
+        if (!receipts.length || total <= 0) return null;
+        const hours = new Array(24).fill(0);
+        for (const receipt of receipts) hours[receipt.paid.hour] += receipt.payment.totalCents;
+        const hour = hours.indexOf(Math.max(...hours));
+        return { hour, share: Math.round(hours[hour] / total * 100) };
+      }
+      function prepTimes(receipts) {
+        return receipts.filter(receipt => receipt.order.status === 'completed')
+          .map(receipt => new Date(receipt.order.completedAt) - new Date(receipt.payment.paidAt))
+          .filter(elapsed => Number.isFinite(elapsed) && elapsed >= 0);
+      }
+      function durationLabel(elapsed) {
+        const minutes = Math.round(elapsed / 60000);
+        if (elapsed < 60000) return '<1m';
+        return minutes < 60 ? `${minutes}m` : `${Math.floor(minutes / 60)}h ${minutes % 60}m`;
+      }
+      function rankItems(receipts) {
+        const items = new Map();
+        for (const receipt of receipts) for (const item of receipt.order.items || []) {
+          if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0) continue;
+          const key = item.menuItemId || item.name, entry = items.get(key) || { name: item.name, quantity: 0 };
+          entry.quantity += item.quantity; items.set(key, entry);
+        }
+        return [...items.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name));
+      }
+
+      function renderControls(state, range) {
+        document.querySelectorAll('[data-period]').forEach(button => {
+          const active = button.dataset.period === period;
+          button.setAttribute('aria-pressed', String(active));
+          button.className = active ? SEGMENT.on : SEGMENT.off;
+        });
+        el('metrics-date').value = anchor;
+        const rangeText = period === 'day' ? dateLabel(anchor) : `${dateLabel(ordinalKey(range.start))} – ${dateLabel(ordinalKey(range.end - 1))}`;
+        setText(el('period-label'), `${rangeText} · ${state.settings.timeZone}${period === 'week' ? ' · Monday–Sunday' : ''}`);
+        setText(el('updated-label'), `Updated ${new Intl.DateTimeFormat(LOCALE(), { timeZone: state.settings.timeZone, hour: 'numeric', minute: '2-digit', second: '2-digit' }).format(new Date())}`);
+      }
+      // Percent change against the previous period; no chip when there is nothing to compare with.
+      function renderTrendChip(name, current, previous, comparable) {
+        const change = comparable && previous > 0 ? Math.round((current - previous) / previous * 100) : null;
+        document.querySelectorAll(`[data-trend="${name}"]`).forEach(chip => {
+          chip.hidden = change === null;
+          if (change === null) { paint(chip, ''); return; }
+          const tone = change >= 0 ? TREND.up : TREND.down;
+          chip.className = chip.dataset.trendLayout === 'phone' ? tone.phone : tone.desktop;
+          paint(chip, `<i class="fa-solid ${tone.icon}" aria-hidden="true"></i><span><span class="sr-only">${tone.word} </span>${Math.abs(change).toLocaleString(LOCALE())}%<span class="sr-only"> versus the previous ${period}</span></span>`);
+        });
+      }
+      function renderStats(receipts, previous, total) {
+        const net = sum(receipts, receipt => receipt.order.subtotalCents), tax = sum(receipts, receipt => receipt.order.taxCents);
+        setText(el('receipt-total'), M.money(total));
+        setText(el('net-sales'), M.money(net));
+        setText(el('tax-detail'), `${M.money(tax)} tax collected`);
+        setText(el('transaction-count'), receipts.length.toLocaleString(LOCALE()));
+        setText(el('average-ticket'), M.money(receipts.length ? Math.round(total / receipts.length) : 0));
+        renderTrendChip('revenue', total, sum(previous, receipt => receipt.payment.totalCents), previous.length > 0);
+        renderTrendChip('orders', receipts.length, previous.length, previous.length > 0);
+
+        const peak = peakHour(receipts, total);
+        setText(el('peak-hour'), peak ? hourLabel(peak.hour, { hour: 'numeric', minute: '2-digit' }) : '—');
+        el('peak-share').hidden = !peak;
+        setText(el('peak-share'), peak ? `${peak.share}% of sales` : '');
+
+        const prep = prepTimes(receipts);
+        setText(el('avg-prep'), prep.length ? durationLabel(sum(prep, elapsed => elapsed) / prep.length) : '—');
+        el('prep-count').className = prep.length ? PREP_TAG.some : PREP_TAG.none;
+        paint(el('prep-count'), `<i class="fa-solid fa-clock" aria-hidden="true"></i> ${prep.length.toLocaleString(LOCALE())} completed`);
+      }
+      function renderFulfillment(receipts) {
+        const count = statuses => receipts.filter(receipt => statuses.includes(receipt.order.status)).length;
+        const part = (number, label) => `<span><strong class="font-bold text-stone-900">${number}</strong> ${label}</span>`;
+        const dot = '<span class="hidden sm:inline text-stone-300" aria-hidden="true">·</span>';
+        paint(el('fulfillment-summary'), `<span class="w-full sm:w-auto sm:mr-3 text-[10px] font-bold text-stone-400 uppercase tracking-widest">Paid fulfillment</span>${part(count(['pending', 'preparing']), 'in kitchen')}${dot}${part(count(['ready']), 'ready for pickup')}${dot}${part(count(['completed']), 'completed')}`);
+      }
+      function renderTrendTable(state) {
+        setText(el('trend-title'), TREND_TITLES[period]);
+        setText(el('trend-subtitle'), `Amounts by payment time in ${state.settings.timeZone}.`);
+        paint(el('trend-rows'), view.rows.map(row => `<tr><th scope="row" class="py-2 text-xs font-medium text-stone-600">${esc(row.label)}</th><td class="py-2 text-xs font-bold text-stone-900 text-right">${M.money(row.amount)}</td><td class="py-2 text-xs text-stone-400 font-medium text-right">${row.count}</td></tr>`).join(''));
+      }
+      function renderItemsList(ranking) {
+        paint(el('top-items-list'), view.top.map(item => `<li>${esc(item.name)}: ${item.quantity} sold</li>`).join(''));
+        setText(el('other-items'), ranking.length > 5 ? `Showing the top 5 of ${ranking.length} items sold.` : '');
+      }
+      function renderRecent(state, receipts) {
+        const recent = [...receipts].sort((a, b) => new Date(b.payment.paidAt) - new Date(a.payment.paidAt)).slice(0, 8).map(receipt => {
+          const order = receipt.order;
+          const paidAt = period === 'day' ? UI.time(receipt.payment.paidAt) : new Intl.DateTimeFormat(LOCALE(), { timeZone: state.settings.timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(receipt.payment.paidAt));
+          return {
+            number: esc(`#${order.number || order.id}`), customer: esc(order.customerName || 'Walk-in'),
+            items: esc((order.items || []).map(item => `${item.quantity}x ${item.name}`).join(', ')),
+            amount: M.money(receipt.payment.totalCents), chip: STATUS[order.status] || { ...STATUS.pending, label: order.status },
+            time: `<time datetime="${esc(receipt.payment.paidAt)}">${esc(paidAt)}</time>`
+          };
+        });
+        paint(el('recent-orders'), recent.length ? recent.map(row => `<tr class="hover:bg-stone-50 transition-colors"><td class="py-4 pr-4 font-bold text-stone-600 whitespace-nowrap">${row.number}</td><td class="py-4 pr-4 text-sm font-medium" data-i18n-skip>${row.customer}</td><td class="py-4 pr-4 text-sm text-stone-400">${row.items}</td><td class="py-4 pr-4 text-sm font-bold text-stone-900">${row.amount}</td><td class="py-4 pr-4"><span class="${row.chip.table}">${esc(row.chip.label)}</span></td><td class="py-4 text-xs text-stone-400 font-medium whitespace-nowrap">${row.time}</td></tr>`).join('')
+          : '<tr><td colspan="6" class="py-8 text-sm text-stone-400 text-center">No paid orders in this period.</td></tr>');
+        paint(el('recent-orders-list'), recent.length ? recent.map(row => `<li class="flex items-center justify-between gap-4 pb-5 border-b border-stone-50 last:border-0 last:pb-0"><div class="flex flex-col min-w-0"><span class="text-sm font-bold text-stone-800">${row.number}</span><span class="text-xs text-stone-400"><span data-i18n-skip>${row.customer}</span> • ${row.time}</span><span class="text-[11px] text-stone-500 mt-1">${row.items}</span></div><div class="text-right flex-shrink-0"><div class="text-sm font-bold text-stone-900">${row.amount}</div><span class="${row.chip.list}">${esc(row.chip.label)}</span></div></li>`).join('')
+          : '<li class="py-4 text-sm text-stone-400 text-center">No paid orders in this period.</li>');
+      }
+      function renderSourceNote(state, excluded) {
+        // One element per sentence, so each one is translated on its own.
+        const sentences = ['Sales include every verified paid cash order, regardless of fulfillment status. Cash tender minus change equals the receipt total. Draft orders, starting float, and cash drops are excluded.'];
+        if (state.settings.taxBasisPoints === 0) sentences.push('Tax is currently set to 0%; configure it before charging tax.');
+        if (excluded) sentences.push(`${excluded} incomplete or inconsistent cash ${excluded === 1 ? 'receipt is' : 'receipts are'} excluded.`);
+        paint(el('source-note'), sentences.map(sentence => `<span>${esc(sentence)}</span>`).join(' '));
+      }
+
+      function showNote(container, message) {
+        if (window.Plotly) window.Plotly.purge(container);
+        paint(container, `<p class="${CHART_NOTE}">${esc(message)}</p>`);
+        container.setAttribute('aria-label', message);
+      }
+      function showPlot(container, trace, layout, label) {
+        // Plotly keeps whatever is already inside the container, so an earlier note has to go first.
+        if (painted.has(container)) { painted.delete(container); container.innerHTML = ''; }
+        container.setAttribute('aria-label', label);
+        window.Plotly.react(container, [trace], { paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)', showlegend: false, dragmode: false, ...layout }, PLOT_CONFIG);
+      }
+      // Narrow charts (phones, and the two-column layout on small laptops) cannot fit full dish names.
+      function compactNames() { return el('top-items').clientWidth < 440; }
+      // Shows every n-th axis label, so a month of days or a year of months stays readable on a narrow chart.
+      function tickStep(wide) {
+        const longest = Math.max(0, ...view.rows.map(row => (wide ? row.tick : row.short).length));
+        const room = Math.max(1, el('trend-chart').clientWidth - (wide ? 76 : 50));
+        return Math.max(1, Math.ceil(view.rows.length * (longest * 7 + 16) / room));
+      }
+      function drawTrend(wide) {
+        const container = el('trend-chart'), title = el('trend-title').textContent;
+        if (!view.rows.some(row => row.count)) return showNote(container, 'No paid cash receipts in this period.');
+        if (!window.Plotly) return showNote(container, 'The chart could not be loaded. Exact totals are listed below.');
+        const step = tickStep(wide), ticks = view.rows.map((_, index) => index).filter(index => index % step === 0);
+        const trace = {
+          x: view.rows.map((_, index) => index), y: view.rows.map(row => row.amount / 100),
+          customdata: view.rows.map(row => `${row.label} · ${M.money(row.amount)} · ${plural(row.count, 'transaction', 'transactions')}`), hovertemplate: '%{customdata}<extra></extra>',
+          type: 'scatter', mode: wide ? 'lines+markers' : 'lines',
+          line: { color: '#ea580c', width: wide ? 4 : 3, shape: 'spline' },
+          fill: 'tozeroy', fillcolor: wide ? 'rgba(234, 88, 12, 0.1)' : 'rgba(234, 88, 12, 0.05)'
+        };
+        if (wide) trace.marker = { color: '#ea580c', size: 8 };
+        showPlot(container, trace, {
+          margin: wide ? { t: 20, r: 20, b: 40, l: 56 } : { t: 10, r: 10, b: 30, l: 40 },
+          xaxis: { tickmode: 'array', tickvals: ticks, ticktext: ticks.map(index => wide ? view.rows[index].tick : view.rows[index].short), tickangle: 0, gridcolor: '#f5f5f4', zeroline: false, fixedrange: true },
+          // The spline dips under zero next to an isolated busy hour; keep the axis at $0.
+          yaxis: { gridcolor: '#f5f5f4', tickprefix: '$', rangemode: 'nonnegative', automargin: true, fixedrange: true }
+        }, `${title}: ${M.money(view.total)} in paid cash receipts.`);
+      }
+      function drawItems(wide) {
+        const container = el('top-items'), top = view.top;
+        if (!top.length) return showNote(container, 'No items sold in this period.');
+        if (!window.Plotly) return showNote(container, 'The chart could not be loaded.');
+        const compact = compactNames();
+        const names = top.map(item => compact && item.name.length > 14 ? `${item.name.slice(0, 13).trimEnd()}…` : item.name);
+        const trace = {
+          type: 'bar', orientation: 'h', x: top.map(item => item.quantity), y: top.map((_, index) => index),
+          customdata: top.map(item => item.name), hovertemplate: '%{customdata} · %{x} sold<extra></extra>',
+          marker: { color: BAR_COLORS.slice(0, top.length), line: { width: 0 } }
+        };
+        showPlot(container, trace, {
+          margin: wide ? { t: 20, r: 20, b: 40, l: 80 } : { t: 10, r: 10, b: 30, l: 40 },
+          // Quantities are whole dishes: no half ticks on a quiet day.
+          xaxis: { gridcolor: '#f5f5f4', rangemode: 'tozero', tickformat: ',d', fixedrange: true, ...(top[0].quantity <= 10 ? { dtick: 1 } : {}) },
+          // Positions instead of names on the axis, so two dishes with the same (or the same shortened) name stay apart.
+          yaxis: { tickmode: 'array', tickvals: top.map((_, index) => index), ticktext: names, autorange: 'reversed', automargin: true, fixedrange: true }
+        }, 'Bar chart of the top selling items by quantity. The list that follows has the same figures.');
+      }
+      function layoutKey() { return `${desktop.matches}|${compactNames()}|${tickStep(desktop.matches)}`; }
+      function drawCharts() { drawnFor = layoutKey(); drawTrend(desktop.matches); drawItems(desktop.matches); }
+
+      function render() {
+        const state = M.getState(), verified = paidReceipts(state), range = periodRange();
+        const receipts = within(verified.receipts, range), previous = within(verified.receipts, previousRange(range));
+        const total = sum(receipts, receipt => receipt.payment.totalCents), ranking = rankItems(receipts);
+        view = { rows: trendRows(range, receipts), total, top: ranking.slice(0, 5) };
+        renderControls(state, range);
+        renderStats(receipts, previous, total);
+        renderFulfillment(receipts);
+        renderTrendTable(state);
+        renderItemsList(ranking);
+        drawCharts();
+        renderRecent(state, receipts);
+        renderSourceNote(state, verified.excluded);
+      }
+      function start() {
+        if (started) return;
+        started = true;
+        el('metrics-error').textContent = '';
+        if (!validKey(anchor)) anchor = localParts(new Date()).key;
+        render();
+      }
+      function updateUrl() { const next = new URL(window.location.href); next.searchParams.set('period', period); next.searchParams.set('date', anchor); history.replaceState(null, '', next); }
+
+      document.querySelectorAll('[data-period]').forEach(button => button.addEventListener('click', () => {
+        if (!started) return;
+        period = button.dataset.period; updateUrl(); render();
+      }));
+      el('metrics-date').addEventListener('change', () => {
+        if (!started || !validKey(el('metrics-date').value)) return;
+        anchor = el('metrics-date').value; updateUrl(); render();
+      });
+      window.addEventListener('popstate', () => {
+        if (!started) return;
+        const current = new URL(window.location.href), nextPeriod = current.searchParams.get('period'), nextDate = current.searchParams.get('date');
+        period = PERIODS.includes(nextPeriod) ? nextPeriod : 'day';
+        anchor = validKey(nextDate) ? nextDate : localParts(new Date()).key;
+        render();
+      });
+      // Plotly resizes itself; the trace style, the axis labels and the dish-name length depend on the layout, so those need a redraw.
+      const redrawOnLayoutChange = () => { if (started && layoutKey() !== drawnFor) drawCharts(); };
+      desktop.addEventListener('change', redrawOnLayoutChange);
+      const chartSizes = new ResizeObserver(redrawOnLayoutChange);
+      chartSizes.observe(el('trend-chart')); chartSizes.observe(el('top-items'));
+
+      // Subscribing before the first load also lets the page recover by itself once the service comes back.
+      M.subscribe(() => { if (!M.getConnection().hasConfirmedState) return; if (started) render(); else start(); });
+      MasaFlowI18n.subscribe(() => { if (started) { render(); drawCharts(); } });
+      try { await M.ready; start(); }
+      catch (_) {
+        if (started) return;
+        el('metrics-error').textContent = 'Unable to load cash receipts. Refresh this page to reconnect.';
+        showNote(el('trend-chart'), 'Cash receipts are not loaded yet.');
+        showNote(el('top-items'), 'Cash receipts are not loaded yet.');
+      }
+    });
+  </script>
+</body>
+</html>
