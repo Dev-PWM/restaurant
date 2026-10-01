@@ -61,7 +61,7 @@ function renderSummary(selection, dto, locale) {
       return { metricId: def.id, label: def.label, commentary: commentary[finding.commentary], value: values[def.id], unit, definition: def.definition };
     }),
     caveats: [es ? 'Números calculados por el servidor; la IA selecciona las métricas. Sin pronósticos ni acciones de caja.' : 'Numbers calculated by the server; AI selects the metrics. No forecasts or cash actions.',
-      es ? `Impuesto sin configurar (0%). Registros inconsistentes excluidos: ${dto.quality.excludedReceipts}.` : `Tax unconfigured (0%). Inconsistent records excluded: ${dto.quality.excludedReceipts}.`]
+      es ? `Impuesto ${dto.taxConfigured ? 'configurado' : 'sin configurar'} (${dto.taxBasisPoints / 100}%). Registros inconsistentes excluidos: ${dto.quality.excludedReceipts}.` : `Tax ${dto.taxConfigured ? 'configured' : 'unconfigured'} (${dto.taxBasisPoints / 100}%). Inconsistent records excluded: ${dto.quality.excludedReceipts}.`]
   };
 }
 function createSummaryService({ getState, apiKey = process.env.AI_GATEWAY_API_KEY, model = process.env.AI_GATEWAY_MODEL || DEFAULT_MODEL, fetchImpl = globalThis.fetch, now = Date.now, timeoutMs = 20000 } = {}) {

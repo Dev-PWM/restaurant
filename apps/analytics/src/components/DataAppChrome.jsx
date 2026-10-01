@@ -1,3 +1,4 @@
+import { tChrome } from '../content/shared/analytics-chrome-copy.js';
 import { dataAppBuildState } from "../build-state.js";
 import * as Dropdown from "@radix-ui/react-dropdown-menu";
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -79,14 +80,14 @@ function formatReviewedAt(value, part = "date") {
     part === "time"
       ? { hour: "numeric", minute: "2-digit" }
       : { month: "short", day: "numeric", ...(part === "compact" ? {} : { year: "numeric" }) };
-  return new Intl.DateTimeFormat(undefined, options).format(date);
+  return new Intl.DateTimeFormat(globalThis.document?.documentElement.lang==='es'?'es-MX':'en-US', {...options,timeZone:'America/Mexico_City'}).format(date);
 }
 
 function ReviewedFreshness({ generatedAt }) {
   return (
     <>
       <span className="dashboard-freshness-full">
-        Updated {formatReviewedAt(generatedAt)}
+        {tChrome("Updated")} {formatReviewedAt(generatedAt)}
         <span className="dashboard-freshness-time">, {formatReviewedAt(generatedAt, "time")}</span>
       </span>
       <span className="dashboard-freshness-compact">{formatReviewedAt(generatedAt, "compact")}</span>
@@ -228,9 +229,9 @@ function DataAppPublishButton({ published, getActionHref, surface, disabled, ope
   function openReview() { setAccessMode("custom"); onOpenChange(true); }
   return <>
     <span className="history-tooltip-trigger" data-delayed-tooltip>
-    <button aria-describedby={disabled && !editing ? disabledTooltipId : undefined} type="button" className="dashboard-publish-button" data-mode-action="primary" aria-label={editing ? "Save" : published ? "Publish changes" : "Publish"} onClick={editing ? onSave : openReview} disabled={disabled}>
-      <span className="dashboard-header-action-label-full">{editing ? "Save" : published ? "Publish changes" : "Publish"}</span>
-      <span className="dashboard-header-action-label-compact">{editing ? "Save" : "Publish"}</span>
+    <button aria-describedby={disabled && !editing ? disabledTooltipId : undefined} type="button" className="dashboard-publish-button" data-mode-action="primary" aria-label={tChrome(editing ? "Save" : published ? "Publish changes" : "Publish")} onClick={editing ? onSave : openReview} disabled={disabled}>
+      <span className="dashboard-header-action-label-full">{tChrome(editing ? "Save" : published ? "Publish changes" : "Publish")}</span>
+      <span className="dashboard-header-action-label-compact">{tChrome(editing ? "Save" : "Publish")}</span>
     </button>
     {disabled && !editing && <Tooltip id={disabledTooltipId} className="topbar-mode-tooltip">Available when this {surface === "report" ? "report" : "dashboard"} is ready.</Tooltip>}
     </span>
@@ -290,7 +291,7 @@ function DataAppRefreshControl({ generatedAt, getActionHref, published, schedule
             ref={trigger}
             type="button"
             className="freshness freshness-button dashboard-refresh-trigger"
-            aria-label="Refresh data"
+            aria-label={tChrome("Refresh data")}
             title="Refresh data or configure a recurring schedule"
           >
             <Icon name="refresh" size={16} />
@@ -430,13 +431,13 @@ const HeaderOverflowButton = React.forwardRef(function HeaderOverflowButton(prop
       {...props}
       ref={ref}
       type="button"
-      aria-label="More"
+      aria-label={tChrome("More")}
       aria-describedby={tooltipId}
       className="dashboard-header-action-button dashboard-header-overflow-button"
     >
       <span className="dashboard-header-overflow-visual"><Icon name="more" size={18} /></span>
     </button>
-    <Tooltip id={tooltipId} className="topbar-mode-tooltip">More</Tooltip>
+    <Tooltip id={tooltipId} className="topbar-mode-tooltip">{tChrome("More")}</Tooltip>
     </span>
   );
 });
@@ -517,11 +518,11 @@ function DataAppOverflowMenu({
           Edit text and layout
         </MenuItem>}
         {!published && <MenuItem icon="globe" className="dashboard-action-menu-item"
-          disabled={publishDisabled} onSelect={onPublish}>Publish</MenuItem>}
+          disabled={publishDisabled} onSelect={onPublish}>{tChrome("Publish")}</MenuItem>}
         <Dropdown.Separator className="menu-separator" />
       </Dropdown.Group>
       {hasRefresh && <Dropdown.Group className="dashboard-mobile-menu-group">
-        <Dropdown.Label className="menu-group-label">Refresh</Dropdown.Label>
+        <Dropdown.Label className="menu-group-label">{tChrome("Refresh")}</Dropdown.Label>
         <MenuItem icon="refresh" className="dashboard-action-menu-item"
           {...dataAppActionLink(getActionHref, "refresh")}>Refresh now</MenuItem>
         <MenuItem icon="calendar" className="dashboard-action-menu-item"
@@ -562,19 +563,19 @@ function DataAppOverflowMenu({
     </span>
     <span className="dashboard-native-overflow">
       <span className="dashboard-header-overflow-visual" aria-hidden="true"><Icon name="more" size={18} /></span>
-      <select ref={nativeSelect} aria-label="More" onChange={nativeAction}
+      <select ref={nativeSelect} aria-label={tChrome("More")} onChange={nativeAction}
         onKeyDown={event => { if (event.key === "Escape") event.stopPropagation(); }}>
         <optgroup label="Actions">
           <option value="ask" aria-label="Ask ChatGPT">Ask ChatGPT</option>
-          {canEdit && <option value="edit">Edit text and layout</option>}
-          {!published && <option value="publish" aria-label="Publish" disabled={publishDisabled}>Publish</option>}
+          {canEdit && <option value="edit">{tChrome("Edit text and layout")}</option>}
+          {!published && <option value="publish" aria-label={tChrome("Publish")} disabled={publishDisabled}>{tChrome("Publish")}</option>}
           {canEdit && <option value="theme">Switch theme</option>}
-          {published && <option value="copy-link">Copy link</option>}
+          {published && <option value="copy-link">{tChrome("Copy link")}</option>}
           {published && onOpenHandoffSettings && <option value="handoff-settings">Open in ChatGPT settings</option>}
           {surface !== "report" && <option value="duplicate">Create a copy</option>}
           {canEdit && mode === "edit" && hiddenCount > 0 && <option value="restore">Restore hidden ({hiddenCount})</option>}
         </optgroup>
-        {hasRefresh && <optgroup label="Refresh">
+        {hasRefresh && <optgroup label={tChrome("Refresh")}>
           <option value="refresh">Refresh now</option>
           <option value="schedule">Schedule refresh</option>
         </optgroup>}
@@ -935,7 +936,7 @@ export function DataAppTopbar({
           />
           {canEdit && <span className="history-tooltip-trigger" data-delayed-tooltip>
             <button type="button" className="dashboard-header-action-button dashboard-header-edit-button"
-              aria-describedby={editTooltipId} aria-label="Edit text and layout" disabled={editingBlocked || saveStatus === "saving"} onClick={() => onModeChange?.("edit")}>
+              aria-describedby={editTooltipId} aria-label={tChrome("Edit text and layout")} disabled={editingBlocked || saveStatus === "saving"} onClick={() => onModeChange?.("edit")}>
               <Icon name="edit" size={18} />
             </button>
             <Tooltip id={editTooltipId} className="topbar-mode-tooltip">{editingBlocked ? `Available when this ${noun} is ready.` : "Edit text and layout"}</Tooltip>

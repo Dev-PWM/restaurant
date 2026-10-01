@@ -1,4 +1,5 @@
 import React from "react";
+import { tChrome } from '../content/shared/analytics-chrome-copy.js';
 
 export function chartSkeletonFamily(chart = {}) {
   if (chart.presentation === "segmented") return "composition";
@@ -35,8 +36,8 @@ export function ComponentSkeleton({ kind = "chart", chart = {}, rows = [] }) {
 export function ComponentState({ error = false, kind = "chart", height = 240, onRetry }) {
   const noun = kind === "table" ? "table" : kind === "metric" ? "metric" : "chart";
   return <div className="component-data-state" role={error ? "alert" : "status"} style={{ minHeight: height }}>
-    <strong>{error ? `Couldn’t load this ${noun}` : "No data to display"}</strong>
-    <p>{error ? "The data is unavailable. Try again in a moment." : "No rows are available for this view."}</p>
+    <strong>{error ? `Couldn’t load this ${noun}` : tChrome("No data to display")}</strong>
+    <p>{error ? tChrome("The data is unavailable. Try again in a moment.") : tChrome("No rows are available for this view.")}</p>
     {error && onRetry && <button type="button" className="button secondary" onClick={onRetry}>Try again</button>}
   </div>;
 }

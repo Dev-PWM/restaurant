@@ -472,6 +472,7 @@ export function BarFamilyRenderer({ rows = [], spec: chartSpec, height = 220, cl
   };
   const valueAxis = {
     type: "number",
+    currency: rawSpec.format?.style === "currency" ? rawSpec.format.currency : undefined,
     hide: !spec.axes.value,
     axisLine: false,
     tickLine: false,

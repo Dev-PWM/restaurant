@@ -17,7 +17,7 @@ Open [MasaFlow](http://127.0.0.1:4173/businessDashbord.html). The service binds 
 | Screen | Local URL |
 | --- | --- |
 | Order Queue: collect cash, run the kitchen | [Orders](http://127.0.0.1:4173/businessDashbord.html) |
-| Business Analytics (the mockup screen; no build needed) | [Metrics](http://127.0.0.1:4173/metricsDashbord.html) |
+| Responsive Business Analytics overview (no build needed) | [Metrics](http://127.0.0.1:4173/metricsDashbord.html) |
 | Operations / Sales analytics with source inspection and AI summaries | [Analytics](http://127.0.0.1:4173/analytics/) (after `npm run build`) |
 | Menu prices, 86 switches, history with undo | [Menu management](http://127.0.0.1:4173/MenuManagment.html) |
 | Float, cash drops, shift audit, transaction ledger | [History & Ledger](http://127.0.0.1:4173/history.html) |
@@ -52,7 +52,9 @@ The command is `1B 70 00 19 FA`, following [Epson's ESC p reference](https://dow
 
 ## Live analytics and summaries
 
-Analytics, ledger calculations and summary inputs share one receipt validator. Sales use verified payment time. Operations includes the entire paid queue and today's completed-ticket pickup median. The source inspector exposes exact evidence, formulas, observation time and exclusions. Charts use zero baselines and exact tables. Disconnected screens retain confirmed data with a stale notice; initial failures recover from SSE or retry.
+Analytics, ledger calculations and summary inputs share one receipt validator. Sales use verified payment time. Operations includes the entire paid queue and today's completed-ticket pickup median, with its sample count. The source inspector exposes exact evidence, formulas, observation time and exclusions. Charts use zero baselines and exact tables; empty averages and medians display “—”. Disconnected screens retain confirmed data with a stale notice; initial failures recover from SSE or retry.
+
+`GET /api/analytics?tab=owner&period=day&date=2026-09-30&lang=es` returns normalized scope, revision, observation time, currency/timezone, definitions, quality counts and evidence datasets. `owner` is the Sales tab; `operations` is Operations. Legacy `view=sales` and `view=owner` links remain accepted. Receipt, invalid-completion and invalid-audit quality counts cover the committed store, rather than only the selected sales period. Inconsistent receipts are excluded from current totals. Closed audit values stay frozen; malformed audits are disclosed and omitted from the latest-valid-audit card.
 
 AI summaries generate only on request. Set the **server environment** variable `AI_GATEWAY_API_KEY` and optionally `AI_GATEWAY_MODEL` (default `openai/gpt-6-luna`, verified in the [model catalog](https://ai-gateway.vercel.sh/v1/models)). Local calls use the [Gateway Chat Completions API](https://vercel.com/docs/ai-gateway/sdks-and-apis/openai-chat-completions); no Vercel deployment is required. Without a key, the interface shows unavailable.
 
@@ -64,9 +66,9 @@ Only aggregates and definitions are sent to Gateway; customer names, cashier ide
 
 Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. Back up this directory while the service is stopped. This app is intended for a trusted local counter; authentication, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
 
-HTML screens use shared `assets/`: the order store, translations (`masaflow-i18n.js`), UI helpers, the compiled stylesheet and vendored icons/charts (`assets/vendor/`: FontAwesome Free 6.4 solid, Plotly 3.1 basic), so the counter keeps working offline apart from the two Google web fonts.
+HTML screens use shared `assets/`: the order store, translations, UI helpers, the compiled stylesheet and vendored icons/charts (`assets/vendor/`: FontAwesome Free 6.4 solid, Plotly 3.1 basic), so the counter keeps working offline apart from the two Google web fonts. The English/Spanish catalog is [assets/masaflow-catalog.json](assets/masaflow-catalog.json). HTML pages load its `html` namespace through `masaflow-i18n.js`; React imports its `analytics` namespace at build time. The HTML script keeps an inline fallback for immediate rendering and failed asset requests. A language selected in the URL takes precedence over saved `masaflow.locale`; otherwise the saved preference applies, initially Spanish.
 
-Styles are [Tailwind CSS v3](https://v3.tailwindcss.com) utility classes, the same ones the design mockups use, compiled ahead of time into `assets/masaflow.css`, which is committed. The source is `styles/masaflow.css` plus `tailwind.config.js`. After adding or changing classes, run `npm run build:css` (downloads the pinned Tailwind CLI on first use). Tailwind only emits classes written out in full, so `'text-' + color + '-600'` produces no CSS; use a lookup object of complete class strings. New UI text also needs a Spanish entry in `assets/masaflow-i18n.js`; customer names, notes and audit messages carry `data-i18n-skip` so they are never translated.
+Styles are [Tailwind CSS v3](https://v3.tailwindcss.com) utility classes, the same ones the design mockups use, compiled ahead of time into `assets/masaflow.css`, which is committed. The source is `styles/masaflow.css` plus `tailwind.config.js`. After adding or changing classes, run `npm run build:css` (downloads the pinned Tailwind CLI on first use). Tailwind only emits classes written out in full, so `'text-' + color + '-600'` produces no CSS; use a lookup object of complete class strings. Add new UI labels to the relevant English and Spanish catalog namespace; keep the HTML inline fallback in sync for new HTML labels. Rebuild analytics after catalog changes. Customer names, notes and audit messages carry `data-i18n-skip` so they are never translated.
 
 The React/Recharts module in `apps/analytics` preserves canonical source inspection and presentation controls. Rebuild after frontend changes. Keep protected-runtime changes narrowly authorized and verified using its [authoring guide](apps/analytics/AGENTS.md).
 
@@ -78,4 +80,14 @@ The [data model](DATA_MODEL.md), [reusable KPI context](docs/data-context/contex
 npm test
 ```
 
-Tests use temporary directories and cover cash validation, removable toppings, optional phone numbers, cancelling unpaid orders, deleting dishes, undoable menu audit entries, kitchen step timestamps, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors, plus static checks on the screens (links resolve, no CDN scripts, one shared staff shell, translation loaded, required hooks present, no mockup placeholders). Browser verification covers customer-to-audit fulfillment, reconnects, URL/language restoration, source inspection, chart interaction and desktop / 390px / 430px layouts.
+Tests use temporary directories and cover cash validation, removable toppings, optional phone numbers, cancelling unpaid orders, deleting dishes, undoable menu audit entries, kitchen step timestamps, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors, plus static checks on the screens (links resolve, no CDN scripts, one shared staff shell, translation loaded, required hooks present, no mockup placeholders).
+
+The browser acceptance suite is separate from `npm test`. Build analytics first and use installed Google Chrome with Playwright:
+
+```sh
+npm run build
+npm install --no-save --package-lock=false playwright
+node tests/browser-acceptance.cjs
+```
+
+If Playwright is supplied by an existing runtime, set `PLAYWRIGHT_MODULE` to that installation's absolute module path instead of installing another copy. The suite starts its own service against a temporary data directory, uses a mocked Gateway, and removes that temporary store when it finishes. It checks API/card/table reconciliation, source inspection, request races, reconnects, URL/language restoration, malformed summaries, keyboard/touch chart interaction and desktop / 390px / 430px analytics layouts. It also completes mobile customer ordering with a lost response, short/full cash tender, kitchen dispatch and pickup tracking, a cash drop and a signed shift audit, then verifies initial-failure recovery on all six HTML screens. Screenshots and a result report are written to Git-ignored `artifacts/qa/`; no QA receipts enter `.masaflow`. Live Gateway access and physical drawer opening require separate checks with the configured credentials and actual printer.

@@ -1,3 +1,4 @@
+import { tChrome } from '../content/shared/analytics-chrome-copy.js';
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { canDownloadChartImage } from "../chart-image.js";
@@ -44,7 +45,7 @@ export function ComponentActions({
   additionalActions,
   required = false,
 }) {
-  const label = `${component.title} actions`;
+  const label = `${component.title} · ${tChrome("Actions")}`;
   const nativeSelect = useRef(null);
   useLayoutEffect(() => { if (nativeSelect.current) nativeSelect.current.selectedIndex = -1; });
   const [imageReady, setImageReady] = useState(false);
@@ -59,21 +60,21 @@ export function ComponentActions({
     return () => observer.disconnect();
   }, [component.id, Boolean(component.chart)]);
   const inspectActions = [
-    canEdit && component.chart && <MenuItem key="edit-chart" icon="edit" onSelect={() => onOpen("explore", component)}>Edit chart</MenuItem>,
-    <MenuItem key="source" icon="database" onSelect={() => onOpen("source", component)}>View data source</MenuItem>,
+    canEdit && component.chart && <MenuItem key="edit-chart" icon="edit" onSelect={() => onOpen("explore", component)}>{tChrome("Edit chart")}</MenuItem>,
+    <MenuItem key="source" icon="database" onSelect={() => onOpen("source", component)}>{tChrome("View data source")}</MenuItem>,
   ].filter(Boolean);
   const copyActions = [
     onCopy && component.chart && imageReady
-      && <MenuItem key="copy-image" icon="copy" onSelect={() => onCopy("image", component)}>Copy as image</MenuItem>,
-    onCopy && <MenuItem key="copy-data" icon="copy" onSelect={() => onCopy("data", component)}>Copy data</MenuItem>,
+      && <MenuItem key="copy-image" icon="copy" onSelect={() => onCopy("image", component)}>{tChrome("Copy as image")}</MenuItem>,
+    onCopy && <MenuItem key="copy-data" icon="copy" onSelect={() => onCopy("data", component)}>{tChrome("Copy data")}</MenuItem>,
     published && onCopy && validComponentId(component.id) && <MenuItem key="copy-link" icon="link"
-      onSelect={() => onCopy(component.chart ? "link" : "component-link", component)}>Copy link</MenuItem>,
+      onSelect={() => onCopy(component.chart ? "link" : "component-link", component)}>{tChrome("Copy link")}</MenuItem>,
     ...menuItems(additionalActions).filter(action => !action.props["data-requires-chart-image"] || imageReady),
   ].filter(Boolean);
   const editActions = [
-    canEdit && onEdit && <MenuItem key="edit-text" icon="edit" onSelect={onEdit}>Edit text</MenuItem>,
+    canEdit && onEdit && <MenuItem key="edit-text" icon="edit" onSelect={onEdit}>{tChrome("Edit text")}</MenuItem>,
     canEdit && editMode && !required
-      && <MenuItem key="hide" icon="trash" danger onSelect={() => onHide(component.id)}>Hide</MenuItem>,
+      && <MenuItem key="hide" icon="trash" danger onSelect={() => onHide(component.id)}>{tChrome("Hide")}</MenuItem>,
   ].filter(Boolean);
   const actionGroups = [inspectActions, copyActions, editActions].filter(group => group.length);
   const actions = actionGroups.flat();

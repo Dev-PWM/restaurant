@@ -462,13 +462,6 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ---------- Ledger ---------- */
-
-  function validPayments(state, orders) {
-    return state.payments.filter(payment => {
-      const order = orders.get(payment.orderId);
-      return payment.method === 'cash' && order && order.paymentId === payment.id && order.paymentStatus === 'paid' && order.totalCents === payment.totalCents && payment.tenderedCents >= payment.totalCents && payment.changeCents === payment.tenderedCents - payment.totalCents;
-    });
-  }
   function dayBounds() {
     if (filters.range === 'today') return [today, today];
     if (filters.range === 'yesterday') return [yesterday, yesterday];
@@ -477,17 +470,16 @@ window.addEventListener('DOMContentLoaded', () => {
     return ['', ''];
   }
   function ledgerRows(state) {
-    const orders = new Map(state.orders.map(order => [order.id, order]));
-    const verified = validPayments(state, orders);
+    const verified = MasaFlow.verifiedReceipts();
     const shift = MasaFlow.getOpenShift();
     const [from, to] = dayBounds();
-    const rows = verified.map(payment => ({ payment, order: orders.get(payment.orderId) })).filter(({ payment, order }) => {
+    const rows = verified.receipts.filter(({ payment, order }) => {
       if (filters.scope === 'current' && !(shift && payment.shiftId === shift.id)) return false;
       if (filters.status !== 'all' && (STATUS[order.status] || {}).group !== filters.status) return false;
       if (from || to) { const day = dayOf(payment.paidAt); if ((from && day < from) || (to && day > to)) return false; }
       return !filters.search || [order.number, '#' + order.number, order.customerName, payment.cashierId].join(' ').toLowerCase().includes(filters.search);
     }).reverse().sort((a, b) => new Date(b.payment.paidAt) - new Date(a.payment.paidAt));
-    return { rows, total: verified.length, shift };
+    return { rows, total: verified.receipts.length, excluded: verified.excluded, shift };
   }
   // Records saved in the same millisecond keep their saved order, so each list is reversed
   // before its (stable) newest-first sort.
@@ -530,7 +522,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderTransactions(state) {
-    const { rows, total, shift } = ledgerRows(state);
+    const { rows, total, excluded, shift } = ledgerRows(state);
     const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     page = Math.min(Math.max(1, page), pages);
     const start = (page - 1) * PAGE_SIZE;
@@ -539,7 +531,7 @@ window.addEventListener('DOMContentLoaded', () => {
     exportRows = rows;
 
     const count = rows.length + ' cash ' + (rows.length === 1 ? 'transaction' : 'transactions') + ' shown · unpaid orders are excluded';
-    if ($('transaction-count').textContent !== count) $('transaction-count').textContent = count;
+    paint($('transaction-count'), `<span>${escape(count)}</span>${excluded ? `<span class="block">${escape(MasaFlowI18n.t('Inconsistent cash receipts excluded (all dates): {count}', { count: excluded }))}</span>` : ''}`);
     paint($('transactions-body'), visible.map(rowHtml).join(''));
 
     $('empty-state').classList.toggle('hidden', rows.length > 0);
@@ -654,9 +646,9 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   const plainMoney = cents => (cents / 100).toFixed(2);
   function exportCsv() {
-    const lines = [['Order', 'Paid at (ISO)', 'Customer', 'Items', 'Total', 'Tendered', 'Change', 'Cashier', 'Status']];
+    const lines = [['Order', 'Paid at (ISO)', 'Customer', 'Items', 'Currency', 'Total', 'Tendered', 'Change', 'Cashier', 'Status']];
     for (const { payment, order } of exportRows) {
-      lines.push(['#' + order.number, payment.paidAt, order.customerName, order.items.map(line => line.quantity + 'x ' + line.name).join('; '), plainMoney(payment.totalCents), plainMoney(payment.tenderedCents), plainMoney(payment.changeCents), payment.cashierId, (STATUS[order.status] || { label: order.status }).label]);
+      lines.push(['#' + order.number, payment.paidAt, order.customerName, order.items.map(line => line.quantity + 'x ' + line.name).join('; '), payment.currency, plainMoney(payment.totalCents), plainMoney(payment.tenderedCents), plainMoney(payment.changeCents), payment.cashierId, (STATUS[order.status] || { label: order.status }).label]);
     }
     const name = 'masaflow-ledger-' + today + '.csv';
     // The byte-order mark makes Excel read accented dish and guest names as UTF-8.

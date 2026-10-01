@@ -40,7 +40,7 @@
       if (!line.currency) line.currency = order.currency;
       if (Array.isArray(line.options)) line.options.forEach(option => { if (option && !option.currency) option.currency = order.currency; });
     }); });
-    state.settings = { ...state.settings, currency: 'MXN', timeZone: 'America/Mexico_City', locale: 'es', taxConfigured: false };
+    state.settings = { ...state.settings, currency: 'MXN', timeZone: 'America/Mexico_City', locale: 'es', taxBasisPoints: 0, taxConfigured: false };
     state.version = 2;
     state.revision = (Number.isSafeInteger(state.revision) ? state.revision : 0) + 1;
     return state;
@@ -156,7 +156,7 @@
       queue = operation.catch(() => {});
       return operation;
     }
-    function orderFor(s, id) { const order = s.orders.find(o => o.id === id); if (!order) throw new Error('Order not found.'); return order; }
+    function orderFor(s, id) { const order = s.orders.find(o => o && o.id === id); if (!order) throw new Error('Order not found.'); return order; }
     function menuFor(s, id) { const item = s.menu.find(m => m.id === id); if (!item) throw new Error('Menu item not found.'); return item; }
     function available(s, order) {
       order.items.forEach(line => {
@@ -237,7 +237,7 @@
       }); },
       payOrder(id, tenderedCents, cashierId = 'Cashier 1') { return mutate(s => {
         const order = orderFor(s, id);
-        if (isVerifiedPaid(s, order)) return { order, payment: s.payments.find(p => p.id === order.paymentId), alreadyPaid: true };
+        if (isVerifiedPaid(s, order)) return { order, payment: s.payments.find(p => p && p.id === order.paymentId), alreadyPaid: true };
         if (order.status !== 'draft' || order.paymentStatus !== 'unpaid') throw new Error('Only an unpaid draft can be finalized.');
         if (order.currency !== s.settings.currency) fail('This draft uses legacy currency. Rebuild it using the current menu before taking payment.', 'LEGACY_ORDER_CURRENCY');
         const shift = getOpenShift(s); if (!shift) throw new Error('Open a cash drawer shift and record the starting float first.');
@@ -301,17 +301,17 @@
         audit(s, 'modifier_edit', `${item.name} · ${option.name}: ${option.currency} ${money(option.priceCents, option.currency)}, ${option.available ? 'in stock' : 'out of stock'}.`, { menuItemId: item.id, optionId: option.id, name: `${item.name} · ${option.name}`, available: option.available }); return option;
       }); },
       reserveHardwareJob(key, paymentId = null) { return mutate(s => {
-        const existing = s.hardwareJobs.find(j => j.key === key); if (existing) return { job: existing, duplicate: true };
-        if (paymentId && !s.payments.some(p => p.id === paymentId && isVerifiedPaid(s, orderFor(s, p.orderId)))) throw new Error('Drawer pulse requires a verified cash payment.');
+        const existing = s.hardwareJobs.find(j => j && j.key === key); if (existing) return { job: existing, duplicate: true };
+        if (paymentId && !verifiedReceipts(s).receipts.some(({ payment }) => payment.id === paymentId)) throw new Error('Drawer pulse requires a verified cash payment.');
         if (!paymentId && !getOpenShift(s)) throw new Error('Open a drawer shift before a manual drawer pulse.');
         const job = { key, paymentId, status: 'reserved', createdAt: now(), message: '' }; s.hardwareJobs.push(job);
         audit(s, paymentId ? 'drawer_kick_requested' : 'manual_drawer_kick', paymentId ? 'Drawer pulse requested for verified cash sale.' : 'Cashier requested a manual drawer pulse.');
         return { job, duplicate: false };
       }); },
       finishHardwareJob(key, status, message) { return mutate(s => {
-        const job = s.hardwareJobs.find(j => j.key === key); if (!job) throw new Error('Hardware job not found.');
+        const job = s.hardwareJobs.find(j => j && j.key === key); if (!job) throw new Error('Hardware job not found.');
         job.status = status; job.message = cleanText(message, 300); job.updatedAt = now();
-        const payment = s.payments.find(p => p.id === job.paymentId); if (payment) payment.drawerKickStatus = status;
+        const payment = s.payments.find(p => p && p.id === job.paymentId); if (payment) payment.drawerKickStatus = status;
         audit(s, 'drawer_kick_result', `${status}: ${job.message}`); return job;
       }); }
     };

@@ -1,3 +1,4 @@
+import { tChrome } from '../content/shared/analytics-chrome-copy.js';
 import React, { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 // Standalone chart snippets only mount SourceSidebar. Keep receipt-only UI out
@@ -268,7 +269,7 @@ function ReceiptOverview({ overview, assumptions, description }) {
   return <>
     {description && <p className="receipt-description">{description}</p>}
     {!!definitions.length && <div className="receipt-definitions">
-      <p className="source-label">Definitions</p>
+      <p className="source-label">{tChrome("Definitions")}</p>
       <ul className="receipt-definition-list">{definitions.map(({ value: record }, index) => {
         const calculation = record.calculationSummary;
         const redundant = calculation?.trim().toLowerCase().replace(/[.!?]+$/u, "")
@@ -289,7 +290,7 @@ function ReceiptOverview({ overview, assumptions, description }) {
         <li key={index}>{text}</li>)}</ul>
     </div>}
     <div className="source-group">
-      <p className="source-label">Sources</p>
+      <p className="source-label">{tChrome("Sources")}</p>
       <div className="source-list">{sources.map(({ value }, index) => <SourceRow key={index} receipt {...value} />)}</div>
     </div>
   </>;
@@ -527,7 +528,7 @@ function SourceDetails({ component, query, rows = [], filters = [], allowCopy, r
         </div>}
         {!receipt && !!visibleDefinitions.length && (
           <div className="source-group">
-            <p className="source-label">Definitions</p>
+            <p className="source-label">{tChrome("Definitions")}</p>
             <table className="source-definitions">
               <tbody>
                 {visibleDefinitions.map((record) => {
@@ -566,7 +567,7 @@ function SourceDetails({ component, query, rows = [], filters = [], allowCopy, r
         )}
         {!!(receipt || hasSourceLabel || tables.length || files.length || links.length) && (
           <div className="source-group">
-            <p className="source-label">Sources</p>
+            <p className="source-label">{tChrome("Sources")}</p>
             <div className="source-list">
               {(receipt || hasSourceLabel) && !tables.length && !files.length && !links.length && <SourceRow receipt={Boolean(receipt)} label={source.label} />}
               {tables.map((table) => (
@@ -703,8 +704,8 @@ export function SourceInspector({ component, query, rows = [], filters = [], all
   const hasEvidence = receipt ? hasReceiptEvidence(consolidated) : available.evidence.length;
   const hasOverview = receipt || available.hasOverview;
   const tabs = [
-    ...(hasOverview ? [{ id: "overview", label: "Overview" }] : []),
-    ...(hasData ? [{ id: "data", label: "Data preview" }] : []),
+    ...(hasOverview ? [{ id: "overview", label: tChrome("Overview") }] : []),
+    ...(hasData ? [{ id: "data", label: tChrome("Data preview") }] : []),
     ...(hasSql ? [{ id: "sql", label: "SQL query" }] : []),
     ...(hasEvidence ? [{ id: "evidence", label: "Evidence flow" }] : []),
   ];
@@ -760,7 +761,7 @@ export function SourceInspector({ component, query, rows = [], filters = [], all
     {collapseControl && <div className="receipt-card-toolbar" onClick={handleToolbarClick}>
       <p className="receipt-card-title">{component.title}</p>{collapseControl}
     </div>}
-    <section className="source-section receipt-overview" aria-label="Source details">
+    <section className="source-section receipt-overview" aria-label={tChrome("Source details")}>
       <ReceiptOverview overview={consolidated} assumptions={receiptAssumptions} description={component.description} />
     </section>
   </div>;
@@ -872,7 +873,7 @@ export function SourceSidebar({ component, getSource, queries, onClose, variant 
             <>
               {queryIds.length > 1 && <div className="source-section source-query-picker">
                 <div className="source-group">
-                  <p className="source-label">Data source</p>
+                  <p className="source-label">{tChrome("Data source")}</p>
                   <SourceSelect label="Choose reviewed data source" value={selectedQueryId}
                     choices={queryIds} onChange={setSelectedQueryId}
                     formatChoice={(queryId) => reviewedQueryLabel(queries?.[queryId], queryId)} />

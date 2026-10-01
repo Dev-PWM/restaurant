@@ -58,3 +58,12 @@ test('summary API rejects cross-origin actions and accepts an explicitly request
   const response = await fetch(`${app.url}/api/analytics/summary`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); assert.equal(response.status, 200);
   const summary = await response.json(); assert.equal(summary.summary.headline, 'Sales summary'); assert.equal(summary.summary.findings[0].value, 0); assert.equal(requests, 1);
 });
+
+test('an inconsistent pending receipt does not block service restart or send a drawer pulse', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-invalid-recovery-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const state = initialState(); state.payments.push({ id: 'invalid-payment', orderId: 'missing-order', drawerKickStatus: 'pending' });
+  await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
+  const app = await service(t, { dataDirectory: directory });
+  assert.equal(app.engine.getState().hardwareJobs.length, 0);
+  const dto = await (await fetch(`${app.url}/api/analytics`)).json(); assert.equal(dto.quality.excludedReceipts, 1); assert.equal(dto.sales.ticketCount, 0);
+});

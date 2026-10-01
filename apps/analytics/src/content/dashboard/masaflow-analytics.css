@@ -15,3 +15,16 @@
 @media(prefers-reduced-motion:reduce){.mf-analytics *{scroll-behavior:auto}}
 .mf-analytics .mf-card .component-title{font-size:27px;font-weight:700;line-height:1.2}.mf-analytics .mf-metric .component-title{font-size:12px;letter-spacing:.3px}.mf-analytics .mf-metric-dark .component-title{color:#ddd7d1}.mf-analytics .mf-card .component-title-text{font:inherit;line-height:inherit}.mf-analytics .mf-sales-charts .mf-muted{margin-top:10px}
 @media(max-width:760px){.mf-page{padding:0 16px}.mf-analytics .mf-card .component-title{font-size:25px}.mf-analytics .mf-metric .component-title{font-size:10px;letter-spacing:0}.mf-local-badge{max-width:230px;white-space:normal}}
+.mf-analytics .mf-card[data-component-variant="card"][data-component-id] .component-title{font-size:27px;font-weight:700;line-height:1.2}
+@media(min-width:1101px){.mf-analytics{gap:40px}.mf-rail{width:86px;flex-basis:86px;border-radius:0}.mf-page{padding-right:32px}}
+@media(max-width:760px){.mf-analytics .mf-card[data-component-variant="card"][data-component-id] .component-title{font-size:24px}}
+.mf-queue .mf-table-scroll{max-height:390px;overflow:auto;scrollbar-gutter:stable}
+.mf-queue-table td:last-child a{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px}
+@media(max-width:760px){.mf-languages button{min-height:44px;min-width:44px}.mf-periods button{min-height:44px}.mf-date-controls button{min-height:44px;min-width:44px}.mf-icon-button{min-height:44px;min-width:44px}.mf-data-table summary{min-height:44px;line-height:44px}}
+
+.mf-analytics [data-component-id="top-dishes"] .bar-family-list-copy{position:static;height:auto;align-items:baseline;margin-bottom:7px}
+.mf-analytics [data-component-id="top-dishes"] .bar-family-list-row{gap:0;min-height:44px}
+.mf-money-amount{white-space:nowrap}
+@media(max-width:760px){.mf-analytics .mf-sales-kpis .mf-metric:not(:first-child){padding:12px}.mf-analytics .mf-sales-kpis .mf-metric:not(:first-child) .metric-value{font-size:16px;letter-spacing:-.5px}.mf-sales-kpis .mf-metric:not(:first-child) .mf-money-currency{display:block;font-size:11px;margin-top:3px;letter-spacing:0}.mf-analytics .mf-card .component-title-text{white-space:normal;overflow-wrap:normal}.mf-analytics .mf-card[data-component-variant="card"][data-component-id] .component-title{font-size:22px}}
+
+.mf-queue .mf-table-scroll:focus-visible{outline:3px solid #ff9c5a;outline-offset:3px;border-radius:6px}

@@ -1,6 +1,8 @@
 (function () {
   'use strict';
   const dictionary = {
+    'Inconsistent cash receipts excluded (all dates)':'Cobros inconsistentes excluidos (todas las fechas)',
+    'Inconsistent cash receipts excluded (all dates): {count}':'Cobros inconsistentes excluidos (todas las fechas): {count}',
     'items':'productos','item':'producto','unavailable':'no disponible','available':'disponible','language':'Idioma', 'Spanish':'Español', 'English':'English',
     'Operations':'Operaciones','Sales':'Ventas','Summary':'Resumen','Source':'Fuente','Sources':'Fuentes','Inspect source':'Ver fuente','Cash receipts':'Cobros en efectivo','Drawer variance':'Diferencia de caja','Paid-to-pickup time':'Tiempo de pago a entrega',
     'Mexican Kitchen':'Cocina mexicana','Authentic Masa':'Masa auténtica','Crafted Daily':'Hecha cada día','Made with masa. Served with care.':'Hecho con masa. Servido con cuidado.',
@@ -243,7 +245,12 @@
     const control=document.getElementById('mf-language');if(control)control.value=next;
     apply(); for(const listener of listeners)listener(locale);document.dispatchEvent(new CustomEvent('masaflow:locale',{detail:{locale}}));apply();
   }
-  window.MasaFlowI18n={getLocale:()=>locale,t,setLocale,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},translate,apply};
+  window.MasaFlowI18n={catalog:dictionary,getLocale:()=>locale,t,setLocale,subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener);},translate,apply};
+  // Shared canonical catalog also supplies the React analytics module. The inline
+  // catalog preserves immediate/offline rendering while the local asset loads.
+  fetch('/assets/masaflow-catalog.json').then(response=>response.ok?response.json():null).then(catalog=>{
+    if(catalog?.html?.es){Object.assign(dictionary,catalog.html.es);apply();}
+  }).catch(()=>{});
   function start(){
     const control=document.createElement('label');control.className='mf-language';control.innerHTML='<span>Idioma / Language</span><select id="mf-language" aria-label="Idioma / Language"><option value="es">Español</option><option value="en">English</option></select>';
     const host=document.querySelector('[data-mf-language-host]')||document.querySelector('.header-actions,.q-header-actions,.l-drawer-tools,.menu-toolbar,.tracking-actions')||document.body;

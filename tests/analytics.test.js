@@ -136,3 +136,11 @@ test('audit chronology compares timestamps rather than timezone-offset text', ()
   const dto = buildAnalytics(state, scope, { observedAt });
   assert.equal(dto.operations.latestAudit.id, 'later'); assert.equal(dto.quality.invalidAudits, 0);
 });
+
+test('queue and recent receipt chronology use actual instants for preserved timezone offsets', async () => {
+  const state = await fixture(['2026-09-30T21:00:00+02:00', '2026-09-30T20:00:00Z']);
+  const dto = buildAnalytics(state, scope, { observedAt });
+  assert.deepEqual(dto.operations.activeOrders.map(order => order.id), state.orders.map(order => order.id));
+  assert.deepEqual(dto.sales.recentReceipts.map(order => order.orderId), state.orders.map(order => order.id).reverse());
+  assert.ok(dto.operations.activeOrders[0].ageMinutes > dto.operations.activeOrders[1].ageMinutes);
+});

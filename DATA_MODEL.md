@@ -44,6 +44,8 @@ flowchart LR
 
 ## Analytics API
 
-GET `/api/analytics` normalizes tab (or legacy view), period, date and lang. It returns revision, observation time, currency, timezone, definitions, quality counts, sales and Operations evidence. Sales use Mexico City paidAt; the live queue spans all dates. Pickup median uses today's completedAt, including overnight payments.
+GET `/api/analytics` normalizes tab (or legacy view), period, date and lang. It returns revision, observation time, currency, timezone, definitions, quality counts, sales and Operations evidence. Sales use Mexico City paidAt; the live queue spans all dates. Pickup median uses today's completedAt, including overnight payments, and reports the valid sample count. Empty averages and medians are null in the API and “—” in the interface.
+
+`quality.excludedReceipts` counts unverified payment rows plus paid orders with no linked payment. `quality.invalidCompletionTimes` counts verified completed tickets with missing, impossible or negative completion durations. `quality.invalidAudits` counts closed shifts with inconsistent saved expected/actual/variance values, ambiguous IDs, unsupported currency or invalid closing timestamps. These counts cover the committed store, independently of Sales filters. Closed audits retain their original expected cash and signed variance; the latest audit card selects the most recent valid close without recomputing historical balances.
 
 POST `/api/analytics/summary` accepts displayed scope, locale and revision, recomputes verified aggregates and rejects stale requests. [Summary generation](shared/sales-summary.js) sends aggregates and definitions only, validates references and renders authoritative numbers. The browser accepts matching responses atomically; earlier filter requests and older revisions cannot overwrite displayed evidence.

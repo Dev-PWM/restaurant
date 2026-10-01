@@ -32,7 +32,7 @@ test('concurrent identical requests deduplicate and cache for five minutes; numb
 test('Gateway receives aggregate definitions without customer, cashier or raw transaction records', async () => {
   const engine = createEngine(); await engine.openShift(50000, 'SECRET CASHIER');
   const draft = await engine.createDraft({ customerName: 'SECRET CUSTOMER', orderType: 'takeout', items: [{ menuItemId: 'sope', quantity: 1, optionIds: ['white'] }] }); await engine.payOrder(draft.id, 5000, 'SECRET CASHIER');
-  const state = engine.getState(); let body;
+  const state = engine.getState(); state.orders[0].paidAt = state.payments[0].paidAt = new Date(clock).toISOString(); let body;
   const service = createSummaryService({ getState: () => state, apiKey: 'test-only', now: () => clock, fetchImpl: async (_url, options) => { body = JSON.parse(options.body); return response(choice); } });
   const result = await service.summarize(request(state));
   assert.equal(result.summary.findings[0].value, 3500);

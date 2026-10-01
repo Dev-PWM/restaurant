@@ -94,7 +94,7 @@ function buildAnalytics(state, input = {}, { observedAt = new Date().toISOString
   }
   const active = verified.receipts.filter(({ order }) => STATUSES.has(order.status));
   const ageMinutes = paidAt => Math.max(0, Math.floor((Date.parse(observedAt) - Date.parse(paidAt)) / 60000));
-  const activeOrders = active.map(({ order, payment }) => ({ id: order.id, ticket: order.number, status: order.status, paidAt: payment.paidAt, totalCents: order.totalCents, currency: order.currency, ageMinutes: ageMinutes(payment.paidAt) })).sort((a, b) => a.paidAt.localeCompare(b.paidAt) || a.id.localeCompare(b.id));
+  const activeOrders = active.map(({ order, payment }) => ({ id: order.id, ticket: order.number, status: order.status, paidAt: payment.paidAt, totalCents: order.totalCents, currency: order.currency, ageMinutes: ageMinutes(payment.paidAt) })).sort((a, b) => Date.parse(a.paidAt) - Date.parse(b.paidAt) || a.id.localeCompare(b.id));
   const today = dateParts(observedAt, timeZone).date;
   let invalidCompletionTimes = 0; const durations = [];
   for (const { order, payment } of verified.receipts) {
@@ -128,7 +128,7 @@ function buildAnalytics(state, input = {}, { observedAt = new Date().toISOString
     quality: { excludedReceipts: verified.excluded, invalidCompletionTimes, invalidAudits },
     sales: { receiptsCents, subtotalCents, taxCents, ticketCount: selected.length, averageCents: selected.length ? receiptsCents / selected.length : null,
       buckets, topItems: [...items.values()].sort((a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name) || a.menuItemId.localeCompare(b.menuItemId)),
-      recentReceipts: selected.map(({ order, payment }) => ({ orderId: order.id, ticket: order.number, totalCents: payment.totalCents, subtotalCents: order.subtotalCents, taxCents: order.taxCents, currency: order.currency, status: order.status, paidAt: payment.paidAt })).sort((a, b) => b.paidAt.localeCompare(a.paidAt) || a.orderId.localeCompare(b.orderId)) },
+      recentReceipts: selected.map(({ order, payment }) => ({ orderId: order.id, ticket: order.number, totalCents: payment.totalCents, subtotalCents: order.subtotalCents, taxCents: order.taxCents, currency: order.currency, status: order.status, paidAt: payment.paidAt })).sort((a, b) => Date.parse(b.paidAt) - Date.parse(a.paidAt) || a.orderId.localeCompare(b.orderId)) },
     operations: { activeCount: activeOrders.length, counts: { pending: activeOrders.filter(x => x.status === 'pending').length, preparing: activeOrders.filter(x => x.status === 'preparing').length, ready: activeOrders.filter(x => x.status === 'ready').length },
       oldestAgeMinutes: activeOrders.length ? Math.max(...activeOrders.map(x => x.ageMinutes)) : null,
       medianPickupMinutes: median(durations), completedSampleCount: durations.length, completedDate: today, activeOrders, currentShift, latestAudit, drawerExceptions },

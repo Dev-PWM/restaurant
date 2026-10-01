@@ -203,13 +203,20 @@
   // Today's verified cash receipts and the open drawer, for the end-of-day printout.
   function printDailySummary() {
     const state = M.getState(); const today = dayKey(new Date());
-    const receipts = state.payments.filter(payment => dayKey(payment.paidAt) === today && M.isVerifiedPaid(state.orders.find(order => order.id === payment.orderId)));
-    const total = receipts.reduce((sum, payment) => sum + payment.totalCents, 0);
-    const sold = new Map();
-    for (const payment of receipts) for (const line of state.orders.find(order => order.id === payment.orderId).items) sold.set(line.name, (sold.get(line.name) || 0) + line.quantity);
+    const verified = M.verifiedReceipts();
+    const receipts = verified.receipts.filter(({ payment }) => dayKey(payment.paidAt) === today);
+    // USD snapshots are never converted or combined with the MXN drawer.
+    const currencies = [...new Set([state.settings.currency, ...receipts.map(({ payment }) => payment.currency)])].sort();
     const shift = M.getOpenShift(); const drawer = shift ? M.shiftSummary(shift.id) : null;
     const row = (label, value) => `<p class="line"><span>${escape(label)}</span><b>${escape(value)}</b></p>`;
-    printDocument('masaflow-summary', `MasaFlow daily summary ${today}`, `<h1>MasaFlow</h1><p>Daily summary · ${escape(today)}<br>${escape(zone())}</p><hr>${row('Cash receipts', M.money(total))}${row('Paid orders', String(receipts.length))}${row('Average ticket', M.money(receipts.length ? Math.round(total / receipts.length) : 0))}<hr>${[...sold].sort((a, b) => b[1] - a[1]).map(([name, quantity]) => row(name, `× ${quantity}`)).join('') || '<p>No items sold today.</p>'}<hr>${drawer ? `${row('Starting float', M.money(drawer.floatCents))}${row('Cash sales (shift)', M.money(drawer.salesCents))}${row('Cash drops', M.money(drawer.dropsCents))}${row('Expected in drawer', M.money(drawer.expectedCents))}<p>Cashier: ${escape(shift.cashierId)}</p>` : '<p>No drawer shift is open.</p>'}`);
+    const totals = currencies.map(currency => {
+      const rows = receipts.filter(({ payment }) => payment.currency === currency);
+      const total = rows.reduce((sum, { payment }) => sum + payment.totalCents, 0);
+      const sold = new Map();
+      for (const { order } of rows) for (const line of order.items) sold.set(line.name, (sold.get(line.name) || 0) + line.quantity);
+      return `<h2>${escape(currency)}</h2>${row('Cash receipts', M.money(total, currency))}${row('Paid orders', String(rows.length))}${row('Average ticket', rows.length ? M.money(total / rows.length, currency) : '—')}<hr>${[...sold].sort((a, b) => b[1] - a[1]).map(([name, quantity]) => row(name, `× ${quantity}`)).join('') || '<p>No items sold today.</p>'}`;
+    }).join('<hr>');
+    printDocument('masaflow-summary', `MasaFlow daily summary ${today}`, `<h1>MasaFlow</h1><p>Daily summary · ${escape(today)}<br>${escape(zone())}</p><hr>${totals}<hr>${row('Inconsistent cash receipts excluded (all dates)', String(verified.excluded))}<hr>${drawer ? `<h2>${escape(drawer.currency)}</h2>${row('Starting float', moneyFor(drawer.floatCents, drawer))}${row('Cash sales (shift)', moneyFor(drawer.salesCents, drawer))}${row('Cash drops', moneyFor(drawer.dropsCents, drawer))}${row('Expected in drawer', moneyFor(drawer.expectedCents, drawer))}<p>Cashier: <span data-i18n-skip>${escape(shift.cashierId)}</span></p>` : '<p>No drawer shift is open.</p>'}`);
   }
 
   window.MasaFlowUI = { toast, orderToast, confirm, tender, manualKick, printReceipt, printDailySummary, escape, time, dayKey, lineDetails, needsAttention };

@@ -80,6 +80,26 @@ test('legacy USD migration preserves amounts and frozen audits; requires closing
   assert.equal(createEngine({ state: damaged }).shiftSummary(firstShift.id).expectedCents, 11350);
 });
 
+test('legacy tax snapshots survive migration while new MXN drafts start with zero unconfigured tax', async () => {
+  const legacySeed = initialState();
+  legacySeed.settings.currency = 'USD'; legacySeed.settings.taxBasisPoints = 825; legacySeed.settings.taxConfigured = true;
+  legacySeed.menu.forEach(item => { item.currency = 'USD'; item.options.forEach(option => { option.currency = 'USD'; }); });
+  const legacyStore = createEngine({ state: legacySeed }); await legacyStore.openShift(0);
+  const legacyOrder = await legacyStore.createDraft(draftData()); await legacyStore.payOrder(legacyOrder.id, 20000);
+  await legacyStore.closeShift(legacyOrder.totalCents);
+  const legacy = legacyStore.getState(); legacy.version = 1;
+  const migrated = createEngine({ state: legacy });
+  assert.equal(migrated.getState().settings.taxBasisPoints, 0); assert.equal(migrated.getState().settings.taxConfigured, false);
+  assert.equal(migrated.getOrder(legacyOrder.id).taxCents, 784);
+  assert.equal(migrated.getState().payments[0].taxCents, 784);
+  assert.equal(migrated.getState().payments[0].totalCents, 10284);
+  await migrated.updateMenuItem('huarache', { priceCents: 8500 });
+  await migrated.updateMenuOption('huarache', 'cheese', { priceCents: 1000 });
+  const mxnOrder = await migrated.createDraft(draftData());
+  assert.equal(mxnOrder.currency, 'MXN'); assert.equal(mxnOrder.taxCents, 0); assert.equal(mxnOrder.totalCents, 9500);
+  assert.equal(migrated.verifiedReceipts().receipts[0].payment.taxCents, 784);
+});
+
 test('shared receipt validation excludes malformed, duplicate and cross-currency records without throwing', async () => {
   const store = createEngine(); const shift = await store.openShift(10000);
   const order = await store.createDraft(draftData()); await store.payOrder(order.id, 10000);
@@ -236,6 +256,21 @@ test('restart safely recovers paid receipts with no pulse reservation and marks 
   assert.equal(state.payments.find(p => p.id === firstPayment.id).drawerKickStatus, 'simulated');
   assert.equal(state.payments.find(p => p.id === secondPayment.id).drawerKickStatus, 'unknown');
   assert.equal(state.hardwareJobs.length, 2);
+});
+
+test('null legacy records do not block startup pulse recovery or duplicate payment and pulse prevention', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-null-recovery-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const store = createEngine(); await store.openShift(0);
+  const order = await store.createDraft(draftData()); const payment = (await store.payOrder(order.id, 10000)).payment;
+  const state = store.getState(); state.hardwareJobs.unshift(null); state.payments.unshift(null); state.orders.unshift(null);
+  await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
+  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(() => service.close());
+  assert.equal(service.engine.getState().payments.find(p => p && p.id === payment.id).drawerKickStatus, 'simulated');
+  const retry = await service.engine.payOrder(order.id, 10000);
+  assert.equal(retry.alreadyPaid, true); assert.equal(retry.payment.id, payment.id);
+  assert.equal((await service.kick(payment.id)).duplicate, true);
+  assert.equal(service.engine.getState().hardwareJobs.filter(Boolean).length, 1);
+  assert.equal(service.engine.verifiedReceipts().receipts.length, 1); assert.equal(service.engine.verifiedReceipts().excluded, 1);
 });
 
 test('service persists payment, automatically pulses exact ESC/POS bytes, and suppresses duplicate pulses across restart', async t => {

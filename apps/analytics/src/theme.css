@@ -45,3 +45,12 @@
 :root:is([data-app-theme="original"], [data-app-theme="codex-classic"]) {
   --dashboard-background: light-dark(color-mix(in srgb, var(--background) 98.6%, var(--text)), var(--background));
 }
+
+/* Approved MasaFlow starts in light mode; explicit appearance and themes still work. */
+:root:not([data-app-theme]), :root[data-app-theme="original"] {
+  --fixed-theme-scheme: light;
+  --accent: #f45108;
+  --chart-1: #ff5100;
+}
+:root[data-app-appearance="dark"]:not([data-app-theme]),
+:root[data-app-appearance="dark"][data-app-theme="original"] { --fixed-theme-scheme: dark; }
