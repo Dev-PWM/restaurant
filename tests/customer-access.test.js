@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createService } = require('../server.js');
+const { createService } = require('../legacy-server.cjs');
 const { createStaffAccess } = require('../shared/staff-access.js');
 const PASSWORD = 'test-only-staff-password';
 const input = name => ({ submissionId: crypto.randomUUID(), customerName: name, customerPhone: '5551234567', orderType: 'takeout', items: [{ menuItemId: 'huarache', quantity: 1, optionIds: ['white', 'cheese'], notes: 'Salsa on the side' }] });
@@ -42,7 +42,7 @@ test('customer entrances preserve links while staff pages and every financial AP
   for (const page of ['/businessDashbord.html', '/history.html', '/MenuManagment.html', '/metricsDashbord.html', '/analytics/']) {
     const response = await fetch(app.base + page, { redirect: 'manual' }); assert.equal(response.status, 302); assert.match(response.headers.get('location'), /^\/staff-login\.html\?next=/);
   }
-  for (const url of ['/api/state', '/api/events', '/api/analytics', '/api/backups']) assert.equal((await app.request(url)).status, 401, url);
+  for (const url of ['/api/state', '/api/events', '/api/analytics', '/api/backups', '/api/recent-orders', '/api/transactions/recent']) assert.equal((await app.request(url)).status, 401, url);
   for (const url of ['/api/action', '/api/cash-drawer/kick', '/api/backups/create', '/api/analytics/summary']) assert.equal((await app.request(url, {})).status, 401, url);
   assert.equal((await fetch(app.base + '/%62usinessDashbord.html', { redirect: 'manual' })).status, 302);
   assert.equal((await app.request('/MenuUI.html')).status, 200);

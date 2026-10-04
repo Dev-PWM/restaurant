@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { createService } = require('../server.js');
+const { createService } = require('../legacy-server.cjs');
 const { initialState } = require('../assets/masaflow-store.js');
 
 async function service(t, options = {}) {

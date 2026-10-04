@@ -7,7 +7,7 @@ const os = require('node:os');
 const net = require('node:net');
 const { createEngine, initialState, verifiedReceipts } = require('../assets/masaflow-store.js');
 const { createBackupManager, validateState, validateBackup, backupEnvelope, acquireLock, identity, saveBackup, listBackups, pruneAutomatic, prepareRestore, restoreBackup } = require('../shared/local-data.js');
-const { createService } = require('../server.js');
+const { createService } = require('../legacy-server.cjs');
 const { configuration, probeHealth } = require('../scripts/mac-start.cjs');
 const copy = value => JSON.parse(JSON.stringify(value));
 const draft = () => ({ submissionId: crypto.randomUUID(), customerName: 'Backup fixture', orderType: 'takeout', items: [{ menuItemId: 'sope', quantity: 1, optionIds: ['white'] }] });

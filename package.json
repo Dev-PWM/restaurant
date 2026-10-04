@@ -1,32 +1,55 @@
 {
   "name": "masaflow-cash-pos",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "MasaFlow upfront cash ordering and drawer reconciliation",
   "workspaces": [
+    "apps/client-web",
+    "apps/business-pos",
     "apps/analytics"
   ],
   "scripts": {
-    "setup": "npm --prefix apps/analytics ci",
-    "build": "npm --prefix apps/analytics run build",
+    "setup": "npm ci",
+    "build": "npm run typecheck && vite build --config vite.realtime.config.mts --mode client-web && vite build --config vite.realtime.config.mts --mode business-pos && vite build --config vite.realtime.config.mts --mode analytics",
     "build:css": "npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i styles/masaflow.css -o assets/masaflow.css --minify",
     "start": "node server.js",
-    "dev": "node server.js",
+    "dev": "node scripts/dev.cjs",
     "test": "node --test tests/*.test.js",
-    "backup": "node scripts/data.cjs backup",
-    "backups": "node scripts/data.cjs list",
-    "backup:verify": "node scripts/data.cjs verify",
-    "restore": "node scripts/data.cjs restore",
-    "start:mac": "node scripts/mac-start.cjs",
-    "startup:enable": "node scripts/mac-login.cjs install",
-    "startup:disable": "node scripts/mac-login.cjs uninstall",
-    "startup:status": "node scripts/mac-login.cjs status"
+    "start:mac": "bash Start_MasaFlow.command",
+    "typecheck": "tsc --noEmit",
+    "test:realtime": "node --test tests/realtime.test.js",
+    "legacy:start": "node legacy-server.cjs",
+    "legacy:build": "npm --prefix apps/analytics run build",
+    "legacy:backup": "node scripts/data.cjs backup",
+    "legacy:backups": "node scripts/data.cjs list",
+    "legacy:backup:verify": "node scripts/data.cjs verify",
+    "legacy:restore": "node scripts/data.cjs restore",
+    "legacy:startup:enable": "node scripts/mac-login.cjs install",
+    "legacy:startup:disable": "node scripts/mac-login.cjs uninstall",
+    "legacy:startup:status": "node scripts/mac-login.cjs status"
   },
   "engines": {
     "node": ">=22.12"
   },
   "dependencies": {
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
     "socket.io": "^4.8.4",
     "socket.io-client": "^4.8.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@types/express": "^5.0.3",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.21",
+    "postcss": "^8.5.6",
+    "prettier": "^3.9.9",
+    "tailwindcss": "3.4.17",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.8"
   }
 }

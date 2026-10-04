@@ -1,0 +1,43 @@
+# MasaFlow real-time suite
+
+## Scope and boundaries
+
+The v0.3 suite serves three independent React/TypeScript/Tailwind applications. Express and Socket.io in `server.js` own the only live ledger. `shared/types/realtime.ts` defines the contracts imported by both TSX and the checked JavaScript server/engine. The previous HTML/SSE implementation is preserved as `legacy-server.cjs`, along with its historical tests and data tools; the new service neither serves it nor executes its hardware integrations.
+
+The operational lifecycle is `unpaid → cooking → ready → completed`; only `unpaid → no_show` is allowed as an alternate terminal path. `draft` remains in the shared union for pre-submission use. A customer creates an unpaid ticket; a staff-authorized cash receipt is the only transition into cooking. Status and payment changes are server-confirmed, never optimistic.
+
+## Cash contract
+
+Every monetary field ends in `Cents` and uses safe integer MXN centavos. Menu prices are final prices; this suite does not add tax or convert legacy currencies. The server ignores client totals and prices the selected menu IDs, modifier IDs, and quantities. Each order freezes the resulting line items. Sold-out changes stop new submissions; existing accepted tickets retain their agreed price and remain payable.
+
+`cashHeldCents = tenderedCents − changeCents = revenueCents + tipsCents`. Each transaction records `tipCents` explicitly; omitted tips default to zero. A tip may not exceed the tender surplus and never changes item revenue or average food ticket. Retried payments must match both tender and tip. The cashier can mark the entire change as a tip only after the customer agrees. Older v3 receipts missing the field recover with zero tip. Revenue is recognized on payment, including cooking and ready tickets. A transaction can be inserted only once. Item volume, item revenue ranking, and modifier combination counts use completed (handed-off) orders. The ledger includes every paid ticket immediately plus unpaid no-shows after removal from the queue; no-shows have no transaction and contribute zero revenue or tips. `voidCount` counts these unpaid cancellations only; it is not a count of refunded paid receipts. The UI labels these different populations explicitly.
+
+## Durable state and retries
+
+`data.json` lives in `.masaflow-realtime/` by default. Every mutation clones the current state, validates invariants, writes and fsyncs a temporary file, renames it atomically, and fsyncs the containing directory before acknowledging success or broadcasting. A failure before replacement leaves memory unchanged. If directory flushing fails after replacement, memory follows the replaced live file and further mutations are blocked until restart and ledger verification; the operation is not acknowledged as successful. An uncertain archive flush blocks reset and also requires restart. A directory writer lock prevents two servers from owning the same data. Corrupt files fail startup rather than being silently replaced. Restart recalculates metrics from validated records.
+
+The customer persists a session UUID, pending request, and active order ID in localStorage. A request ID is stable until a definitive response arrives. Retrying the same ID/payload returns the existing order; conflicting content is rejected. Old shift IDs prevent a timed-out submission from being recreated after a shift close. New orders are not automatically replayed on reconnect.
+
+Closeout requires an empty queue and matching shift/revision. The complete state and final metrics are written to a dated, shift-unique `archive_*.json` before resetting. Stock state is preserved, order numbers reset, web orders resume. A persisted closed-shift receipt makes retries return the same archive without closing the new shift. An interrupted close can safely retry. Closed-shift receipts are small, but grow over time; order histories live in separate archives.
+
+## Transport and security
+
+Client events: `submit_client_order`, `pos_order_paid`, `pos_update_status`, `pos_mark_noshow`, `admin_toggle_stock`, `pos_toggle_accepting_orders`, `pos_close_shift`, `request_init`, `staff_login`, `staff_logout`.
+
+Server events: `init_data`, `state_updated`, `menu_updated`, `metrics_updated`, `staff_expired`. Event acknowledgements include `ok` and a typed error code. The provider listens once per app, requests init on every connection, retains last known data during an outage, and disables writes until a fresh snapshot is received. Ack timeouts require reconciliation and idempotent retry.
+
+Four-digit staff PIN verification is on the server. The PIN is never sent in public snapshots or bundled into the frontends. Successful login returns a random 12-hour token; every staff event verifies it. Restart invalidates tokens. Logout revokes the token across connected sockets. Wrong PIN attempts are rate-limited by client IP across socket reconnects. The loopback development proxy appends a forwarded address; the server trusts only its final hop, never forwarded headers from direct non-loopback clients. Successful sign-ins do not consume the failure limit. Initial snapshot requests are bounded per socket, and broadcasts reuse one immutable state copy for all peers. Customer snapshots contain only orders belonging to that customer's random session capability; global financial data goes only to authorized staff. Public health returns no ledger data. CORS supports the separate local frontends; authorization is still mandatory.
+
+A PIN is intended for a trusted restaurant LAN. Use HTTPS and a stronger access gateway before exposing the service publicly. This project does not create tunnels, public hosting, payment integrations, printer commands, drawer kicks, or QR codes in the v0.3 runtime.
+
+## UI and visualization design
+
+The first scan of the POS shows three stable lanes and explicit counts. Kitchen age uses one 15-second timer per board, with amber at 5 minutes and a red pulse at 10 minutes after payment; reduced motion removes the pulse. Omissions use red plus explicit `Sin…` text; extras use green plus `Extra…` text. Native dialog elements provide modal focus behavior and Escape dismissal. All controls remain usable by keyboard and touch.
+
+Analytics uses one DOM bar list, a small set of cash summaries, a favorite card, and a semantic ledger. There is no Canvas/WebGL or chart dependency. Quantity is encoded by bar width against the current maximum and always printed as text, so no hover is necessary. Financial fields remain text, not rounded visual estimates. The ledger renders 50 rows per page, can filter by name/ticket/status, and exports CSV with formula-injection protection. Staff pages stack in portrait; only the wide ledger scrolls horizontally inside its container. Controls wrap above the main evidence. No live chart animation competes with the workflow.
+
+Updates are event-driven full snapshots suitable for a single counter. Pending active tickets are capped at 500; request sizes and event rates are bounded. Long shifts increase snapshot size because the full current ledger is held in memory. Close shifts regularly; for multi-store or very high-volume use, replace full snapshots with versioned deltas and a transactional database. This implementation deliberately targets one restaurant and one authoritative writer.
+
+## Verification
+
+`npm run typecheck` checks all new frontends and the server's JSDoc imports. `npm test` runs both retained legacy regression coverage and `tests/realtime.test.js`, which exercises the new engine and real Socket.io connections. `npm run build` produces three independent Vite bundles. Browser acceptance covers the cash workflow, customer refresh recovery, PIN gate, live inventory, pause, no-show history, offline/reconnect behavior, responsive layout and shift close. Legacy tests are explicitly routed to `legacy-server.cjs`; they are not evidence that the v0.3 events work.

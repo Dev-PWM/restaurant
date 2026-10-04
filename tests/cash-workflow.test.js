@@ -7,7 +7,7 @@ const path = require('node:path');
 const net = require('node:net');
 const vm = require('node:vm');
 const { createEngine, initialState, migrateState, verifiedReceipts, money, parseMoney } = require('../assets/masaflow-store.js');
-const { createService, DRAWER_PULSE } = require('../server.js');
+const { createService, DRAWER_PULSE } = require('../legacy-server.cjs');
 const draftData = (quantity = 1) => ({ customerName: 'Ana', orderType: 'takeout', tableNumber: null, items: [{ menuItemId: 'huarache', quantity, optionIds: ['blue', 'cheese'], notes: 'No onions' }] });
 const copy = value => JSON.parse(JSON.stringify(value));
 

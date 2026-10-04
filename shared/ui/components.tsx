@@ -1,0 +1,452 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  ArrowRight,
+  Check,
+  ChefHat,
+  LockKeyhole,
+  Minus,
+  Package,
+  Plus,
+  Volume2,
+  Wifi,
+  WifiOff,
+  X,
+} from "lucide-react";
+import type { Modifier, Order } from "../types/realtime";
+import { useRealtime } from "./RealtimeProvider";
+export const mxn = (cents: number) =>
+  new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
+    cents / 100,
+  );
+export const time = (at: string) =>
+  new Intl.DateTimeFormat("es-MX", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Mexico_City",
+  }).format(new Date(at));
+export const orderLabel = (order: Order) =>
+  `#${String(order.number).padStart(3, "0")}`;
+export function appLink(app: "order" | "pos" | "analytics") {
+  const devPorts = { order: "5173", pos: "5174", analytics: "5175" };
+  return ["5173", "5174", "5175"].includes(location.port)
+    ? `${location.protocol}//${location.hostname}:${devPorts[app]}/realtime.html`
+    : `/${app}/`;
+}
+export function ConnectionBanner() {
+  const { connected, error, clearError } = useRealtime();
+  return (
+    <>
+      {!connected && (
+        <div
+          role="alert"
+          className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-red-800 p-3 font-bold text-white"
+        >
+          <WifiOff size={18} />
+          Sin Conexión{" "}
+          <span className="hidden text-sm font-normal sm:inline">
+            · Esperando al servidor
+          </span>
+        </div>
+      )}
+      {error && (
+        <div
+          role="alert"
+          className="flex items-center justify-between gap-3 border-b border-red-200 bg-red-50 p-4 text-red-800"
+        >
+          <span>{error}</span>
+          <button
+            aria-label="Cerrar error"
+            className="p-2"
+            onClick={clearError}
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+    </>
+  );
+}
+export function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
+  const { connected, error } = useRealtime();
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    ref.current?.showModal();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      aria-label={title}
+    >
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-stone-200 bg-cream p-5">
+        <h2 className="text-xl font-bold">{title}</h2>
+        <button className="btn" aria-label="Cerrar ventana" onClick={onClose}>
+          <X size={18} />
+        </button>
+      </header>
+      {!connected && (
+        <p
+          role="alert"
+          className="bg-red-800 p-3 text-center font-bold text-white"
+        >
+          Sin Conexión
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="bg-red-50 p-3 text-sm text-red-800">
+          {error}
+        </p>
+      )}
+      <div className="p-5">{children}</div>
+    </dialog>
+  );
+}
+export function ToggleSwitch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: () => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={onChange}
+      className={`flex min-h-12 min-w-20 items-center justify-center gap-2 rounded-full px-3 text-xs font-bold ${checked ? "bg-emerald-800 text-white" : "bg-stone-200 text-stone-700"}`}
+    >
+      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-emerald-900">
+        {checked ? <Check size={14} /> : <Minus size={14} />}
+      </span>
+      {checked ? "Disponible" : "Agotado"}
+    </button>
+  );
+}
+export function InventoryControl({ onClose }: { onClose: () => void }) {
+  const { snapshot, command, connected } = useRealtime();
+  const [pending, setPending] = useState(false);
+  if (!snapshot) return null;
+  return (
+    <Modal title="Inventario" onClose={onClose}>
+      <p className="mb-6 text-sm text-stone-600">
+        Los cambios aparecen al instante en el menú de tus clientes.
+      </p>
+      {(["item", "modifier"] as const).map((kind) => (
+        <section key={kind} className="mb-6">
+          <h3 className="eyebrow mb-2">
+            {kind === "item" ? "Platillos" : "Masas y modificadores"}
+          </h3>
+          {(kind === "item" ? snapshot.menuItems : snapshot.modifiers).map(
+            (item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 border-b border-stone-200 py-3"
+              >
+                <span className="font-medium">{item.name}</span>
+                <ToggleSwitch
+                  checked={item.available}
+                  label={`Disponibilidad de ${item.name}`}
+                  disabled={!connected || pending}
+                  onChange={async () => {
+                    setPending(true);
+                    await command("admin_toggle_stock", {
+                      kind,
+                      id: item.id,
+                      available: !item.available,
+                    });
+                    setPending(false);
+                  }}
+                />
+              </div>
+            ),
+          )}
+        </section>
+      ))}
+    </Modal>
+  );
+}
+export function PinGate({ children }: { children: ReactNode }) {
+  const { snapshot, login, connected } = useRealtime();
+  const [pin, setPin] = useState(""),
+    [busy, setBusy] = useState(false);
+  if (snapshot?.staff) return <>{children}</>;
+  const enter = async () => {
+    setBusy(true);
+    await login(pin);
+    setPin("");
+    setBusy(false);
+  };
+  return (
+    <div className="flex min-h-[90dvh] items-center justify-center px-5 py-10">
+      <section className="w-full max-w-sm text-center">
+        <Brand />
+        <div className="mx-auto mb-5 mt-10 flex h-14 w-14 items-center justify-center rounded-full bg-clay-100 text-clay-700">
+          <LockKeyhole />
+        </div>
+        <h1 className="display text-4xl">Bienvenido al turno.</h1>
+        <p className="mb-6 mt-3 text-stone-600">
+          Ingresa el PIN de 4 dígitos del personal.
+        </p>
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            void enter();
+          }}
+        >
+          <label className="sr-only" htmlFor="staff-pin">
+            PIN del personal
+          </label>
+          <input
+            id="staff-pin"
+            className="field text-center text-3xl tracking-[0.5em]"
+            type="password"
+            inputMode="numeric"
+            autoComplete="off"
+            maxLength={4}
+            value={pin}
+            onChange={(e) =>
+              setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+            }
+          />
+          <div className="my-4 grid grid-cols-3 gap-3">
+            {[
+              "1",
+              "2",
+              "3",
+              "4",
+              "5",
+              "6",
+              "7",
+              "8",
+              "9",
+              "Borrar",
+              "0",
+              "←",
+            ].map((key) => (
+              <button
+                key={key}
+                type="button"
+                className="btn text-xl"
+                disabled={busy}
+                onClick={() =>
+                  setPin((p) =>
+                    key === "Borrar"
+                      ? ""
+                      : key === "←"
+                        ? p.slice(0, -1)
+                        : (p + key).slice(0, 4),
+                  )
+                }
+              >
+                {key}
+              </button>
+            ))}
+          </div>
+          <button
+            className="btn btn-primary w-full"
+            disabled={!connected || pin.length !== 4 || busy}
+          >
+            {busy ? "Verificando…" : "Entrar al turno"}
+            <ArrowRight size={18} />
+          </button>
+        </form>
+        <p className="mt-5 text-xs text-stone-500">
+          Acceso exclusivo del personal · MasaFlow
+        </p>
+      </section>
+    </div>
+  );
+}
+export function Brand() {
+  return (
+    <div className="inline-flex items-center gap-3">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-600 text-white">
+        <ChefHat size={24} />
+      </span>
+      <span className="text-xl font-bold tracking-tight">
+        MasaFlow<span className="text-clay-600">.</span>
+      </span>
+    </div>
+  );
+}
+export function StaffHeader({
+  page,
+  children,
+}: {
+  page: "pos" | "analytics";
+  children?: ReactNode;
+}) {
+  const { snapshot, connected, logout } = useRealtime();
+  return (
+    <header className="border-b border-stone-200 bg-white">
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
+        <Brand />
+        <nav className="flex gap-2" aria-label="Navegación del personal">
+          <a
+            className={`btn ${page === "pos" ? "bg-clay-50 text-clay-700" : ""}`}
+            href={appLink("pos")}
+            aria-current={page === "pos" ? "page" : undefined}
+          >
+            <ChefHat size={17} />
+            Cocina
+          </a>
+          <a
+            className={`btn ${page === "analytics" ? "bg-clay-50 text-clay-700" : ""}`}
+            href={appLink("analytics")}
+            aria-current={page === "analytics" ? "page" : undefined}
+          >
+            Caja y ventas
+          </a>
+        </nav>
+        <div className="flex flex-wrap items-center gap-3">
+          <span
+            className={`flex items-center gap-1.5 text-xs font-semibold ${connected ? "text-emerald-800" : "text-red-700"}`}
+          >
+            {connected ? <Wifi size={15} /> : <WifiOff size={15} />}{" "}
+            {connected ? "En vivo" : "Sin Conexión"}
+            {snapshot && (
+              <span className="hidden font-normal text-stone-500 xl:inline">
+                · {time(snapshot.observedAt)}
+              </span>
+            )}
+          </span>
+          {children}
+          <button className="btn" onClick={logout} aria-label="Bloquear sesión">
+            <LockKeyhole size={16} />
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}
+export function ModifierBadge({ modifier }: { modifier: Modifier }) {
+  return (
+    <span
+      className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${modifier.kind === "omit" ? "bg-red-600 text-white" : modifier.kind === "extra" ? "bg-green-600 text-white" : "bg-stone-100 text-stone-700"}`}
+    >
+      {modifier.name}
+    </span>
+  );
+}
+export function OrderLines({ order }: { order: Order }) {
+  return (
+    <ul className="space-y-4">
+      {order.items.map((line, index) => (
+        <li key={index}>
+          <div className="flex items-start justify-between gap-3">
+            <span className="font-semibold">
+              {line.quantity} × {line.name}
+            </span>
+            <span className="text-sm tabular-nums text-stone-500">
+              {mxn(line.lineTotalCents)}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {line.modifiers.map((m) => (
+              <ModifierBadge key={m.id} modifier={m} />
+            ))}
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+export function useTicketTimer() {
+  const [now, setNow] = useState(Date.now);
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(id);
+  }, []);
+  return now;
+}
+let audio: AudioContext | undefined;
+export function enableAudio() {
+  audio ||= new AudioContext();
+  void audio.resume();
+}
+export function chime(ready = false) {
+  if (!audio || audio.state !== "running") return;
+  [ready ? 660 : 440, ready ? 880 : 660].forEach((frequency, index) => {
+    const oscillator = audio!.createOscillator(),
+      gain = audio!.createGain(),
+      at = audio!.currentTime + index * 0.16;
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.12, at);
+    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
+    oscillator.connect(gain);
+    gain.connect(audio!.destination);
+    oscillator.start(at);
+    oscillator.stop(at + 0.31);
+  });
+}
+export function SoundButton() {
+  const [enabled, setEnabled] = useState(false);
+  return (
+    <button
+      className="btn"
+      onClick={() => {
+        enableAudio();
+        setEnabled(true);
+        chime();
+      }}
+    >
+      <Volume2 size={16} />
+      {enabled ? "Sonido activo" : "Activar sonido"}
+    </button>
+  );
+}
+export function EmptyState({ children }: { children: ReactNode }) {
+  return (
+    <div className="py-12 text-center text-stone-500">
+      <Package className="mx-auto mb-3 opacity-40" size={32} />
+      <p className="text-sm">{children}</p>
+    </div>
+  );
+}
+export function Quantity({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <button
+        className="btn"
+        aria-label="Quitar uno"
+        disabled={value <= 1}
+        onClick={() => onChange(value - 1)}
+      >
+        <Minus size={16} />
+      </button>
+      <span className="w-5 text-center font-bold">{value}</span>
+      <button
+        className="btn"
+        aria-label="Agregar uno"
+        disabled={value >= 99}
+        onClick={() => onChange(value + 1)}
+      >
+        <Plus size={16} />
+      </button>
+    </div>
+  );
+}
