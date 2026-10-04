@@ -7,8 +7,7 @@ const crypto = require("node:crypto");
 const { isIP } = require("node:net");
 const { Server } = require("socket.io");
 const { createEngine, UUID, ensure } = require("./shared/realtime/engine.js");
-const { acquireLock } = require("./shared/realtime/lock.js");
-/** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
+const { acquireLock } = require("./shared/realtime/lock.js");/** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
 /** @typedef {import('./shared/types/realtime').Command} Command */
 /** @typedef {import('./shared/types/realtime').Reply} Reply */
 /** @typedef {{sessionId: string, token: string}} SocketData */
@@ -106,6 +105,7 @@ async function createService({
       for (const socket of io.sockets.sockets.values()) {
         socket.emit("state_updated", snapshot(socket, s));
         if (staff(socket)) socket.emit("metrics_updated", s.salesMetrics);
+
       }
       if (event === "admin_toggle_stock")
         io.emit("menu_updated", {
