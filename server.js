@@ -92,7 +92,6 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
       const requestUrl = new URL(req.url, 'http://localhost');
       res.setHeader('Referrer-Policy', 'no-referrer');
       res.setHeader('X-Content-Type-Options', 'nosniff');
-      res.setHeader('X-Frame-Options', 'DENY');
       if (req.method === 'POST') access.checkOrigin(req);
       if (requestUrl.pathname === '/api/session' && req.method === 'GET') return json(res, 200, { required: access.enabled, authenticated: access.authorized(req) });
       if (requestUrl.pathname === '/api/session/login' && req.method === 'POST') {
@@ -184,8 +183,8 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
 }
 
 if (require.main === module) {
-  const host = process.env.MASAFLOW_HOST || '127.0.0.1';
-  if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !process.env.MASAFLOW_STAFF_PASSWORD) {
+  const host = process.env.MASAFLOW_HOST || process.env.HOST || '0.0.0.0';
+  if (!['127.0.0.1', 'localhost', '::1', '0.0.0.0'].includes(host) && !process.env.MASAFLOW_STAFF_PASSWORD) {
     process.stderr.write('Set MASAFLOW_STAFF_PASSWORD before listening on a network interface.\n'); process.exitCode = 1;
   } else createService().then(app => {
     const { server } = app;
@@ -193,7 +192,7 @@ if (require.main === module) {
     const stop = async () => { if (stopping) return; stopping = true; await app.close(); };
     process.once('SIGTERM', stop); process.once('SIGINT', stop);
     server.once('error', async error => { await stop(); process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
-    const port = Number(process.env.PORT || 4173);
+    const port = Number(process.env.PORT || 3000);
     server.listen(port, host, () => process.stdout.write(`MasaFlow running at http://${host}:${port}\n`));
   }).catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }

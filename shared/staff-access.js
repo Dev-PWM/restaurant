@@ -36,8 +36,11 @@ function createStaffAccess({ password = '', publicOrigin = '', now = Date.now } 
     enabled: Boolean(password), origin, authorized,
     require(req) { if (!authorized(req)) reject('Staff sign-in required.', 401, 'STAFF_SIGN_IN_REQUIRED'); },
     checkOrigin(req) {
-      const expectedOrigin = origin || `${req.socket.encrypted ? 'https' : 'http'}://${req.headers.host}`;
-      if (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && req.headers.origin !== expectedOrigin)) reject('Cross-origin actions are not allowed.', 403, 'CROSS_ORIGIN');
+      const proto = req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http');
+      const expectedOrigin = origin || `${proto}://${req.headers.host}`;
+      const hostOriginHttp = `http://${req.headers.host}`;
+      const hostOriginHttps = `https://${req.headers.host}`;
+      if (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && req.headers.origin !== expectedOrigin && req.headers.origin !== hostOriginHttp && req.headers.origin !== hostOriginHttps)) reject('Cross-origin actions are not allowed.', 403, 'CROSS_ORIGIN');
     },
     login(req, res, value) {
       const key = req.socket.remoteAddress || 'unknown';

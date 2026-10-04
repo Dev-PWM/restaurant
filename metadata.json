@@ -1,0 +1,7 @@
+{
+  "name": "MasaFlow",
+  "description": "MasaFlow upfront cash ordering, kitchen display, and drawer reconciliation POS",
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

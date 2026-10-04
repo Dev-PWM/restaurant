@@ -3,6 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "description": "MasaFlow upfront cash ordering and drawer reconciliation",
+  "workspaces": [
+    "apps/analytics"
+  ],
   "scripts": {
     "setup": "npm --prefix apps/analytics ci",
     "build": "npm --prefix apps/analytics run build",
