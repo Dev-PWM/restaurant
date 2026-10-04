@@ -1,0 +1,9 @@
+.git
+.env
+.env.*
+.masaflow
+**/node_modules
+apps/analytics/dist
+artifacts
+.DS_Store
+*.log

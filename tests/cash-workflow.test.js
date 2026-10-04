@@ -133,7 +133,7 @@ test('shared receipt validation excludes malformed, duplicate and cross-currency
 async function browserFixture(fetch) {
   const streams = [], events = [];
   const sandbox = {
-    module: { exports: {} }, crypto: globalThis.crypto, console, fetch,
+    module: { exports: {} }, crypto: globalThis.crypto, console, fetch, URLSearchParams,
     localStorage: { getItem: () => 'en' },
     document: { dispatchEvent: event => events.push(event) },
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options.detail; } },

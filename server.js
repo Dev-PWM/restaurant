@@ -8,8 +8,12 @@ const { buildAnalytics } = require('./shared/analytics.js');
 const { createSummaryService } = require('./shared/sales-summary.js');
 const { acquireLock, identity, validateState, atomicWrite, createBackupManager, listBackups } = require('./shared/local-data.js');
 
+const { customerState, customerOrder, UUID } = require('./shared/customer-data.js');
+const { createStaffAccess } = require('./shared/staff-access.js');
+
 const DRAWER_PULSE = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
-async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {}, backupOptions = {} } = {}) {
+async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {}, backupOptions = {}, staffPassword = process.env.MASAFLOW_STAFF_PASSWORD || '', publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || '' } = {}) {
+  const access = createStaffAccess({ password: staffPassword, publicOrigin });
   const releaseLock = await acquireLock(dataDirectory);
   try {
   dataDirectory = await fs.realpath(dataDirectory);
@@ -33,8 +37,12 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
   // Commit schema migration before serving requests or recovering hardware jobs.
   await persist(engine.getState());
   const summaries = createSummaryService({ ...summaryOptions, getState: engine.getState });
-  const streams = new Set();
-  engine.subscribe(next => { const event = `data: ${JSON.stringify(next)}\n\n`; streams.forEach(stream => stream.write(event)); });
+  const streams = new Map();
+  function sendState(stream, client, next) {
+    if (!client.customer && !access.authorized(client.req)) { stream.end(); return; }
+    stream.write(`data: ${JSON.stringify(client.customer ? customerState(next, client.query) : next)}\n\n`);
+  }
+  engine.subscribe(next => streams.forEach((client, stream) => sendState(stream, client, next)));
   for (const job of engine.getState().hardwareJobs.filter(j => j && j.status === 'reserved')) await engine.finishHardwareJob(job.key, 'unknown', 'Service restarted during this pulse. Check the physical drawer before requesting a manual pulse.');
   function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
   async function body(req) {
@@ -82,17 +90,42 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     try {
       if (closing) return json(res, 503, { error: 'MasaFlow is stopping. Retry after restart.' });
       const requestUrl = new URL(req.url, 'http://localhost');
-      if (req.method === 'POST' && (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`))) { json(res, 403, { error: 'Cross-origin actions are not allowed.' }); return; }
-      if (requestUrl.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { service: 'masaflow', version: '0.2.0', workspaceId, status: 'ready', backup: backups.status() });
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      if (req.method === 'POST') access.checkOrigin(req);
+      if (requestUrl.pathname === '/api/session' && req.method === 'GET') return json(res, 200, { required: access.enabled, authenticated: access.authorized(req) });
+      if (requestUrl.pathname === '/api/session/login' && req.method === 'POST') {
+        const data = await body(req); access.login(req, res, data.password); return json(res, 200, { authenticated: true });
+      }
+      if (requestUrl.pathname === '/api/session/logout' && req.method === 'POST') {
+        access.logout(req, res); streams.forEach((client, stream) => { if (!client.customer && !access.authorized(client.req)) stream.end(); });
+        return json(res, 200, { authenticated: false });
+      }
+      if (requestUrl.pathname.startsWith('/api/') && !requestUrl.pathname.startsWith('/api/customer/') && requestUrl.pathname !== '/api/health') access.require(req);
+      if (requestUrl.pathname === '/api/customer/state' && req.method === 'GET') return json(res, 200, customerState(engine.getState(), requestUrl.searchParams));
+      if (requestUrl.pathname === '/api/customer/orders' && req.method === 'POST') {
+        access.limitSubmission(req);
+        const data = await body(req);
+        if (data.action !== 'createDraft' || !Array.isArray(data.args) || data.args.length !== 1 || !UUID.test(data.args[0]?.submissionId || '')) throw new Error('Submit one order with a persistent submission UUID.');
+        const order = await engine.createDraft(data.args[0]);
+        const snapshot = customerState(engine.getState(), new URLSearchParams({ order: order.id }));
+        return json(res, 200, { result: customerOrder(order, snapshot.orders[0].verifiedPaid), state: snapshot });
+      }
+      if (requestUrl.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { service: 'masaflow', version: '0.2.0', workspaceId, status: 'ready', ...(access.authorized(req) ? { backup: backups.status() } : {}) });
       if (requestUrl.pathname === '/api/backups' && req.method === 'GET') return json(res, 200, { backups: await listBackups(dataDirectory) });
       if (requestUrl.pathname === '/api/backups/create' && req.method === 'POST') return json(res, 200, { backup: await backups.create(engine.getState()) });
       if (requestUrl.pathname === '/api/state' && req.method === 'GET') return json(res, 200, engine.getState());
       if (requestUrl.pathname === '/api/analytics' && req.method === 'GET') return json(res, 200, buildAnalytics(engine.getState(), requestUrl.searchParams, { summaryAvailable: summaries.available() }));
       if (requestUrl.pathname === '/api/analytics/summary' && req.method === 'POST') return json(res, 200, await summaries.summarize(await body(req)));
-      if (requestUrl.pathname === '/api/events' && req.method === 'GET') {
+      if (['/api/events', '/api/customer/events'].includes(requestUrl.pathname) && req.method === 'GET') {
+        if (streams.size >= 200) return json(res, 503, { error: 'Connection capacity reached. Please retry shortly.' });
         res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'X-Accel-Buffering': 'no' });
-        res.write(`data: ${JSON.stringify(engine.getState())}\n\n`); streams.add(res);
-        const heartbeat = setInterval(() => res.write(': keepalive\n\n'), 20000);
+        const client = { req, customer: requestUrl.pathname === '/api/customer/events', query: requestUrl.searchParams };
+        sendState(res, client, engine.getState()); streams.set(res, client);
+        const heartbeat = setInterval(() => {
+          if (!client.customer && !access.authorized(req)) res.end(); else res.write(': keepalive\n\n');
+        }, 20000);
         req.on('close', () => { clearInterval(heartbeat); streams.delete(res); }); return;
       }
       if (requestUrl.pathname === '/api/action' && req.method === 'POST') {
@@ -117,7 +150,10 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
       }
       if (requestUrl.pathname.startsWith('/api/')) return json(res, 404, { error: 'Endpoint not found.' });
       if (!['GET', 'HEAD'].includes(req.method)) return json(res, 405, { error: 'Method not allowed.' });
-      if (requestUrl.pathname === '/') { res.writeHead(302, { Location: '/businessDashbord.html' }); res.end(); return; }
+      const entrances = { '/': '/MenuUI.html', '/order': '/MenuUI.html', '/track': '/readypickupUI.html', '/pos': '/businessDashbord.html', '/insights': '/analytics/' };
+      if (entrances[requestUrl.pathname]) { res.writeHead(302, { Location: entrances[requestUrl.pathname] + requestUrl.search }); res.end(); return; }
+      const staffPage = ['/businessDashbord.html', '/metricsDashbord.html', '/MenuManagment.html', '/history.html', '/analytics'].includes(requestUrl.pathname) || requestUrl.pathname.startsWith('/analytics/');
+      if (staffPage && !access.authorized(req)) { res.writeHead(302, { Location: `/staff-login.html?next=${encodeURIComponent(requestUrl.pathname + requestUrl.search)}`, 'Cache-Control': 'no-store' }); res.end(); return; }
       if (requestUrl.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
       if (requestUrl.pathname === '/analytics') { res.writeHead(302, { Location: `/analytics/${requestUrl.search}` }); res.end(); return; }
       const isAnalytics = requestUrl.pathname.startsWith('/analytics/');
@@ -126,6 +162,7 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
       const fileName = isAnalytics ? requestUrl.pathname.slice('/analytics/'.length) || 'index.html' : isAsset ? requestUrl.pathname.slice('/assets/'.length) : requestUrl.pathname.slice(1);
       const requested = path.resolve(staticRoot, decodeURIComponent(fileName));
       if (!requested.startsWith(`${staticRoot}${path.sep}`) || !types[path.extname(requested)]) return json(res, 404, { error: 'File not found.' });
+      if (['businessDashbord.html', 'metricsDashbord.html', 'MenuManagment.html', 'history.html'].includes(path.basename(requested)) && !access.authorized(req)) { res.writeHead(302, { Location: '/staff-login.html', 'Cache-Control': 'no-store' }); res.end(); return; }
       const content = await fs.readFile(requested);
       res.writeHead(200, { 'Content-Type': types[path.extname(requested)], 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
       res.end(req.method === 'HEAD' ? undefined : content);
@@ -136,7 +173,7 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     if (closePromise) return closePromise;
     closing = true;
     closePromise = (async () => {
-      streams.forEach(stream => stream.end()); server.closeAllConnections();
+      streams.forEach((_client, stream) => stream.end()); server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
       await Promise.allSettled([...activeRequests]);
       await engine.whenIdle(); await backups.idle(); await releaseLock();
@@ -147,13 +184,16 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
 }
 
 if (require.main === module) {
-  createService().then(app => {
+  const host = process.env.MASAFLOW_HOST || '127.0.0.1';
+  if (!['127.0.0.1', 'localhost', '::1'].includes(host) && !process.env.MASAFLOW_STAFF_PASSWORD) {
+    process.stderr.write('Set MASAFLOW_STAFF_PASSWORD before listening on a network interface.\n'); process.exitCode = 1;
+  } else createService().then(app => {
     const { server } = app;
     let stopping = false;
     const stop = async () => { if (stopping) return; stopping = true; await app.close(); };
     process.once('SIGTERM', stop); process.once('SIGINT', stop);
     server.once('error', async error => { await stop(); process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
-    const port = Number(process.env.PORT || 4173); const host = process.env.MASAFLOW_HOST || '127.0.0.1';
+    const port = Number(process.env.PORT || 4173);
     server.listen(port, host, () => process.stdout.write(`MasaFlow running at http://${host}:${port}\n`));
   }).catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }

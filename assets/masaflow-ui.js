@@ -84,6 +84,11 @@
 
   // Keeps the shared staff chrome live: the awaiting-cash bell, the cashier chip and new-order toasts.
   function shell() {
+    const sessionHost = document.querySelector("[data-mf-language-host]");
+    if (sessionHost) {
+      const sessionLink = document.createElement("a"); sessionLink.href = "/staff-login.html"; sessionLink.textContent = "Staff session";
+      sessionLink.className = "text-xs font-semibold text-stone-500 min-h-[44px] flex items-center"; sessionHost.append(sessionLink);
+    }
     let seen = null; let chip = null;
     function update() {
       const state = M.getState();

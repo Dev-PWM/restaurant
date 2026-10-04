@@ -27,10 +27,20 @@ async function main(argv = process.argv.slice(2)) {
   if (command === 'backup') {
     const service = await probeHealth(config);
     if (service.state === 'ready') {
-      const response = await fetch(`${config.url}/api/backups/create`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(20000) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Backup failed.');
-      return { ...result, directory: path.join(config.dataDirectory, 'backups') };
+      let cookie = '';
+      if (config.env.MASAFLOW_STAFF_PASSWORD) {
+        const login = await fetch(`${config.url}/api/session/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: config.env.MASAFLOW_STAFF_PASSWORD }), signal: AbortSignal.timeout(20000) });
+        if (!login.ok) throw new Error('Staff sign-in failed. Check the server environment password before backing up.');
+        cookie = login.headers.get('set-cookie')?.split(';')[0] || '';
+      }
+      try {
+        const response = await fetch(`${config.url}/api/backups/create`, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) }, body: '{}', signal: AbortSignal.timeout(20000) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Backup failed.');
+        return { ...result, directory: path.join(config.dataDirectory, 'backups') };
+      } finally {
+        if (cookie) await fetch(`${config.url}/api/session/logout`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: '{}', signal: AbortSignal.timeout(5000) }).catch(() => {});
+      }
     }
     const release = await acquireLock(config.dataDirectory);
     try { const state = validateState(JSON.parse(await fs.readFile(path.join(config.dataDirectory, 'state.json'), 'utf8'))); return { backup: await saveBackup(config.dataDirectory, state), directory: path.join(config.dataDirectory, 'backups') }; }

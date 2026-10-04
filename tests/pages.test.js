@@ -19,7 +19,7 @@ const pages = [...staffPages, ...customerPages];
 test('every local link, script and stylesheet points at a file that exists', () => {
   for (const page of pages) {
     // /analytics/ is the separately built React app (npm run setup && npm run build); its dist/ is not committed.
-    const targets = [...read(page).matchAll(/\b(?:href|src)="([^"#?]+)[^"]*"/g)].map(match => match[1]).filter(target => !/^(https?:|mailto:|tel:|data:)/.test(target) && !target.startsWith('/analytics/') && !target.includes('${') && !target.includes("'"));
+    const targets = [...read(page).matchAll(/\b(?:href|src)="([^"#?]+)[^"]*"/g)].map(match => match[1]).filter(target => !/^(https?:|mailto:|tel:|data:)/.test(target) && !target.startsWith('/analytics/') && !['/order', '/pos', '/track', '/insights'].includes(target) && !target.includes('${') && !target.includes("'"));
     for (const target of targets) assert.ok(fs.existsSync(onDisk(target)), `${page} links to missing ${target}`);
   }
 });
@@ -49,7 +49,7 @@ test('staff screens share one shell and mark exactly their own nav item as curre
 test('every screen loads translation before the UI helpers and offers the language picker', () => {
   for (const page of pages) {
     const html = read(page);
-    assert.match(html, /<html lang="es">/, `${page} should default to Spanish`);
+    assert.match(html, /<html lang="es"[^>]*>/, `${page} should default to Spanish`);
     const order = ['masaflow-store.js', 'masaflow-i18n.js', 'masaflow-ui.js'].map(file => html.indexOf(`/assets/${file}`));
     assert.ok(order.every(index => index > 0) && order[0] < order[1] && order[1] < order[2], `${page} must load store, then i18n, then UI helpers`);
     assert.match(html, /data-mf-language-host/, `${page} needs a slot for the language picker`);

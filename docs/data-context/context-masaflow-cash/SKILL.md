@@ -67,6 +67,10 @@ Use for operational and sales analysis in this project. The user-approved upfron
 | AI summary | On request only; aggregates/definitions without names, cashier IDs or raw ledger. Validated references and server-rendered clauses/numbers; no forecasts, causes or cash actions. | [Summary](../../../shared/sales-summary.js) |
 | Demo figures | Concepts and temporary browser fixtures are fictional and never operational records. | Approved user plan; [guide](../../../README.md) |
 
+## Customer and staff access
+
+The public customer API serves menu data and a single ticket selected by its private order or submission UUID. Public pickup-board rows contain numbers and kitchen stages only. These redacted customer payloads are not financial-analysis datasets. Staff sign-in grants access to the full verified analytics, ledger and summary endpoints. Both interfaces use the same persisted server state. Online order submission remains unpaid until the cashier records physical MXN cash; daily, monthly and yearly popularity continues to count purchased quantities from verified receipts.
+
 ## Open Questions
 
 No unresolved KPI definition questions remain from the approved plan. Tax policy remains explicitly unconfigured at zero; this context supplies no external tax or accounting policy.

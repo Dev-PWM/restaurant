@@ -1,6 +1,20 @@
 (function () {
   'use strict';
   const dictionary = {
+    "Business access": "Acceso al negocio",
+    "Staff sign-in": "Acceso del personal",
+    "Manage orders, collect cash, and view your sales.": "Administra pedidos, cobra en efectivo y consulta tus ventas.",
+    "Staff password": "Contraseña del personal",
+    "Sign in": "Iniciar sesión",
+    "Sign out": "Cerrar sesión",
+    "You are signed in on this device.": "Tu sesión está abierta en este dispositivo.",
+    "Open order queue": "Abrir cola de pedidos",
+    "Order food as a customer": "Pedir comida como cliente",
+    "Too many sign-in attempts. Try again in 15 minutes.": "Demasiados intentos. Intenta de nuevo en 15 minutos.",
+    "Incorrect staff password.": "Contraseña del personal incorrecta.",
+    "Connection unavailable. Please try again.": "Sin conexión. Intenta de nuevo.",
+    "Staff session": "Sesión del personal",
+
     'Inconsistent cash receipts excluded (all dates)':'Cobros inconsistentes excluidos (todas las fechas)',
     'Inconsistent cash receipts excluded (all dates): {count}':'Cobros inconsistentes excluidos (todas las fechas): {count}',
     'items':'productos','item':'producto','unavailable':'no disponible','available':'disponible','language':'Idioma', 'Spanish':'Español', 'English':'English',

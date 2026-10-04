@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MasaFlow · Staff sign-in</title>
+  <link rel="stylesheet" href="/assets/masaflow.css">
+  <link rel="stylesheet" href="/assets/staff-login.css">
+  <script defer src="/assets/masaflow-i18n.js"></script>
+  <script defer src="/assets/staff-login.js"></script>
+</head>
+<body class="mf-login-page">
+  <main class="mf-login-card">
+    <a href="/order" class="mf-login-brand" aria-label="MasaFlow menu">MasaFlow<span>MXN · Efectivo</span></a>
+    <p class="mf-login-eyebrow">Business access</p>
+    <h1>Staff sign-in</h1>
+    <p>Manage orders, collect cash, and view your sales.</p>
+    <form id="staff-login-form">
+      <label for="staff-password">Staff password</label>
+      <input id="staff-password" name="password" type="password" autocomplete="current-password" required minlength="12" maxlength="256" aria-describedby="login-error">
+      <p id="login-error" role="alert" hidden></p>
+      <button id="staff-sign-in" type="submit">Sign in</button>
+    </form>
+    <div id="staff-session" hidden>
+      <p>You are signed in on this device.</p>
+      <a id="staff-continue" class="mf-login-continue" href="/pos">Open order queue</a>
+      <button id="staff-sign-out" type="button">Sign out</button>
+    </div>
+    <a class="mf-login-customer" href="/order">Order food as a customer</a>
+    <div data-mf-language-host></div>
+  </main>
+</body>
+</html>

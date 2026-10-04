@@ -26,6 +26,7 @@ export function LiveAnalyticsProvider({children}:{children:(state:LiveState)=>Re
    async function load(){
      for(let attempt=0;attempt<3;attempt++){
        const response=await fetch('/api/analytics?'+queryScope(scope),{signal:controller.signal,cache:'no-store'});
+       if(response.status===401){location.assign('/staff-login.html?next='+encodeURIComponent(location.pathname+location.search));throw new Error('Staff sign-in required.');}
        if(!response.ok)throw new Error('Analytics unavailable ('+response.status+')');
        const next=decodeAnalytics(await response.json());if(id!==generation.current)return;
        if(queryScope(next.scope)!==queryScope(scope))throw new Error('Analytics scope mismatch');

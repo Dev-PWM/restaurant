@@ -320,6 +320,21 @@
   }
   const clientActions = ['createDraft', 'cancelDraft', 'payOrder', 'advanceOrder', 'openShift', 'recordCashDrop', 'closeShift', 'updateMenuItem', 'addMenuItem', 'deleteMenuItem', 'updateMenuOption'];
   function createBrowserStore() {
+    const customer = globalThis.document?.documentElement?.dataset?.mfCustomer;
+    let submissionId = null, activeStream;
+    const params = new URLSearchParams(globalThis.location?.search || '');
+    function customerQuery() {
+      const query = new URLSearchParams();
+      if (customer === 'tracking') {
+        if (params.has('order')) query.set('order', params.get('order')); else query.set('board', '1');
+      } else {
+        try { submissionId ||= JSON.parse(sessionStorage.getItem('masaflow.customer.submission.v1'))?.id; } catch (_) {}
+        if (submissionId) query.set('submissionId', submissionId);
+      }
+      return `?${query}`;
+    }
+    const endpoint = name => customer ? `/api/customer/${name}${customerQuery()}` : `/api/${name}`;
+    function signIn(response) { if (!customer && response.status === 401 && globalThis.location) location.assign(`/staff-login.html?next=${encodeURIComponent(location.pathname + location.search)}`); }
     let state = initialState(); const listeners = new Set();
     let connectionStatus = { connected: false, syncedAt: null, hasConfirmedState: false, revision: null };
     function connection(ok) {
@@ -346,39 +361,43 @@
     const api = {
       getState: () => clone(state), getOrder: id => clone(state.orders.find(o => o.id === id) || null),
       getOpenShift: () => clone(getOpenShift(state)), shiftSummary: id => shiftSummary(state, id),
-      isVerifiedPaid: order => isVerifiedPaid(state, order), verifiedReceipts: () => clone(verifiedReceipts(state)),
+      isVerifiedPaid: order => customer ? order?.verifiedPaid === true : isVerifiedPaid(state, order), verifiedReceipts: () => clone(verifiedReceipts(state)),
       getConnectionStatus: () => clone(connectionStatus), getConnection: () => clone(connectionStatus),
       money: (value, currency = state.settings.currency, locale = preferredLocale()) => money(value, currency, locale), parseMoney,
       subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
     };
-    clientActions.forEach(action => { api[action] = async (...args) => {
+    (customer ? ['createDraft'] : clientActions).forEach(action => { api[action] = async (...args) => {
       if (action === 'createDraft' && args[0] && !args[0].submissionId) args[0] = { ...args[0], submissionId: uid() };
       await api.ready;
+      if (customer && args[0]?.submissionId !== submissionId) { submissionId = args[0].submissionId; listen(); }
       if (action === 'advanceOrder' && args.length === 1) args.push(api.getOrder(args[0])?.status);
-      let response; try { response = await fetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, args }) }); } catch (_) { connection(false); throw unconfirmed(); }
+      let response; try { response = await fetch(customer ? '/api/customer/orders' : '/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, args }) }); } catch (_) { connection(false); throw unconfirmed(); }
       let data; try { data = await response.json(); } catch (_) { connection(false); throw unconfirmed(); }
       if (!response.ok) {
+        signIn(response);
         const error = new Error(data.error || 'The action could not be saved.'); error.code = data.code || 'ACTION_REJECTED'; error.status = response.status; error.statusCode = response.status; throw error;
       }
       try { accept(data.state); } catch (_) { connection(false); throw unconfirmed(); } return data.result;
     }; });
     async function connect() {
       try {
-        const response = await fetch('/api/state'); if (!response.ok) throw new Error('Service unavailable.'); accept(await response.json());
+        const response = await fetch(endpoint('state')); signIn(response); if (!response.ok) throw new Error('Service unavailable.'); accept(await response.json());
       } catch (error) {
         if (connectionStatus.hasConfirmedState && connectionStatus.connected) return;
         connection(false); error.code = 'SERVICE_UNAVAILABLE'; throw error;
       }
     }
-    api.reconnect = () => { api.ready = connect(); api.ready.catch(() => {}); return api.ready; };
+    api.reconnect = () => { if (customer) listen(); api.ready = connect(); api.ready.catch(() => {}); return api.ready; };
     api.ready = connect();
     api.ready.catch(() => {});
-    (function listen() {
-      const stream = new EventSource('/api/events');
-      stream.onmessage = event => { try { accept(JSON.parse(event.data)); api.ready = Promise.resolve(); } catch (_) { connection(false); } };
+    function listen() {
+      if (activeStream) activeStream.close();
+      const stream = new EventSource(endpoint('events')); activeStream = stream;
+      stream.onmessage = event => { if (stream !== activeStream) return; try { accept(JSON.parse(event.data)); api.ready = Promise.resolve(); } catch (_) { connection(false); } };
       // Network drops retry on their own; an HTTP error closes the stream for good, so reopen it.
-      stream.onerror = () => { connection(false); if (stream.readyState === 2 /* CLOSED */) setTimeout(listen, 3000); };
-    })();
+      stream.onerror = () => { if (stream !== activeStream) return; connection(false); if (stream.readyState === 2 /* CLOSED */) setTimeout(() => { if (stream === activeStream) { connect().catch(() => {}); listen(); } }, 3000); };
+    }
+    listen();
     return api;
   }
   return { createEngine, initialState, migrateState, createBrowserStore, money, parseMoney, clientActions, validTimestamp, verifiedReceipts, isVerifiedPaid, shiftSummary };

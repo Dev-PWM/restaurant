@@ -18,7 +18,7 @@ npm run backup:verify -- "/absolute/path/to/backup.json"
 
 `backup` takes a manual snapshot of the running instance when its health identity matches the configured data directory. If that instance is stopped, it takes the writer lock and reads the saved ledger directly. It never creates a second ledger writer. `backups` lists snapshot filenames, saved revisions, dates, and damaged-file markers. `backup:verify` checks the checksum, supported data version, revision, and settings without modifying the ledger.
 
-The server also provides metadata-only `GET /api/backups`, `POST /api/backups/create`, and `GET /api/health` endpoints for the trusted local installation. Creating a manual backup does not change the financial revision. Health includes the last successful backup time and revision and an error message when a backup fails. These APIs do not expose backup file contents.
+The server also provides metadata-only `GET /api/backups`, `POST /api/backups/create`, and `GET /api/health` endpoints for the trusted local installation. Creating a manual backup does not change the financial revision. Health includes the last successful backup time and revision and an error message when a backup fails. These APIs do not expose backup file contents. With staff access enabled, backup endpoints and detailed backup health require a staff session. The CLI signs in using `MASAFLOW_STAFF_PASSWORD` from the server environment or local `.env` and revokes that temporary session when done.
 
 To target an alternate data directory, add `--data-dir` with an explicit path:
 
