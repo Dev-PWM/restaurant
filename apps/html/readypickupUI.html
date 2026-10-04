@@ -147,8 +147,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const $ = id => document.getElementById(id);
 
   const params = new URLSearchParams(location.search);
-  // null = Pickup Board. Anything that is not an order UUID (an order number, say) can never match, so it shows "not found".
-  const orderId = !params.has('order') ? null : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(params.get('order')) ? params.get('order') : '';
+  // null = Pickup Board. Check localStorage for active order if not provided in URL
+  const storedOrder = !params.has('order') ? (localStorage.getItem('activeMasaFlowOrder') || '') : '';
+  const targetId = params.has('order') ? params.get('order') : storedOrder;
+  const orderId = !targetId ? null : /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId) ? targetId : '';
   const seenKey = id => `masaflow.customer.readySeen.${id}`;
   const lastKey = 'masaflow.customer.lastOrder';
 
@@ -268,12 +270,34 @@ window.addEventListener('DOMContentLoaded', () => {
   function markReadySeen(id) { seenInMemory.add(id); writeSession(seenKey(id), true); }
   // Everything behind the full-screen announcement is made inert, so focus and screen readers stay on it.
   function behindOverlay() { return [...document.body.children].filter(element => element !== $('ready-overlay')); }
+  function playReadyChime() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const notes = [523.25, 659.25, 783.99]; // C5, E5, G5 major triad
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.15);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime + idx * 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.15 + 0.6);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.15);
+        osc.stop(ctx.currentTime + idx * 0.15 + 0.6);
+      });
+    } catch (_) {}
+  }
+
   function openReady() {
     overlayOpen = true;
     focusBeforeOverlay = document.activeElement;
     behindOverlay().forEach(element => { element.inert = true; });
     $('ready-overlay').classList.remove('hidden');
     $('ready-dismiss').focus();
+    playReadyChime();
   }
   function closeReady() {
     if (!overlayOpen) return;
@@ -291,6 +315,11 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderOrder(order, state) {
+    if (order.status === 'completed' || order.status === 'cancelled') {
+      try { localStorage.removeItem('activeMasaFlowOrder'); } catch (_) {}
+    } else {
+      try { localStorage.setItem('activeMasaFlowOrder', order.id); } catch (_) {}
+    }
     const view = VIEWS[order.status] || VIEWS.pending;
     const minutes = order.status === 'preparing' ? usualMinutes(state) : null;
     showStatus(view, minutes ? `Usually ready in about ${minutes} min` : view.sub);
@@ -313,6 +342,9 @@ window.addEventListener('DOMContentLoaded', () => {
     const order = loaded ? M.getOrder(orderId) : null;
     if (order) return renderOrder(order, M.getState());
     // Until the service answers, an empty local state must not read as "order not found".
+    if (loaded && !order) {
+      try { localStorage.removeItem('activeMasaFlowOrder'); } catch (_) {}
+    }
     showStatus(loaded ? MISSING : connected ? LOADING : OFFLINE);
     show($('order-body'), false); show($('order-footer'), false); show($('missing-footer'), loaded);
     show($('keep-open'), false); show($('menu-link'), false); show($('tracking-print'), false);
@@ -355,6 +387,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   $('ready-dismiss').addEventListener('click', closeReady);
   $('tracking-print').addEventListener('click', () => { if (orderId) UI.printReceipt(orderId); });
+  $('menu-link').addEventListener('click', () => { try { localStorage.removeItem('activeMasaFlowOrder'); } catch (_) {} });
   document.addEventListener('keydown', event => {
     if (!overlayOpen) return;
     if (event.key === 'Escape') { event.preventDefault(); closeReady(); }

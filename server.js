@@ -10,6 +10,7 @@ const { acquireLock, identity, validateState, atomicWrite, createBackupManager, 
 
 const { customerState, customerOrder, UUID } = require('./shared/customer-data.js');
 const { createStaffAccess } = require('./shared/staff-access.js');
+const { Server: SocketIOServer } = require('socket.io');
 
 const DRAWER_PULSE = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
 async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {}, backupOptions = {}, staffPassword = process.env.MASAFLOW_STAFF_PASSWORD || '', publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || '' } = {}) {
@@ -37,12 +38,19 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
   // Commit schema migration before serving requests or recovering hardware jobs.
   await persist(engine.getState());
   const summaries = createSummaryService({ ...summaryOptions, getState: engine.getState });
+  let io;
   const streams = new Map();
   function sendState(stream, client, next) {
     if (!client.customer && !access.authorized(client.req)) { stream.end(); return; }
     stream.write(`data: ${JSON.stringify(client.customer ? customerState(next, client.query) : next)}\n\n`);
   }
-  engine.subscribe(next => streams.forEach((client, stream) => sendState(stream, client, next)));
+  engine.subscribe(next => {
+    streams.forEach((client, stream) => sendState(stream, client, next));
+    if (io) {
+      io.emit('state_update', next);
+      io.emit('customer_state_update', customerState(next));
+    }
+  });
   for (const job of engine.getState().hardwareJobs.filter(j => j && j.status === 'reserved')) await engine.finishHardwareJob(job.key, 'unknown', 'Service restarted during this pulse. Check the physical drawer before requesting a manual pulse.');
   function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
   async function body(req) {
@@ -85,6 +93,110 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
   const server = http.createServer((req, res) => {
     const work = handleRequest(req, res); activeRequests.add(work);
     work.finally(() => activeRequests.delete(work)).catch(() => {});
+  });
+  io = new SocketIOServer(server, {
+    cors: { origin: '*', methods: ['GET', 'POST'] },
+    transports: ['websocket', 'polling']
+  });
+  io.on('connection', socket => {
+    socket.emit('initial_state', customerState(engine.getState()));
+
+    socket.on('join_order', orderId => {
+      if (orderId) socket.join('order:' + orderId);
+    });
+    socket.on('leave_order', orderId => {
+      if (orderId) socket.leave('order:' + orderId);
+    });
+
+    // 1. submit_client_order: Customer phone -> POS
+    socket.on('submit_client_order', async (payload, callback) => {
+      try {
+        const input = payload?.order || payload || {};
+        if (!input.submissionId) input.submissionId = crypto.randomUUID();
+        const order = await engine.createDraft(input);
+        console.log(`[Socket.io] submit_client_order received: Ticket ${order.number} for ${order.customerName || 'Walk-in'} (items: ${order.items?.length || 0})`);
+        io.emit('new_client_order', order);
+        io.emit('new_incoming_ticket', order);
+        io.emit('submit_client_order', order);
+        socket.join('order:' + order.id);
+        if (typeof callback === 'function') callback({ success: true, order });
+      } catch (err) {
+        console.error(`[Socket.io] submit_client_order error:`, err.message);
+        socket.emit('order_error', { message: err.message, code: err.code || 'ACTION_REJECTED' });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    // 2. pos_order_paid: Cashier confirms physical cash -> kitchen queue & analytics
+    socket.on('pos_order_paid', async (payload, callback) => {
+      try {
+        const orderId = payload?.orderId || (Array.isArray(payload) ? payload[0] : null);
+        const tenderedCents = payload?.tenderedCents !== undefined ? payload.tenderedCents : (Array.isArray(payload) ? payload[1] : null);
+        const cashierId = payload?.cashierId || (Array.isArray(payload) ? payload[2] : 'Cashier 1');
+        if (!orderId || tenderedCents === null || tenderedCents === undefined) {
+          throw new Error('orderId and tenderedCents are required.');
+        }
+        const result = await engine.payOrder(orderId, Number(tenderedCents), cashierId);
+        const { order, payment } = result;
+        console.log(`[Socket.io] pos_order_paid received: Order ${order.number} paid (Tendered: ${tenderedCents} cents, Change: ${payment.changeCents} cents, Cashier: ${cashierId})`);
+        if (payment && payment.id) kick(payment.id, null).catch(() => {});
+        io.emit('pos_order_paid', { order, payment });
+        io.emit('order_paid', { order, payment });
+        io.emit('kitchen_new_ticket', order);
+        io.to('order:' + order.id).emit('order_status_updated', { orderId: order.id, status: order.status, paymentStatus: 'paid', order, payment });
+        io.to('order:' + order.id).emit('client_status_changed', { orderId: order.id, status: order.status, order, payment });
+        io.emit('revenue_updated', { totalCents: payment.totalCents, currency: payment.currency });
+        if (typeof callback === 'function') callback({ success: true, order, payment });
+      } catch (err) {
+        console.error(`[Socket.io] pos_order_paid error:`, err.message);
+        socket.emit('payment_error', { message: err.message, code: err.code || 'ACTION_REJECTED' });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    // 3. pos_update_status: Kitchen marks cooking or ready -> pings customer phone
+    socket.on('pos_update_status', async (payload, callback) => {
+      try {
+        const orderId = payload?.orderId || payload?.id || (Array.isArray(payload) ? payload[0] : null);
+        let targetStatus = payload?.status || (Array.isArray(payload) ? payload[1] : null);
+        if (!orderId || !targetStatus) throw new Error('orderId and status are required.');
+        if (targetStatus === 'cooking') targetStatus = 'preparing';
+
+        let order = engine.getState().orders.find(o => o.id === orderId);
+        if (!order) throw new Error('Order not found.');
+
+        const sequence = ['pending', 'preparing', 'ready', 'completed'];
+        const currentIdx = sequence.indexOf(order.status);
+        const targetIdx = sequence.indexOf(targetStatus);
+
+        if (targetIdx > currentIdx) {
+          for (let i = currentIdx; i < targetIdx; i++) {
+            const fromStatus = sequence[i];
+            order = await engine.advanceOrder(orderId, fromStatus);
+          }
+        }
+
+        console.log(`[Socket.io] pos_update_status received: Order ${order.number} status -> ${order.status}`);
+        io.emit('pos_update_status', { orderId, status: order.status, order });
+        io.emit('order_status_updated', { orderId, status: order.status, order });
+        io.emit('client_status_changed', { orderId, status: order.status, order });
+        io.to('order:' + orderId).emit('status_change', { orderId, status: order.status, order });
+        io.to('order:' + orderId).emit('client_status_changed', { orderId, status: order.status, order });
+        if (typeof callback === 'function') callback({ success: true, order });
+      } catch (err) {
+        console.error(`[Socket.io] pos_update_status error:`, err.message);
+        socket.emit('status_error', { message: err.message, code: err.code || 'ACTION_REJECTED' });
+        if (typeof callback === 'function') callback({ success: false, error: err.message });
+      }
+    });
+
+    // Check order status for customer reconnection & refresh protection
+    socket.on('check_order_status', (orderId, callback) => {
+      const order = engine.getState().orders.find(o => o.id === orderId);
+      console.log(`[Socket.io] check_order_status: ${orderId} -> ${order ? order.status : 'not found'}`);
+      socket.emit('order_status_result', { orderId, order: order || null, status: order?.status || 'not_found' });
+      if (typeof callback === 'function') callback({ success: !!order, order });
+    });
   });
   async function handleRequest(req, res) {
     try {
@@ -209,11 +321,13 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     } catch (error) { if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.statusCode || 400, { error: error.message, code: error.code || 'ACTION_REJECTED' }); else res.end(); }
   }
   let closePromise;
-  return { server, engine, dataFile, kick, close: () => {
+  return { server, io, engine, dataFile, kick, close: () => {
     if (closePromise) return closePromise;
     closing = true;
     closePromise = (async () => {
-      streams.forEach((_client, stream) => stream.end()); server.closeAllConnections();
+      streams.forEach((_client, stream) => stream.end());
+      if (io) io.close();
+      server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
       await Promise.allSettled([...activeRequests]);
       await engine.whenIdle(); await backups.idle(); await releaseLock();

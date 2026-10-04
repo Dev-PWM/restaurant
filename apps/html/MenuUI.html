@@ -232,6 +232,21 @@
   <script>
   window.addEventListener('DOMContentLoaded', () => {
     'use strict';
+    // Accidental Refresh Protection: if customer has an active order, recover live tracking screen
+    try {
+      const isExplicitNew = new URLSearchParams(location.search).has('new');
+      if (isExplicitNew) {
+        localStorage.removeItem('activeMasaFlowOrder');
+      } else {
+        const existingOrder = localStorage.getItem('activeMasaFlowOrder');
+        if (existingOrder && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(existingOrder)) {
+          const lang = window.MasaFlowI18n?.getLocale() || 'es';
+          location.replace(`readypickupUI.html?order=${encodeURIComponent(existingOrder)}&lang=${lang}`);
+          return;
+        }
+      }
+    } catch (_) {}
+
     const $ = id => document.getElementById(id);
     const esc = MasaFlowUI.escape;
     const money = cents => MasaFlow.money(cents);
@@ -474,6 +489,7 @@
     function finishSubmission(order) {
       if (navigating) return;
       navigating = true;
+      try { localStorage.setItem('activeMasaFlowOrder', order.id); } catch (_) {}
       write(lastKey, order.id); write(submissionKey, null); pendingSubmission = null;
       cart = []; saveCart();
       location.href = `readypickupUI.html?order=${encodeURIComponent(order.id)}&lang=${MasaFlowI18n.getLocale()}`;
@@ -711,8 +727,8 @@
       else image.parentElement.outerHTML = NO_PHOTO[image.dataset.photo === 'true'];
     }, true);
 
-    const lastOrder = read(lastKey);
-    if (typeof lastOrder === 'string') {
+    const lastOrder = read(lastKey) || localStorage.getItem('activeMasaFlowOrder');
+    if (typeof lastOrder === 'string' && lastOrder) {
       $('last-order-link').href = `readypickupUI.html?order=${encodeURIComponent(lastOrder)}&lang=${MasaFlowI18n.getLocale()}`;
       $('last-order-link').hidden = false;
     }

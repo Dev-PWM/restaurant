@@ -282,7 +282,7 @@ window.addEventListener('DOMContentLoaded', () => {
 
   function draftCard(order) {
     const id = esc(order.id);
-    return `<article data-testid="draft-${id}" aria-labelledby="guest-${id}" class="${CARD.neutral}">
+    return `<article data-testid="draft-${id}" aria-labelledby="guest-${id}" data-time="${new Date(order.createdAt).getTime()}" class="ticket-card ${CARD.neutral}">
       ${cardTop(order, 'neutral', 'Placed At', order.createdAt)}
       <p class="text-xs font-medium text-stone-500">${esc(service(order))}</p>
       <div class="flex-1 space-y-3 my-4">${order.items.map(line => lineRow(line, false)).join('')}</div>
@@ -301,7 +301,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const id = esc(order.id);
     const tone = UI.needsAttention(order, now) ? 'attention' : 'neutral';
     const stage = STAGE[order.status];
-    return `<article id="order-${esc(order.number)}" data-testid="kitchen-order-${id}" aria-labelledby="guest-${id}" class="${CARD[tone]}">
+    return `<article id="order-${esc(order.number)}" data-testid="kitchen-order-${id}" aria-labelledby="guest-${id}" data-time="${new Date(order.paidAt).getTime()}" class="ticket-card ${CARD[tone]}">
       ${cardTop(order, tone, 'Paid At', order.paidAt)}
       <div class="flex flex-wrap items-center gap-2">
         <p class="text-xs font-medium text-stone-500">${esc(service(order))}</p>
@@ -476,14 +476,57 @@ window.addEventListener('DOMContentLoaded', () => {
     UI.printDailySummary();
   });
 
+  let knownOrderIds = new Set();
+
+  function playKitchenBell() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc1 = ctx.createOscillator(), osc2 = ctx.createOscillator(), gain = ctx.createGain();
+      osc1.type = 'sine'; osc1.frequency.setValueAtTime(880, ctx.currentTime);
+      osc1.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.8);
+      osc2.type = 'triangle'; osc2.frequency.setValueAtTime(1320, ctx.currentTime);
+      osc2.frequency.exponentialRampToValueAtTime(660, ctx.currentTime + 0.6);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8);
+      osc1.connect(gain); osc2.connect(gain); gain.connect(ctx.destination);
+      osc1.start(); osc2.start();
+      osc1.stop(ctx.currentTime + 0.8); osc2.stop(ctx.currentTime + 0.8);
+    } catch (_) {}
+  }
+
+  function updateTicketAging() {
+    const tickets = document.querySelectorAll('.ticket-card[data-time]');
+    const now = Date.now();
+    tickets.forEach(ticket => {
+      const orderTime = parseInt(ticket.getAttribute('data-time'), 10);
+      if (!orderTime) return;
+      const minutesElapsed = Math.floor((now - orderTime) / 60000);
+      if (minutesElapsed >= 15) {
+        ticket.classList.remove('bg-yellow-50', 'border-yellow-400');
+        ticket.classList.add('bg-red-50', 'border-red-500', 'animate-pulse');
+      } else if (minutesElapsed >= 10) {
+        ticket.classList.add('bg-yellow-50', 'border-yellow-400');
+      }
+    });
+  }
+
   // The first state to arrive also clears a "service not responding" notice left by a failed start.
   function refresh() {
     if (!M.getConnection().hasConfirmedState) return;
+    const currentOrders = M.getState().orders || [];
+    if (loaded) {
+      const hasNewOrder = currentOrders.some(o => !knownOrderIds.has(o.id) && (o.status === 'draft' || o.status === 'pending'));
+      if (hasNewOrder) playKitchenBell();
+    }
+    knownOrderIds = new Set(currentOrders.map(o => o.id));
     if (!loaded) { loaded = true; setError(null); }
     render();
+    updateTicketAging();
   }
   M.subscribe(refresh);
-  MasaFlowI18n.subscribe(() => { if (loaded) render(); });
+  MasaFlowI18n.subscribe(() => { if (loaded) { render(); updateTicketAging(); } });
   Promise.resolve(M.ready).then(refresh, () => {
     if (loaded) return;
     subtitle.textContent = 'Order service unavailable';
@@ -491,7 +534,7 @@ window.addEventListener('DOMContentLoaded', () => {
   });
   // Not a simulation: needsAttention() may follow the clock and "today" rolls over at midnight.
   // paint() leaves the page alone unless one of those actually changed something.
-  setInterval(() => { if (loaded) render(); }, 30000);
+  setInterval(() => { if (loaded) { render(); updateTicketAging(); } }, 30000);
 });
 </script>
 </body>
