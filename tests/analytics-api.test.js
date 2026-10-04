@@ -8,7 +8,7 @@ const { createService } = require('../server.js');
 const { initialState } = require('../assets/masaflow-store.js');
 
 async function service(t, options = {}) {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-api-'));
+  const directory = options.dataDirectory || await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-api-'));
   const app = await createService({ dataDirectory: directory, printerHost: '', summaryOptions: { apiKey: '' }, ...options });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await app.close(); await fs.rm(directory, { recursive: true, force: true }); });
@@ -35,7 +35,7 @@ test('analytics API shares committed revisions with payments, source evidence an
 });
 
 test('version-one records migrate durably without converting USD, requiring legacy shift close', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-legacy-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-legacy-'));
   const legacy = initialState(); legacy.version = 1; legacy.settings.currency = 'USD'; legacy.settings.timeZone = 'America/Los_Angeles';
   legacy.menu.forEach(item => { delete item.currency; item.options.forEach(option => { delete option.currency; }); });
   legacy.shifts.push({ id: 'old-shift', floatCents: 2000, cashierId: 'Legacy', openedAt: '2026-09-30T10:00:00.000Z', closedAt: null });
@@ -60,7 +60,7 @@ test('summary API rejects cross-origin actions and accepts an explicitly request
 });
 
 test('an inconsistent pending receipt does not block service restart or send a drawer pulse', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-invalid-recovery-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-invalid-recovery-'));
   const state = initialState(); state.payments.push({ id: 'invalid-payment', orderId: 'missing-order', drawerKickStatus: 'pending' });
   await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
   const app = await service(t, { dataDirectory: directory });

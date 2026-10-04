@@ -120,7 +120,7 @@ async function serve(config, { probe = probeHealth, createService = require('../
     await new Promise((resolve, reject) => { app.server.once('error', reject); app.server.listen(config.port, config.host, resolve); });
   } catch (error) {
     if (app) await app.close();
-    if (['EADDRINUSE', 'DATA_DIRECTORY_LOCKED', 'STORE_BUSY', 'LOCKED'].includes(error.code)) { process.stderr.write(`${error.message} The login agent will remain idle.\n`); return { blocked: true }; }
+    if (['EADDRINUSE', 'DATA_IN_USE', 'DATA_DIRECTORY_LOCKED', 'STORE_BUSY', 'LOCKED'].includes(error.code)) { process.stderr.write(`${error.message} The login agent will remain idle.\n`); return { blocked: true }; }
     throw error;
   }
   process.stdout.write(`${new Date().toISOString()} MasaFlow running at ${config.url}\n`);

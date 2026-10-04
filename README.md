@@ -25,6 +25,8 @@ Open [MasaFlow](http://127.0.0.1:4173/businessDashbord.html). The service binds 
 | Customer tracking | `/readypickupUI.html?order=ORDER_UUID`, linked after submission |
 | Pickup board for a counter screen | [Pickup](http://127.0.0.1:4173/readypickupUI.html) |
 
+On this Mac, double-click [Start MasaFlow.command](launchers/Start%20MasaFlow.command), or run `npm run start:mac`. The launcher reads the local `.env`, verifies the server's data-directory identity, and opens the cashier screen. Optional login startup is available through `npm run startup:enable`, `npm run startup:status`, and `npm run startup:disable`; see [Mac startup](docs/MAC_STARTUP.md) for Finder shortcuts, configuration, logs, and safe shutdown.
+
 Staff screens use a sidebar on tablets and desktops and a top bar with a tab bar on phones. `metricsDashbord.html` keeps its `?period=&date=` filters in the URL and links to the analytics app. Analytics URLs restore `tab=operations|owner`, `period=day|week|month|year`, `date=YYYY-MM-DD`, and `lang=es|en`. Spanish is initially selected; the language picker on every screen switches to English, and the choice persists across screens.
 
 ## Complete a cash shift
@@ -64,7 +66,11 @@ Only aggregates and definitions are sent to Gateway; customer names, cashier ide
 
 ## Persistence and development
 
-Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. Back up this directory while the service is stopped. This app is intended for a trusted local counter; authentication, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
+Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. One writer holds the canonical data directory's lock until requests and saves finish. `MASAFLOW_DATA_DIR` selects an alternate store.
+
+Automatic snapshots run at startup, after a changed revision at least an hour after the last automatic snapshot, and when a shift closes. Run `npm run backup` for a manual snapshot, `npm run backups` to list them, and `npm run backup:verify -- BACKUP_FILE` to verify one. `GET /api/health` reports the last successful backup and any backup error. Restore requires a stopped server, a verified source and `npm run restore -- BACKUP_FILE --confirm`; it first preserves the previous ledger and never replays uncertain drawer pulses. See [backup and restore instructions](docs/BACKUPS.md). Keep a separate private copy on another disk to protect against losing the Mac.
+
+This app is intended for a trusted local counter; authentication, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
 
 HTML screens use shared `assets/`: the order store, translations, UI helpers, the compiled stylesheet and vendored icons/charts (`assets/vendor/`: FontAwesome Free 6.4 solid, Plotly 3.1 basic), so the counter keeps working offline apart from the two Google web fonts. The English/Spanish catalog is [assets/masaflow-catalog.json](assets/masaflow-catalog.json). HTML pages load its `html` namespace through `masaflow-i18n.js`; React imports its `analytics` namespace at build time. The HTML script keeps an inline fallback for immediate rendering and failed asset requests. A language selected in the URL takes precedence over saved `masaflow.locale`; otherwise the saved preference applies, initially Spanish.
 
@@ -80,7 +86,7 @@ The [data model](DATA_MODEL.md), [reusable KPI context](docs/data-context/contex
 npm test
 ```
 
-Tests use temporary directories and cover cash validation, removable toppings, optional phone numbers, cancelling unpaid orders, deleting dishes, undoable menu audit entries, kitchen step timestamps, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors, plus static checks on the screens (links resolve, no CDN scripts, one shared staff shell, translation loaded, required hooks present, no mockup placeholders).
+Tests use temporary directories and cover cash validation, removable toppings, optional phone numbers, cancelling unpaid orders, deleting dishes, undoable menu audit entries, kitchen step timestamps, idempotent submissions/payments, persistence rollback, restart recovery, pulse bytes to a test TCP receiver, currency migration, malformed receipts, timezone boundaries, immutable snapshots, frozen audits, summary privacy, caching, timeout and provider errors, one-writer locking, backup cadence and retention, restore rollback and safety copies, and native Mac startup, plus static checks on the screens (links resolve, no CDN scripts, one shared staff shell, translation loaded, required hooks present, no mockup placeholders).
 
 The browser acceptance suite is separate from `npm test`. Build analytics first and use installed Google Chrome with Playwright:
 

@@ -6,21 +6,28 @@ const net = require('node:net');
 const { createEngine, initialState, clientActions, verifiedReceipts } = require('./assets/masaflow-store.js');
 const { buildAnalytics } = require('./shared/analytics.js');
 const { createSummaryService } = require('./shared/sales-summary.js');
+const { acquireLock, identity, validateState, atomicWrite, createBackupManager, listBackups } = require('./shared/local-data.js');
 
 const DRAWER_PULSE = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
-async function createService({ dataDirectory = path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {} } = {}) {
-  await fs.mkdir(dataDirectory, { recursive: true });
+async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {}, backupOptions = {} } = {}) {
+  const releaseLock = await acquireLock(dataDirectory);
+  try {
+  dataDirectory = await fs.realpath(dataDirectory);
+  const workspaceId = await identity(dataDirectory);
+  const backups = createBackupManager(dataDirectory, backupOptions);
+  let started = false, closedSignature = '';
+  let closing = false;
+  const activeRequests = new Set();
   const dataFile = path.join(dataDirectory, 'state.json');
   let state;
-  try { state = JSON.parse(await fs.readFile(dataFile, 'utf8')); if (![1, 2].includes(state.version) || !Array.isArray(state.orders)) throw new Error('Unsupported or invalid saved data.'); }
+  try { state = validateState(JSON.parse(await fs.readFile(dataFile, 'utf8'))); }
   catch (error) { if (error.code !== 'ENOENT') throw error; state = initialState(); }
   async function persist(next) {
-    try {
-    const temporary = `${dataFile}.tmp`;
-    const file = await fs.open(temporary, 'w', 0o600);
-    try { await file.writeFile(JSON.stringify(next, null, 2)); await file.sync(); } finally { await file.close(); }
-    await fs.rename(temporary, dataFile);
-    } catch (error) { error.statusCode = 500; error.code = 'PERSISTENCE_FAILED'; throw error; }
+    try { await atomicWrite(dataFile, JSON.stringify(next, null, 2)); }
+    catch (error) { error.statusCode = 500; error.code = 'PERSISTENCE_FAILED'; throw error; }
+    const signature = next.shifts.filter(shift => shift?.closedAt).map(shift => `${shift.id}:${shift.closedAt}`).join('|');
+    if (started) await backups.automatic(next, signature !== closedSignature);
+    closedSignature = signature;
   }
   const engine = createEngine({ state, persist });
   // Commit schema migration before serving requests or recovering hardware jobs.
@@ -63,12 +70,22 @@ async function createService({ dataDirectory = path.join(__dirname, '.masaflow')
   // Payment may have committed immediately before a crash that prevented reservation.
   // With no durable reservation, no pulse bytes could have been sent, so recovery is safe.
   for (const { payment } of verifiedReceipts(engine.getState()).receipts.filter(({ payment }) => payment.drawerKickStatus === 'pending' && !engine.getState().hardwareJobs.some(j => j && j.paymentId === payment.id))) await kick(payment.id, null);
+  await backups.automatic(engine.getState(), true);
+  started = true;
   const root = path.join(__dirname, 'apps/html');
   const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.png': 'image/png', '.jpg': 'image/jpeg', '.webp': 'image/webp', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2' };
-  const server = http.createServer(async (req, res) => {
+  const server = http.createServer((req, res) => {
+    const work = handleRequest(req, res); activeRequests.add(work);
+    work.finally(() => activeRequests.delete(work)).catch(() => {});
+  });
+  async function handleRequest(req, res) {
     try {
+      if (closing) return json(res, 503, { error: 'MasaFlow is stopping. Retry after restart.' });
       const requestUrl = new URL(req.url, 'http://localhost');
       if (req.method === 'POST' && (req.headers['sec-fetch-site'] === 'cross-site' || (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`))) { json(res, 403, { error: 'Cross-origin actions are not allowed.' }); return; }
+      if (requestUrl.pathname === '/api/health' && req.method === 'GET') return json(res, 200, { service: 'masaflow', version: '0.2.0', workspaceId, status: 'ready', backup: backups.status() });
+      if (requestUrl.pathname === '/api/backups' && req.method === 'GET') return json(res, 200, { backups: await listBackups(dataDirectory) });
+      if (requestUrl.pathname === '/api/backups/create' && req.method === 'POST') return json(res, 200, { backup: await backups.create(engine.getState()) });
       if (requestUrl.pathname === '/api/state' && req.method === 'GET') return json(res, 200, engine.getState());
       if (requestUrl.pathname === '/api/analytics' && req.method === 'GET') return json(res, 200, buildAnalytics(engine.getState(), requestUrl.searchParams, { summaryAvailable: summaries.available() }));
       if (requestUrl.pathname === '/api/analytics/summary' && req.method === 'POST') return json(res, 200, await summaries.summarize(await body(req)));
@@ -113,11 +130,29 @@ async function createService({ dataDirectory = path.join(__dirname, '.masaflow')
       res.writeHead(200, { 'Content-Type': types[path.extname(requested)], 'Cache-Control': 'no-cache', 'X-Content-Type-Options': 'nosniff' });
       res.end(req.method === 'HEAD' ? undefined : content);
     } catch (error) { if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.statusCode || 400, { error: error.message, code: error.code || 'ACTION_REJECTED' }); else res.end(); }
-  });
-  return { server, engine, dataFile, kick, close: () => { streams.forEach(s => s.end()); server.closeAllConnections(); return new Promise(resolve => server.close(resolve)); } };
+  }
+  let closePromise;
+  return { server, engine, dataFile, kick, close: () => {
+    if (closePromise) return closePromise;
+    closing = true;
+    closePromise = (async () => {
+      streams.forEach(stream => stream.end()); server.closeAllConnections();
+      await new Promise(resolve => server.close(resolve));
+      await Promise.allSettled([...activeRequests]);
+      await engine.whenIdle(); await backups.idle(); await releaseLock();
+    })();
+    return closePromise;
+  } };
+  } catch (error) { await releaseLock(); throw error; }
 }
+
 if (require.main === module) {
-  createService().then(({ server }) => {
+  createService().then(app => {
+    const { server } = app;
+    let stopping = false;
+    const stop = async () => { if (stopping) return; stopping = true; await app.close(); };
+    process.once('SIGTERM', stop); process.once('SIGINT', stop);
+    server.once('error', async error => { await stop(); process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
     const port = Number(process.env.PORT || 4173); const host = process.env.MASAFLOW_HOST || '127.0.0.1';
     server.listen(port, host, () => process.stdout.write(`MasaFlow running at http://${host}:${port}\n`));
   }).catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });

@@ -245,13 +245,13 @@ test('concurrent stale kitchen actions cannot skip a fulfillment stage', async (
 });
 
 test('restart safely recovers paid receipts with no pulse reservation and marks uncertain reservations unknown', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-recovery-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-recovery-'));
   const store = createEngine(); await store.openShift(0);
   const first = await store.createDraft(draftData()); const firstPayment = (await store.payOrder(first.id, 10000)).payment;
   const second = await store.createDraft(draftData()); const secondPayment = (await store.payOrder(second.id, 10000)).payment;
   await store.reserveHardwareJob(`payment:${secondPayment.id}`, secondPayment.id);
   await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(store.getState()));
-  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(() => service.close());
+  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
   const state = service.engine.getState();
   assert.equal(state.payments.find(p => p.id === firstPayment.id).drawerKickStatus, 'simulated');
   assert.equal(state.payments.find(p => p.id === secondPayment.id).drawerKickStatus, 'unknown');
@@ -259,12 +259,12 @@ test('restart safely recovers paid receipts with no pulse reservation and marks 
 });
 
 test('null legacy records do not block startup pulse recovery or duplicate payment and pulse prevention', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-null-recovery-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-null-recovery-'));
   const store = createEngine(); await store.openShift(0);
   const order = await store.createDraft(draftData()); const payment = (await store.payOrder(order.id, 10000)).payment;
   const state = store.getState(); state.hardwareJobs.unshift(null); state.payments.unshift(null); state.orders.unshift(null);
   await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
-  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(() => service.close());
+  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
   assert.equal(service.engine.getState().payments.find(p => p && p.id === payment.id).drawerKickStatus, 'simulated');
   const retry = await service.engine.payOrder(order.id, 10000);
   assert.equal(retry.alreadyPaid, true); assert.equal(retry.payment.id, payment.id);
@@ -274,13 +274,13 @@ test('null legacy records do not block startup pulse recovery or duplicate payme
 });
 
 test('service persists payment, automatically pulses exact ESC/POS bytes, and suppresses duplicate pulses across restart', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-test-')); t.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-test-'));
   const received = []; const printer = net.createServer(socket => { let data = Buffer.alloc(0); socket.on('data', bytes => { data = Buffer.concat([data, bytes]); }); socket.on('end', () => { received.push(data); socket.end(); }); });
   await new Promise(resolve => printer.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => printer.close(resolve)));
   const config = { dataDirectory: directory, printerHost: '127.0.0.1', printerPort: printer.address().port };
   let service = await createService(config);
   async function listen() { await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve)); return `http://127.0.0.1:${service.server.address().port}`; }
-  let url = await listen(); t.after(() => service.close());
+  let url = await listen(); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
   async function action(name, ...args) { const response = await fetch(`${url}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: name, args }) }); const body = await response.json(); assert.equal(response.status, 200, JSON.stringify(body)); return body.result; }
   await action('openShift', 20000, 'QA'); const order = await action('createDraft', draftData());
   const response = await fetch(`${url}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'payOrder', args: [order.id, 1000] }) }); assert.equal(response.status, 400);

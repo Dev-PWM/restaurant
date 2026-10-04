@@ -175,6 +175,7 @@
       return { name, category, description: cleanText(data.description, 500), priceCents: cents(data.priceCents, 'Price', false), imageUrl, included: cleanIncluded(data.included) };
     }
     const api = {
+      whenIdle: () => queue,
       getState: () => clone(current),
       getOrder: id => clone(current.orders.find(o => o.id === id) || null),
       getOpenShift: () => clone(getOpenShift(current)),

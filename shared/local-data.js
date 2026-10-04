@@ -3,7 +3,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
 const crypto = require('node:crypto');
-const { migrateState, verifiedReceipts } = require('../assets/masaflow-store.js');
+const { migrateState, verifiedReceipts, validTimestamp } = require('../assets/masaflow-store.js');
 const collections = ['menu', 'orders', 'payments', 'shifts', 'cashDrops', 'audit', 'hardwareJobs'];
 const digest = text => crypto.createHash('sha256').update(text).digest('hex');
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -23,8 +23,6 @@ async function atomicWrite(fileName, text) {
     const handle = await fs.open(temporary, 'wx', 0o600);
     try { await handle.writeFile(text); await handle.sync(); } finally { await handle.close(); }
     await fs.rename(temporary, fileName);
-    const directory = await fs.open(path.dirname(fileName), 'r');
-    try { await directory.sync(); } finally { await directory.close(); }
   } finally { await fs.rm(temporary, { force: true }).catch(() => {}); }
 }
 async function identity(directory) { return digest(await fs.realpath(directory)).slice(0, 16); }
@@ -73,7 +71,7 @@ function backupEnvelope(state, kind, createdAt = new Date().toISOString()) {
   return { format: 'masaflow-backup', version: 1, createdAt, kind, revision: state.revision, sha256: digest(JSON.stringify(state)), state };
 }
 function validateBackup(value) {
-  if (!value || value.format !== 'masaflow-backup' || value.version !== 1 || !Number.isFinite(Date.parse(value.createdAt)) || value.sha256 !== digest(JSON.stringify(value.state))) throw new Error('Invalid or damaged MasaFlow backup. Checksum verification failed.');
+  if (!value || value.format !== 'masaflow-backup' || value.version !== 1 || !validTimestamp(value.createdAt) || !['auto', 'manual', 'pre-restore'].includes(value.kind) || value.sha256 !== digest(JSON.stringify(value.state))) throw new Error('Invalid or damaged MasaFlow backup. Checksum verification failed.');
   validateState(value.state);
   if (value.revision !== value.state.revision) throw new Error('Backup revision does not match its saved state.');
   return value;
@@ -119,12 +117,49 @@ async function restoreBackup(directory, fileName) {
   const release = await acquireLock(directory);
   try {
     const backup = validateBackup(JSON.parse(await fs.readFile(fileName, 'utf8')));
-    let current = null;
-    try { current = validateState(JSON.parse(await fs.readFile(path.join(directory, 'state.json'), 'utf8'))); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    let current = null, raw = null, validCurrent = false;
+    try { raw = await fs.readFile(path.join(directory, 'state.json'), 'utf8'); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (raw !== null) {
+      try { current = validateState(JSON.parse(raw)); validCurrent = true; }
+      catch {
+        let parsed; try { parsed = JSON.parse(raw); } catch { parsed = {}; }
+        current = { revision: Number.isSafeInteger(parsed?.revision) && parsed.revision >= 0 ? parsed.revision : 0, nextOrderNumber: Number.isSafeInteger(parsed?.nextOrderNumber) && parsed.nextOrderNumber > 0 ? parsed.nextOrderNumber : 1 };
+      }
+    }
     const restored = prepareRestore(backup, current);
-    const safety = current ? await saveBackup(directory, current, 'pre-restore') : null;
+    let safety = null;
+    if (validCurrent) safety = await saveBackup(directory, current, 'pre-restore');
+    else if (raw !== null) {
+      const createdAt = new Date().toISOString();
+      const fileName = `pre-restore-damaged-${createdAt.replace(/[:.]/g, '-')}-${crypto.randomUUID().slice(0, 8)}.json`;
+      await fs.mkdir(path.join(directory, 'backups'), { recursive: true, mode: 0o700 });
+      await atomicWrite(path.join(directory, 'backups', fileName), JSON.stringify({ format: 'masaflow-damaged-state', version: 1, createdAt, sha256: digest(raw), rawState: raw }, null, 2));
+      safety = { fileName, createdAt, kind: 'pre-restore', damaged: true };
+    }
     await atomicWrite(path.join(directory, 'state.json'), JSON.stringify(restored, null, 2));
     return { revision: restored.revision, sourceRevision: backup.revision, safetyBackup: safety, excludedReceipts: verifiedReceipts(restored).excluded };
   } finally { await release(); }
 }
-module.exports = { validateState, validateBackup, backupEnvelope, atomicWrite, acquireLock, identity, saveBackup, listBackups, pruneAutomatic, prepareRestore, restoreBackup };
+function createBackupManager(directory, { save = saveBackup, prune = pruneAutomatic, now = () => Date.now() } = {}) {
+  let queue = Promise.resolve(), lastAutomatic = -Infinity, lastRevision = -1;
+  const status = { lastBackupAt: null, lastBackupRevision: null, error: null };
+  function create(state, kind = 'manual') {
+    const work = queue.then(async () => {
+      try {
+        const result = await save(directory, state, kind);
+        status.lastBackupAt = result.createdAt; status.lastBackupRevision = result.revision; status.error = null;
+        if (kind === 'auto') { lastAutomatic = now(); lastRevision = state.revision; }
+        try { await prune(directory, now()); } catch { status.error = 'Backup saved, but automatic retention cleanup failed.'; }
+        return result;
+      } catch (error) { status.error = 'Backup could not be saved. Check disk space and backup-folder access.'; throw error; }
+    });
+    queue = work.catch(() => {}); return work;
+  }
+  return {
+    status: () => ({ ...status }),
+    create,
+    automatic: (state, force = false) => force || (state.revision !== lastRevision && now() - lastAutomatic >= 3600000) ? create(state, 'auto').catch(() => null) : Promise.resolve(null),
+    idle: () => queue
+  };
+}
+module.exports = { createBackupManager, validateState, validateBackup, backupEnvelope, atomicWrite, acquireLock, identity, saveBackup, listBackups, pruneAutomatic, prepareRestore, restoreBackup };

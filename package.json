@@ -9,9 +9,17 @@
     "build:css": "npx --yes tailwindcss@3.4.17 -c tailwind.config.js -i styles/masaflow.css -o assets/masaflow.css --minify",
     "start": "node server.js",
     "dev": "node server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "backup": "node scripts/data.cjs backup",
+    "backups": "node scripts/data.cjs list",
+    "backup:verify": "node scripts/data.cjs verify",
+    "restore": "node scripts/data.cjs restore",
+    "start:mac": "node scripts/mac-start.cjs",
+    "startup:enable": "node scripts/mac-login.cjs install",
+    "startup:disable": "node scripts/mac-login.cjs uninstall",
+    "startup:status": "node scripts/mac-login.cjs status"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   }
 }
