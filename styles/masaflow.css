@@ -1,7 +1,18 @@
 /*! MasaFlow styles. Source: styles/masaflow.css. Build: npm run build:css -> assets/masaflow.css */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@theme {
+  --color-brand-orange: #ea580c;
+  --color-brand-stone: #f9f8f6;
+  --color-brand-obsidian: #1c1917;
+  --font-sans: Outfit, system-ui, sans-serif;
+  --font-serif: "Playfair Display", Georgia, serif;
+}
+@source "../apps/html";
+@source "../assets/*.js";
+@utility z-bar { z-index: 50; }
+@utility z-toast { z-index: 60; }
+@utility z-notice { z-index: 70; }
+@utility z-overlay { z-index: 80; }
 
 @layer base {
   :root { color-scheme: light; --mf-orange: #ea580c; --mf-obsidian: #1c1917; --mf-stone: #f9f8f6; }

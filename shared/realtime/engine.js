@@ -9,6 +9,11 @@ const { randomUUID, createHash } = require("node:crypto");
 /** @typedef {import('../types/realtime').Commands} Commands */
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const paymentHourFormatter = new Intl.DateTimeFormat("es-MX", {
+  timeZone: "America/Mexico_City",
+  hour: "2-digit",
+  hourCycle: "h23",
+});
 /** @param {unknown} condition @param {string} message @param {string} [code] @returns {asserts condition} */
 function ensure(condition, message, code = "INVALID_INPUT") {
   if (!condition) throw Object.assign(new Error(message), { code });
@@ -56,11 +61,7 @@ function metrics(orders) {
     result.tenderedCents += payment.tenderedCents;
     result.changeCents += payment.changeCents;
     result.paidOrders++;
-    const hour = new Intl.DateTimeFormat("es-MX", {
-      timeZone: "America/Mexico_City",
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(new Date(payment.paidAt));
+    const hour = paymentHourFormatter.format(new Date(payment.paidAt));
     hours.set(hour, (hours.get(hour) || 0) + 1);
     // Performance uses fulfilled sales from the history ledger, while cash totals recognize payment immediately.
     if (order.status !== "completed") continue;

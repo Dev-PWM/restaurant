@@ -11,7 +11,7 @@ if ! command -v npm >/dev/null 2>&1; then
   echo "No se encontró npm. Reinstala Node.js desde https://nodejs.org."
   exit 1
 fi
-if [ ! -d node_modules ] || [ ! -f node_modules/socket.io/package.json ] || [ ! -f node_modules/vite/package.json ]; then
+if [ ! -d node_modules ] || [ ! -f node_modules/socket.io/package.json ] || [ ! -f node_modules/vite/package.json ] || [ ! -f node_modules/@tailwindcss/vite/package.json ] || [ ! -f node_modules/@tailwindcss/cli/package.json ]; then
   echo "Preparando MasaFlow por primera vez. Se necesita Internet para instalar."
   npm ci --no-audit --no-fund
 fi

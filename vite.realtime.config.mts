@@ -1,7 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import path from "node:path";
-import tailwindcss from "tailwindcss";
-import autoprefixer from "autoprefixer";
+import tailwindcss from "@tailwindcss/vite";
 const repo = import.meta.dirname;
 const ports: Record<string, number> = {
   "client-web": 5173,
@@ -17,39 +16,12 @@ export default defineConfig(({ mode, command }) => {
   return {
     root,
     publicDir: false,
+    plugins: [tailwindcss()],
     base:
       command === "build"
         ? `/${mode === "client-web" ? "order" : mode === "business-pos" ? "pos" : "analytics"}/`
         : "/",
     resolve: { dedupe: ["react", "react-dom", "socket.io-client"] },
-    css: {
-      postcss: {
-        plugins: [
-          tailwindcss({
-            content: [
-              path.join(repo, "shared/ui/**/*.{ts,tsx}"),
-              path.join(repo, "apps/client-web/src/**/*.tsx"),
-              path.join(repo, "apps/business-pos/src/**/*.tsx"),
-              path.join(repo, "apps/analytics/src/content/realtime/**/*.tsx"),
-            ],
-            theme: {
-              extend: {
-                colors: {
-                  clay: {
-                    50: "#faf0eb",
-                    100: "#f3ded2",
-                    600: "#a64930",
-                    700: "#873822",
-                  },
-                  cream: "#f8f5ef",
-                },
-              },
-            },
-          }),
-          autoprefixer(),
-        ],
-      },
-    },
     server: {
       host: "0.0.0.0",
       port: ports[mode],

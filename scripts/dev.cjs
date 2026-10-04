@@ -4,6 +4,7 @@ const { spawn } = require("node:child_process");
 const path = require("node:path");
 const net = require("node:net");
 const root = path.join(__dirname, "..");
+const serviceVersion = require("../package.json").version;
 process.chdir(root);
 try {
   process.loadEnvFile();
@@ -27,16 +28,9 @@ async function available(port) {
 async function main() {
   if (!/^\d{4}$/.test(process.env.MASAFLOW_STAFF_PIN || ""))
     throw new Error("Configura MASAFLOW_STAFF_PIN en .env (4 dígitos).");
-  if (
-    !Number.isInteger(backendPort) ||
-    backendPort < 1 ||
-    backendPort > 65535 ||
-    [5173, 5174, 5175].includes(backendPort)
-  )
-    throw new Error(
-      "PORT debe ser un puerto válido distinto de 5173, 5174 y 5175.",
-    );
-  await Promise.all([backendPort, 5173, 5174, 5175].map(available));
+  if (!Number.isInteger(backendPort) || backendPort < 1 || backendPort > 65535)
+    throw new Error("PORT debe ser un puerto válido.");
+  await available(backendPort);
   const children = [],
     rootEnv = { ...process.env };
   let stopping = false;
@@ -53,46 +47,62 @@ async function main() {
   }
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"])
     process.once(signal, () => stop());
-  const launch = (args) => {
-    const child = spawn(process.execPath, args, {
-      cwd: root,
-      env: rootEnv,
-      stdio: "inherit",
+  const build = () =>
+    new Promise((resolve, reject) => {
+      const child = spawn(
+        process.platform === "win32" ? "npm.cmd" : "npm",
+        ["run", "build"],
+        {
+          cwd: root,
+          env: rootEnv,
+          stdio: "inherit",
+        },
+      );
+      children.push(child);
+      child.once("error", reject);
+      child.once("exit", (code) => {
+        children.splice(children.indexOf(child), 1);
+        if (stopping) return reject(new Error("Inicio cancelado."));
+        if (code !== 0)
+          return reject(new Error("No se pudieron compilar las aplicaciones."));
+        resolve();
+      });
     });
-    children.push(child);
-    child.once("error", (error) => {
-      console.error(error.message);
-      stop(1);
-    });
-    child.once("exit", (code) => {
-      if (!stopping) stop(code || 1);
-    });
-  };
-  launch(["server.js"]);
-  for (const workspace of ["client-web", "business-pos", "analytics"])
-    launch([
-      "node_modules/vite/bin/vite.js",
-      "--config",
-      "vite.realtime.config.mts",
-      "--mode",
-      workspace,
-    ]);
+  await build();
+  const child = spawn(process.execPath, ["server.js"], {
+    cwd: root,
+    env: rootEnv,
+    stdio: "inherit",
+  });
+  children.push(child);
+  child.once("error", (error) => {
+    console.error(error.message);
+    stop(1);
+  });
+  child.once("exit", (code) => {
+    if (!stopping) stop(code || 1);
+  });
   for (let attempt = 0; attempt < 120 && !stopping; attempt++) {
     try {
-      const results = await Promise.all(
-        [
-          `http://127.0.0.1:${backendPort}/api/health`,
-          ...[5173, 5174, 5175].map(
-            (port) => `http://127.0.0.1:${port}/realtime.html`,
-          ),
-        ].map((url) => fetch(url, { signal: AbortSignal.timeout(1000) })),
+      const [healthResponse, ...pages] = await Promise.all(
+        ["/api/health", "/order/", "/pos/", "/analytics/"].map((route) =>
+          fetch(`http://127.0.0.1:${backendPort}${route}`, {
+            signal: AbortSignal.timeout(1000),
+          }),
+        ),
       );
-      if (results.every((result) => result.ok)) {
+      const health = healthResponse.ok ? await healthResponse.json() : null;
+      if (
+        health?.service === "masaflow" &&
+        health.version === serviceVersion &&
+        health.status === "ready" &&
+        pages.every((page) => page.ok)
+      ) {
         console.log(
-          "\nMasaFlow listo. Mantén esta ventana abierta. Ctrl+C cierra todos los servicios.\nPOS: http://localhost:5174/realtime.html\nMenú: http://localhost:5173/realtime.html\nCaja: http://localhost:5175/realtime.html",
+          `\nMasaFlow listo. Mantén esta ventana abierta. Ctrl+C cierra el servicio.\nPOS: http://localhost:${backendPort}/pos/\nMenú: http://localhost:${backendPort}/order/\nCaja: http://localhost:${backendPort}/analytics/`,
         );
         if (process.argv.includes("--open") && process.platform === "darwin")
-          spawn("open", ["http://localhost:5174/realtime.html"], {
+          spawn("open", [`http://localhost:${backendPort}/pos/`], {
             stdio: "ignore",
           }).on("error", (error) =>
             console.error(`Abre el POS manualmente: ${error.message}`),
@@ -100,7 +110,7 @@ async function main() {
         return;
       }
     } catch {
-      /* Wait for all four owned processes to become ready. */
+      /* Wait for the backend and all compiled apps to become ready. */
     }
     await new Promise((resolve) => setTimeout(resolve, 500));
   }

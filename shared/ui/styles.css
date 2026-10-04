@@ -1,6 +1,16 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@theme {
+  --color-clay-50: #faf0eb;
+  --color-clay-100: #f3ded2;
+  --color-clay-600: #a64930;
+  --color-clay-700: #873822;
+  --color-cream: #f8f5ef;
+}
+@source "./components.tsx";
+@source "./RealtimeProvider.tsx";
+@source "../../apps/client-web/src";
+@source "../../apps/business-pos/src";
+@source "../../apps/analytics/src/content/realtime";
 @layer base {
   body {
     @apply m-0 bg-cream text-stone-900 antialiased;

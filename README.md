@@ -8,18 +8,18 @@ A local, cash-only restaurant suite built with **React, TypeScript, Tailwind CSS
 2. Double-click **`Start_MasaFlow.command`** in this folder. If macOS asks which app to use, choose Terminal.
 3. On first launch, dependencies are installed and you choose a private four-digit staff PIN. The launcher writes it to your local `.env` file.
 4. The POS opens automatically. Enter your PIN. Keep the Terminal window open while the restaurant is operating.
-5. Press **Ctrl+C**, or close the Terminal window, to stop the backend and all three frontend servers. The launcher stops only the processes it started; it never kills unrelated apps on a busy port.
+5. Press **Ctrl+C**, or close the Terminal window, to stop the service. The launcher stops only the process it started; it never kills unrelated apps on a busy port.
 
-Internet is needed for the first dependency installation. Afterwards the built apps and local backend work over the restaurant Wi-Fi without outside internet. Phones must reach the Mac on that network; use the Mac's LAN address, not `localhost`, on a phone.
+Internet is needed for the first dependency installation. The launcher builds the apps, then serves the compiled frontends and local backend over one port; after installation, the restaurant can operate over Wi-Fi without outside internet. Phones must reach the Mac on that network; use the Mac's LAN address, not `localhost`, on a phone.
 
-| Screen | Launcher / development URL |
+| Screen | Launcher URL (default port 3000) |
 |---|---|
-| Customer menu | `http://localhost:5173/realtime.html` |
-| POS and kitchen | `http://localhost:5174/realtime.html` |
-| Caja y ventas | `http://localhost:5175/realtime.html` |
+| Customer menu | `http://localhost:3000/order/` |
+| POS and kitchen | `http://localhost:3000/pos/` |
+| Caja y ventas | `http://localhost:3000/analytics/` |
 | Backend health | `http://localhost:3000/api/health` |
 
-The launcher checks ports first, waits for all services to respond, and then opens the browser. If a port is occupied, it reports the conflict without stopping that process. `PORT` changes the backend port; frontends use 5173–5175.
+The launcher checks the backend port first, builds all three frontends, waits for the service identity and each app route to respond, and then opens the browser. If the port is occupied, it reports the conflict without stopping that process. Set `PORT` to change the shared port.
 
 ## Manual start and production build
 

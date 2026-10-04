@@ -6,7 +6,10 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { isIP } = require("node:net");
 const { Server } = require("socket.io");
-const { createEngine, UUID, ensure } = require("./shared/realtime/engine.js");
+const realtime = require("./shared/realtime/engine.js");
+const { createEngine, UUID } = realtime;
+/** @type {typeof import("./shared/realtime/engine.js").ensure} */
+const ensure = realtime.ensure;
 const { acquireLock } = require("./shared/realtime/lock.js");
 /** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
 /** @typedef {import('./shared/types/realtime').Command} Command */
