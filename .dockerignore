@@ -7,3 +7,5 @@ apps/analytics/dist
 artifacts
 .DS_Store
 *.log
+.masaflow-realtime
+**/dist-realtime

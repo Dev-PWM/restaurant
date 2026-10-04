@@ -107,7 +107,7 @@ async function start({ config = configuration(), dryRun = false, openBrowser = t
   }
   return { action: existing.state === 'ready' ? 'reused' : 'started', url: config.url, workspaceId: config.workspaceId };
 }
-async function serve(config, { probe = probeHealth, createService = require('../server.js').createService } = {}) {
+async function serve(config, { probe = probeHealth, createService = require('../legacy-server.cjs').createService } = {}) {
   const existing = await probe(config);
   if (existing.state !== 'missing') {
     process.stderr.write(existing.state === 'ready' ? 'This MasaFlow data directory is already running. The login agent will remain idle.\n' : `Port ${config.port} is occupied. The login agent will remain idle; no service was stopped.\n`);

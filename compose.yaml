@@ -1,6 +1,8 @@
+# Trusted local deployment only. Public hosting requires a stronger access gateway.
 services:
   app:
     build: .
+    hostname: masaflow-local
     restart: unless-stopped
     init: true
     stop_grace_period: 40s
@@ -8,28 +10,11 @@ services:
     environment:
       MASAFLOW_HOST: 0.0.0.0
       PORT: 4173
-      MASAFLOW_DATA_DIR: /data
-      MASAFLOW_PUBLIC_ORIGIN: https://${MASAFLOW_DOMAIN:?Set MASAFLOW_DOMAIN in .env}
-      MASAFLOW_STAFF_PASSWORD: ${MASAFLOW_STAFF_PASSWORD:?Set MASAFLOW_STAFF_PASSWORD in .env}
+      MASAFLOW_DATA_DIR: /data/realtime
+      MASAFLOW_STAFF_PIN: ${MASAFLOW_STAFF_PIN:?Set MASAFLOW_STAFF_PIN in .env}
+    ports:
+      - "${MASAFLOW_BIND_IP:-127.0.0.1}:4173:4173"
     volumes:
       - restaurant-data:/data
-  web:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      MASAFLOW_DOMAIN: ${MASAFLOW_DOMAIN:?Set MASAFLOW_DOMAIN in .env}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      app:
-        condition: service_healthy
 volumes:
   restaurant-data:
-  caddy-data:
-  caddy-config:

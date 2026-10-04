@@ -2,7 +2,7 @@
 // Isolated browser acceptance. Requires Playwright on NODE_PATH (or PLAYWRIGHT_MODULE).
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const assert=require('node:assert/strict');const fs=require('node:fs/promises');const os=require('node:os');const path=require('node:path');
-const {createService}=require('../server.js');
+const {createService}=require('../legacy-server.cjs');
 (async()=>{
  const artifacts=process.env.MASAFLOW_QA_DIR||'artifacts/qa'; await fs.mkdir(artifacts,{recursive:true});
  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'masaflow-browser-'));const results=[];let browser,app,cashApp;
