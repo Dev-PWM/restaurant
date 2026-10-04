@@ -101,7 +101,48 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
         access.logout(req, res); streams.forEach((client, stream) => { if (!client.customer && !access.authorized(client.req)) stream.end(); });
         return json(res, 200, { authenticated: false });
       }
-      if (requestUrl.pathname.startsWith('/api/') && !requestUrl.pathname.startsWith('/api/customer/') && requestUrl.pathname !== '/api/health') access.require(req);
+      if (requestUrl.pathname.startsWith('/api/') && !requestUrl.pathname.startsWith('/api/customer/') && requestUrl.pathname !== '/api/health' && requestUrl.pathname !== '/api/recent-orders' && requestUrl.pathname !== '/api/transactions/recent') access.require(req);
+      if ((requestUrl.pathname === '/api/recent-orders' || requestUrl.pathname === '/api/transactions/recent') && req.method === 'GET') {
+        const verified = verifiedReceipts(engine.getState());
+        const sorted = [...verified.receipts].sort((a, b) => {
+          const timeA = Date.parse(a.payment?.paidAt || a.order?.paidAt || a.order?.createdAt || 0);
+          const timeB = Date.parse(b.payment?.paidAt || b.order?.paidAt || b.order?.createdAt || 0);
+          return timeB - timeA;
+        });
+        const limit = Math.min(Math.max(1, Number(requestUrl.searchParams.get('limit') || 10)), 50);
+        const lastTransactions = sorted.slice(0, limit).map(({ order, payment }) => ({
+          id: payment.id,
+          paymentId: payment.id,
+          orderId: order.id,
+          orderNumber: order.number,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone || null,
+          orderType: order.orderType,
+          tableNumber: order.tableNumber,
+          status: order.status,
+          currency: payment.currency,
+          totalCents: payment.totalCents,
+          tenderedCents: payment.tenderedCents,
+          changeCents: payment.changeCents,
+          method: payment.method,
+          paidAt: payment.paidAt,
+          cashierId: payment.cashierId,
+          drawerKickStatus: payment.drawerKickStatus,
+          itemCount: Array.isArray(order.items) ? order.items.reduce((acc, i) => acc + (i.quantity || 1), 0) : 0,
+          items: Array.isArray(order.items) ? order.items.map(item => ({
+            name: item.name,
+            quantity: item.quantity,
+            lineTotalCents: item.lineTotalCents,
+            options: Array.isArray(item.options) ? item.options.map(o => o.name) : []
+          })) : []
+        }));
+        return json(res, 200, {
+          transactions: lastTransactions,
+          count: lastTransactions.length,
+          total: verified.receipts.length,
+          updatedAt: new Date().toISOString()
+        });
+      }
       if (requestUrl.pathname === '/api/customer/state' && req.method === 'GET') return json(res, 200, customerState(engine.getState(), requestUrl.searchParams));
       if (requestUrl.pathname === '/api/customer/orders' && req.method === 'POST') {
         access.limitSubmission(req);

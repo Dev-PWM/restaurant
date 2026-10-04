@@ -400,7 +400,7 @@
         setText(el('other-items'), ranking.length > 5 ? `Showing the top 5 of ${ranking.length} items sold.` : '');
       }
       function renderRecent(state, receipts) {
-        const recent = [...receipts].sort((a, b) => new Date(b.payment.paidAt) - new Date(a.payment.paidAt)).slice(0, 8).map(receipt => {
+        const recent = [...receipts].sort((a, b) => new Date(b.payment.paidAt) - new Date(a.payment.paidAt)).slice(0, 10).map(receipt => {
           const order = receipt.order;
           const paidAt = period === 'day' ? UI.time(receipt.payment.paidAt) : new Intl.DateTimeFormat(LOCALE(), { timeZone: state.settings.timeZone, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(receipt.payment.paidAt));
           return {
