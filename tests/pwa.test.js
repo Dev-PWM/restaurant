@@ -47,6 +47,7 @@ test("quick UI feedback animations stay brief and honor reduced motion", () => {
   assert.match(pos, /duration: 220/);
   assert.match(pos, /function TicketSkeleton/);
   assert.match(pos, /card\.animate/);
+  assert.doesNotMatch(pos, /BatchingView|Lotes de Cocina|Agrupar por/);
 
   const customer = fs.readFileSync(
     path.join(repo, "apps/client-web/src/pages/OrderStatus.tsx"),
@@ -59,7 +60,6 @@ test("quick UI feedback animations stay brief and honor reduced motion", () => {
 test("digital order tracking and pickup payment contain no print controls", () => {
   const files = [
     "apps/business-pos/src/pages/LiveOrders.tsx",
-    "apps/business-pos/src/pages/BatchingView.tsx",
     "apps/client-web/src/pages/OrderStatus.tsx",
     "apps/analytics/src/content/realtime/Analytics.tsx",
     "shared/ui/components.tsx",

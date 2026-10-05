@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
-  Boxes,
   Check,
   ChefHat,
   Clock3,
@@ -16,7 +15,6 @@ import {
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
-import { BatchingView } from "./BatchingView";
 import {
   chime,
   EmptyState,
@@ -707,9 +705,7 @@ export function LiveOrders() {
     [pausing, setPausing] = useState(false),
     [kitchenOnly, setKitchenOnly] = useState(false),
     [showComalDetails, setShowComalDetails] = useState(false),
-    [activeTab, setActiveTab] = useState<
-      "queue" | "batching" | "completed"
-    >("queue"),
+    [activeTab, setActiveTab] = useState<"queue" | "completed">("queue"),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
@@ -951,9 +947,7 @@ export function LiveOrders() {
             <p className="mt-3 text-stone-600">
               {activeTab === "queue"
                 ? `${snapshot.activeOrders.length} pedidos en fila · Solo efectivo, siempre al mostrador.`
-                : activeTab === "batching"
-                  ? `Agrupación por estaciones y tipos de platillo · ${cookingOrders.length} comandas en preparación.`
-                  : `${snapshot.completedOrders.filter((o) => o.status === "completed").length} pedidos entregados en este turno.`}
+                : `${snapshot.completedOrders.filter((o) => o.status === "completed").length} pedidos entregados en este turno.`}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -981,7 +975,7 @@ export function LiveOrders() {
           </div>
         </div>
 
-        {/* Tab switcher: En Fila vs Lotes vs Completados */}
+        {/* Tab switcher: En Fila vs Completados */}
         <div className="mb-6 flex border-b border-stone-200" role="tablist">
           <button
             role="tab"
@@ -1003,28 +997,6 @@ export function LiveOrders() {
               }`}
             >
               {snapshot.activeOrders.length}
-            </span>
-          </button>
-          <button
-            role="tab"
-            aria-selected={activeTab === "batching"}
-            className={`flex items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors ${
-              activeTab === "batching"
-                ? "border-clay-600 text-clay-800"
-                : "border-transparent text-stone-500 hover:text-stone-800"
-            }`}
-            onClick={() => setActiveTab("batching")}
-          >
-            <Boxes size={16} />
-            <span>Lotes de Cocina (Batching)</span>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-black ${
-                activeTab === "batching"
-                  ? "bg-amber-100 text-amber-900"
-                  : "bg-stone-100 text-stone-600"
-              }`}
-            >
-              {cookingOrders.length}
             </span>
           </button>
           <button
@@ -1056,12 +1028,6 @@ export function LiveOrders() {
 
         {activeTab === "completed" ? (
           <CompletedOrdersSection orders={snapshot.completedOrders} />
-        ) : activeTab === "batching" ? (
-          <BatchingView
-            orders={snapshot.activeOrders}
-            command={command}
-            connected={connected}
-          />
         ) : (
           <>
             {comalSummary.totalPieces > 0 && (
