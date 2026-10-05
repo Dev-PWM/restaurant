@@ -117,6 +117,11 @@
       transform: translateY(0);
     }
   }
+  @keyframes masaflow-hazard-stripes {
+    to {
+      background-position: 34px 0;
+    }
+  }
   .animate-bump {
     animation: masaflow-bump 200ms ease-out;
   }
@@ -125,5 +130,19 @@
   }
   .animate-ready-rise {
     animation: masaflow-ready-rise 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .simulator-hazard-stripes {
+    background-image: repeating-linear-gradient(
+      45deg,
+      #facc15 0 12px,
+      #171717 12px 24px
+    );
+    background-size: 34px 34px;
+    animation: masaflow-hazard-stripes 700ms linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .simulator-hazard-stripes {
+      animation: none;
+    }
   }
 }

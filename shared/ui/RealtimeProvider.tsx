@@ -52,6 +52,7 @@ function session() {
 interface ContextValue {
   snapshot: Snapshot | null;
   connected: boolean;
+  suspended: boolean;
   sessionId: string;
   error: string;
   clearError: () => void;
@@ -61,6 +62,8 @@ interface ContextValue {
   ) => Promise<Reply>;
   login: (pin: string) => Promise<boolean>;
   logout: () => void;
+  suspendRealtime: () => void;
+  resumeRealtime: () => void;
 }
 const Context = createContext<ContextValue | null>(null);
 export function RealtimeProvider({
@@ -73,6 +76,7 @@ export function RealtimeProvider({
   const [sessionId] = useState(session),
     [snapshot, setSnapshot] = useState<Snapshot | null>(null),
     [connected, setConnected] = useState(false),
+    [suspended, setSuspended] = useState(false),
     [error, setError] = useState("");
   const socketRef = useRef<AppSocket | null>(null);
   useEffect(() => {
@@ -148,20 +152,21 @@ export function RealtimeProvider({
       socket.disconnect();
     };
     const online = () => {
-      socket.connect();
+      if (!suspended) socket.connect();
     };
     window.addEventListener("offline", offline);
     window.addEventListener("online", online);
-    if (navigator.onLine) socket.connect();
+    if (!suspended && navigator.onLine) socket.connect();
     return () => {
       cancelRetry();
+      setConnected(false);
       window.removeEventListener("offline", offline);
       window.removeEventListener("online", online);
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [sessionId, staff]);
+  }, [sessionId, staff, suspended]);
   async function command<K extends Command>(
     event: K,
     payload: Commands[K],
@@ -224,20 +229,33 @@ export function RealtimeProvider({
     if (socket) {
       socket.auth = { sessionId, token: "" };
       if (socket.connected) socket.emit("staff_logout", () => {});
-      socket.disconnect().connect();
+      socket.disconnect();
+      if (!suspended) socket.connect();
     }
     setSnapshot(null);
     setConnected(false);
+  }
+  function suspendRealtime() {
+    setSuspended(true);
+    setSnapshot(null);
+    setConnected(false);
+  }
+  function resumeRealtime() {
+    setSnapshot(null);
+    setSuspended(false);
   }
   return (
     <Context.Provider
       value={{
         snapshot,
         connected,
+        suspended,
         sessionId,
         command,
         login,
         logout,
+        suspendRealtime,
+        resumeRealtime,
         error,
         clearError: () => setError(""),
       }}

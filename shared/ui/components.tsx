@@ -37,10 +37,10 @@ export function appLink(app: "order" | "pos" | "analytics") {
     : `/${app}/`;
 }
 export function ConnectionBanner() {
-  const { connected, error, clearError } = useRealtime();
+  const { connected, suspended, error, clearError } = useRealtime();
   return (
     <>
-      {!connected && (
+      {!connected && !suspended && (
         <div
           role="alert"
           className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-red-800 p-3 font-bold text-white"
@@ -101,8 +101,9 @@ export function PWAServiceWorker() {
   return null;
 }
 export function PWAInstallButton() {
-  const [installPrompt, setInstallPrompt] =
-    useState<InstallPromptEvent | null>(() => deferredInstallPrompt);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(
+    () => deferredInstallPrompt,
+  );
   const [ios, setIos] = useState(false);
   const [installed, setInstalled] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -170,7 +171,7 @@ export function Modal({
   children: ReactNode;
   onClose: () => void;
 }) {
-  const { connected, error } = useRealtime();
+  const { connected, suspended, error } = useRealtime();
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     ref.current?.showModal();
@@ -190,7 +191,7 @@ export function Modal({
           <X size={18} />
         </button>
       </header>
-      {!connected && (
+      {!connected && !suspended && (
         <p
           role="alert"
           className="bg-red-800 p-3 text-center font-bold text-white"
@@ -426,7 +427,7 @@ export function StaffHeader({
   page: "pos" | "analytics";
   children?: ReactNode;
 }) {
-  const { snapshot, connected, logout } = useRealtime();
+  const { snapshot, connected, suspended, logout } = useRealtime();
   return (
     <header className="border-b border-stone-200 bg-white">
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-4 px-5 py-4 lg:px-8">
@@ -450,11 +451,17 @@ export function StaffHeader({
         </nav>
         <div className="flex flex-wrap items-center gap-3">
           <span
-            className={`flex items-center gap-1.5 text-xs font-semibold ${connected ? "text-emerald-800" : "text-red-700"}`}
+            className={`flex items-center gap-1.5 text-xs font-semibold ${suspended ? "text-amber-800" : connected ? "text-emerald-800" : "text-red-700"}`}
           >
-            {connected ? <Wifi size={15} /> : <WifiOff size={15} />}{" "}
-            {connected ? "En vivo" : "Sin Conexión"}
-            {snapshot && (
+            {suspended ? (
+              <Volume1 size={15} />
+            ) : connected ? (
+              <Wifi size={15} />
+            ) : (
+              <WifiOff size={15} />
+            )}{" "}
+            {suspended ? "Simulador" : connected ? "En vivo" : "Sin Conexión"}
+            {snapshot && !suspended && (
               <span className="hidden font-normal text-stone-500 xl:inline">
                 · {time(snapshot.observedAt)}
               </span>

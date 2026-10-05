@@ -13,8 +13,12 @@ test("demo order advances and settles entirely as local sample data", async () =
 
   const review = createDemoOrder(created);
   assert.equal(review.status, "review");
-  assert.equal(review.totalCents, 8000);
-  assert.equal(review.items[0].quantity, 2);
+  assert.equal(review.totalCents, 18500);
+  assert.equal(review.items[0].quantity, 3);
+  assert.deepEqual(
+    review.items[0].modifiers.map((modifier) => modifier.name),
+    ["Sin queso", "Extra salsa"],
+  );
 
   const cooking = advanceDemoOrder(review, accepted);
   const ready = advanceDemoOrder(cooking, readyAt);
@@ -24,9 +28,25 @@ test("demo order advances and settles entirely as local sample data", async () =
   assert.equal(ready.status, "ready");
   assert.equal(completed.status, "completed");
   assert.equal(completed.transaction.tenderedCents, 20000);
-  assert.equal(completed.transaction.changeCents, 12000);
+  assert.equal(completed.transaction.changeCents, 1500);
   assert.equal(review.status, "review");
   assert.equal(review.transaction, null);
+});
+
+test("rush challenge creates five distinct local training tickets", async () => {
+  const { createRushOrders } = await simulator;
+  const orders = createRushOrders(new Date("2026-10-05T12:00:00.000Z"));
+
+  assert.equal(orders.length, 5);
+  assert.equal(new Set(orders.map((order) => order.id)).size, 5);
+  assert.ok(orders.every((order) => order.status === "review"));
+  assert.ok(
+    orders.every((order) =>
+      order.items[0].modifiers.some(
+        (modifier) => modifier.name === "Sin queso",
+      ),
+    ),
+  );
 });
 
 test("demo settlement rejects unpaid and under-tendered orders", async () => {

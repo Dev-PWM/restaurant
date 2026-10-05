@@ -4,27 +4,58 @@
  * @typedef {import("../../../shared/types/realtime").Order} Order
  */
 
-/** @param {Date} [now] @returns {Order} */
-export function createDemoOrder(now = new Date()) {
+/**
+ * @param {Date} [now]
+ * @param {{number?: number, id?: string}} [options]
+ * @returns {Order}
+ */
+export function createDemoOrder(now = new Date(), options = {}) {
+  const number = options.number ?? 1;
+  const id = options.id ?? `demo-order-${String(number).padStart(3, "0")}`;
+  const itemScale = 1 + ((number - 1) % 3);
+  const items = [
+    {
+      menuItemId: "demo-gordita-chicharron",
+      name: "Gordita de chicharrón",
+      quantity: 3 * itemScale,
+      modifiers: [
+        {
+          id: "demo-no-cheese",
+          name: "Sin queso",
+          priceCents: 0,
+          available: true,
+          kind: "omit",
+        },
+        {
+          id: "demo-extra-salsa",
+          name: "Extra salsa",
+          priceCents: 0,
+          available: true,
+          kind: "extra",
+        },
+      ],
+      unitPriceCents: 4500,
+      lineTotalCents: 4500 * 3 * itemScale,
+    },
+    {
+      menuItemId: "demo-sope",
+      name: "Sope",
+      quantity: 2 * itemScale,
+      modifiers: [],
+      unitPriceCents: 2500,
+      lineTotalCents: 2500 * 2 * itemScale,
+    },
+  ];
   return {
-    id: "demo-order-001",
+    id,
     sessionId: "demo-session",
     shiftId: "demo-shift",
     fingerprint: "demo-order",
-    number: 1,
+    number,
     customerName: "María (Demo)",
     status: "review",
-    items: [
-      {
-        menuItemId: "demo-sope-asada",
-        name: "Sopes de asada",
-        quantity: 2,
-        modifiers: [],
-        unitPriceCents: 4000,
-        lineTotalCents: 8000,
-      },
-    ],
-    totalCents: 8000,
+    items,
+    totalCents: items.reduce((sum, item) => sum + item.lineTotalCents, 0),
     createdAt: now.toISOString(),
     acceptedAt: null,
     paidAt: null,
@@ -67,7 +98,7 @@ export function payDemoOrder(order, tenderedCents, now = new Date()) {
     paidAt,
     completedAt: paidAt,
     transaction: {
-      id: "demo-payment-001",
+      id: `demo-payment-${order.id}`,
       orderId: order.id,
       paidAt,
       totalCents: order.totalCents,
@@ -77,6 +108,19 @@ export function payDemoOrder(order, tenderedCents, now = new Date()) {
       currency: "MXN",
     },
   };
+}
+
+/**
+ * @param {Date} [now]
+ * @returns {Order[]}
+ */
+export function createRushOrders(now = new Date()) {
+  return Array.from({ length: 5 }, (_, index) =>
+    createDemoOrder(now, {
+      number: index + 1,
+      id: `rush-order-${String(index + 1).padStart(3, "0")}`,
+    }),
+  );
 }
 
 /** @param {Order} order @returns {Order} */
