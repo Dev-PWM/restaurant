@@ -186,18 +186,18 @@ export function Menu() {
     );
   }
 
-  // When kitchen is paused
+  // Pausing web orders only hides the public menu; existing orders remain active.
   if (!snapshot.acceptingOrders) {
     return (
       <div className="mx-auto flex min-h-[90dvh] max-w-lg flex-col items-center justify-center p-8 text-center">
         <Brand />
         <ChefHat className="my-8 text-clay-600 animate-pulse" size={64} />
-        <h1 className="display text-4xl">La cocina está a tope.</h1>
+        <h1 className="display text-4xl">Pedidos por internet pausados.</h1>
         <p className="mt-5 text-xl text-stone-600">
-          Por favor, ordena directamente en el mostrador.
+          Puedes ordenar directamente en el mostrador. Tus pedidos existentes siguen en curso.
         </p>
         <p className="mt-8 text-sm text-stone-500">
-          Gracias por tu paciencia. Este menú volverá automáticamente.
+          Este menú volverá a estar disponible cuando se reanuden los pedidos web.
         </p>
       </div>
     );

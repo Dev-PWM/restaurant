@@ -167,6 +167,26 @@ test("transition validation requires staff acceptance, cooking, pickup, and paym
   );
   assert.equal(engine.getState().completedOrders.length, 1);
 });
+test("pausing web orders blocks new customer orders without stopping existing kitchen or cashier work", (t) => {
+  const { engine } = fixture(t);
+  const { orderId } = submit(engine);
+
+  engine.dispatch("pos_toggle_accepting_orders", { acceptingOrders: false });
+
+  assert.equal(engine.getState().activeOrders[0].status, "review");
+  assert.throws(
+    () => engine.dispatch("submit_client_order", input(engine)),
+    (error) => error.code === "ORDERS_PAUSED",
+  );
+
+  engine.dispatch("pos_update_status", { orderId, status: "cooking" });
+  engine.dispatch("pos_update_status", { orderId, status: "ready" });
+  engine.dispatch("pos_order_paid", { orderId, tenderedCents: 20000 });
+
+  assert.equal(engine.getState().activeOrders.length, 0);
+  assert.equal(engine.getState().completedOrders[0].status, "completed");
+  assert.equal(engine.getState().salesMetrics.revenueCents, 19000);
+});
 test("order idempotency survives restart, stock changes, and pause; conflicts reject", (t) => {
   const { engine, directory } = fixture(t);
   const order = submit(engine);
@@ -204,7 +224,7 @@ test("order idempotency survives restart, stock changes, and pause; conflicts re
   );
   assert.throws(
     () => recovered.dispatch("submit_client_order", input(recovered)),
-    /tope/,
+    (error) => error.code === "ORDERS_PAUSED",
   );
 });
 test("sold-out modifiers, missing required masa and malformed carts fail at the server boundary", (t) => {

@@ -452,7 +452,7 @@ function createEngine({ directory, persist = writeAtomic }) {
       );
       ensure(
         next.acceptingOrders,
-        "La cocina está a tope. Ordena en el mostrador.",
+        "Los pedidos por internet están pausados. Ordena en el mostrador.",
         "ORDERS_PAUSED",
       );
       ensure(

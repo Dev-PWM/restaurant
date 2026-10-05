@@ -953,7 +953,9 @@ export function LiveOrders() {
           }}
         >
           {snapshot.acceptingOrders ? <Pause size={16} /> : <Play size={16} />}
-          Pausar Pedidos Web
+          {snapshot.acceptingOrders
+            ? "Pausar pedidos web"
+            : "Reanudar pedidos web"}
         </button>
       </StaffHeader>
       {activeTab === "queue" && (
@@ -1161,11 +1163,6 @@ export function LiveOrders() {
               </section>
             )}
 
-            {!snapshot.acceptingOrders && (
-              <div className="mb-5 rounded-xl bg-amber-100 p-4 font-semibold text-amber-950">
-                Pedidos web pausados. Los pedidos existentes siguen en cocina.
-              </div>
-            )}
             <div
               ref={boardRef}
               className={`grid items-start gap-5 ${
