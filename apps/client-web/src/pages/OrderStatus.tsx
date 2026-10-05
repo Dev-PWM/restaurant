@@ -228,7 +228,8 @@ export function OrderStatus({
                   ¡Pasa al mostrador a recoger tu charola!
                 </strong>
                 <p className="text-xs text-emerald-900">
-                  Muestra tu número <strong>{orderLabel(order)}</strong> ({order.customerName}) y paga en efectivo al recogerlo.
+                  Muestra tu número <strong>{orderLabel(order)}</strong> ({order.customerName}) y paga{" "}
+                  <strong>{mxn(order.totalCents)} MXN</strong> en caja para recogerlo.
                 </p>
               </div>
             )}

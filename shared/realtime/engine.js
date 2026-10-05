@@ -616,9 +616,9 @@ function createEngine({ directory, persist = writeAtomic }) {
       } else if (event === "pos_mark_noshow") {
         if (order.status === "no_show") return { ok: true };
         ensure(
-          ["review", "cooking", "ready"].includes(order.status) &&
+          ["review", "ready"].includes(order.status) &&
             !order.transaction,
-          "Solo puedes cancelar o marcar como No-Show un pedido sin cobrar.",
+          "Solo puedes anular pedidos sin cobrar que estén en revisión o listos para recoger.",
         );
         order.status = "no_show";
         finish(order, next);

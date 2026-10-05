@@ -51,7 +51,7 @@ Docker execution has not been verified on this workstation; the local Node runti
 - **Propinas:** en el cobro, selecciona **El cliente deja el cambio como propina** solo cuando el cliente lo pida. El excedente queda como propina, el cambio pasa a cero y la venta de comida conserva su importe. Cambiar el efectivo recibido desactiva esa selección para evitar propinas accidentales.
 - **Cocinando:** accepting the order starts preparation and updates the customer's live tracking screen. Modifiers are explicit: red omissions, green extras, neutral masa choices. Tickets age to amber at five minutes and pulse red at ten.
 - **Lista para recoger:** tap **Marcar lista para recoger** to notify the customer in the app; customers can opt into browser notifications and hear the ready chime. At pickup, use **Cobrar al entregar** to calculate change and record cash; successful payment also records the handoff.
-- **Cancelar / No-Show:** an uncollected, unpaid ticket can be cancelled from the queue and stays in digital history with zero sales.
+- **Anular / No-Show:** an unpaid ticket can be voided while in review or after it is ready for pickup; its items remain in digital history, but it adds no revenue or sold-item totals. Cooking tickets must finish or be marked ready first.
 - **Sin impresora ni periféricos:** tickets, receipts, payment calculations, and shift records stay in the app; the workflow does not send print or cash-drawer commands.
 - **Inventario:** toggle dishes or modifiers. Every connected customer sees **Agotado** immediately. The server also rejects stale carts containing unavailable choices.
 - **Pausar Pedidos Web:** customers see “La cocina está a tope. Por favor, ordena directamente en el mostrador.” Existing orders remain trackable.

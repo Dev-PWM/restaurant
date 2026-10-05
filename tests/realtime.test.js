@@ -118,11 +118,23 @@ test("no-show leaves the queue, remains in history, never contributes to cash or
   const order = submit(engine);
   engine.dispatch("pos_mark_noshow", { orderId: order.orderId });
   engine.dispatch("pos_mark_noshow", { orderId: order.orderId });
+  const readyOrder = submit(engine);
+  engine.dispatch("pos_update_status", {
+    orderId: readyOrder.orderId,
+    status: "cooking",
+  });
+  engine.dispatch("pos_update_status", {
+    orderId: readyOrder.orderId,
+    status: "ready",
+  });
+  engine.dispatch("pos_mark_noshow", { orderId: readyOrder.orderId });
   const state = engine.getState();
   assert.equal(state.activeOrders.length, 0);
-  assert.equal(state.completedOrders.length, 1);
+  assert.equal(state.completedOrders.length, 2);
   assert.equal(state.completedOrders[0].status, "no_show");
-  assert.equal(state.salesMetrics.noShows, 1);
+  assert.equal(state.completedOrders[0].items[0].quantity, 2);
+  assert.equal(state.completedOrders[1].status, "no_show");
+  assert.equal(state.salesMetrics.noShows, 2);
   assert.equal(state.salesMetrics.revenueCents, 0);
   assert.equal(state.salesMetrics.itemPerformance.length, 0);
   assert.throws(() => pay(engine, order.orderId), /listo para entregar/);
@@ -139,6 +151,10 @@ test("transition validation requires staff acceptance, cooking, pickup, and paym
     /listo para entregar/,
   );
   engine.dispatch("pos_update_status", { orderId, status: "cooking" });
+  assert.throws(
+    () => engine.dispatch("pos_mark_noshow", { orderId }),
+    /revisión|listo para recoger/,
+  );
   engine.dispatch("pos_update_status", { orderId, status: "ready" });
   pay(engine, orderId);
   assert.throws(

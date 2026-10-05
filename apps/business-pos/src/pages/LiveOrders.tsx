@@ -183,12 +183,16 @@ export function TicketCard({
   const formattedTimer = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   const isCooking = order.status === "cooking";
-  const aging = isCooking && minutes >= 10;
+  const isReview = order.status === "review";
+  const aging =
+    (isReview && elapsedSeconds > 180) ||
+    (isCooking && elapsedSeconds > 900);
   const isWarning =
-    (isCooking && minutes >= 5) || (order.status === "review" && minutes >= 8);
+    (isCooking && minutes >= 5) || (isReview && minutes >= 2);
+  const agingLimitSeconds = isReview ? 180 : 900;
   const progressPercent = Math.min(
     100,
-    Math.max(4, Math.round((elapsedSeconds / 600) * 100)),
+    Math.max(4, Math.round((elapsedSeconds / agingLimitSeconds) * 100)),
   );
   async function advance() {
     setBusy(true);
@@ -292,14 +296,23 @@ export function TicketCard({
           <strong>{mxn(order.totalCents)}</strong>
         </div>
         {order.status === "review" ? (
-          <button
-            className="btn btn-primary mt-4 w-full"
-            disabled={!connected || busy}
-            onClick={() => void advance()}
-          >
-            <Check size={17} />
-            Aceptar y empezar a cocinar
-          </button>
+          <>
+            <button
+              className="btn btn-primary mt-4 w-full"
+              disabled={!connected || busy}
+              onClick={() => void advance()}
+            >
+              <Check size={17} />
+              Aceptar y empezar a cocinar
+            </button>
+            <button
+              className="btn btn-danger mt-2 w-full"
+              disabled={!connected || busy}
+              onClick={() => setNoShow(true)}
+            >
+              Anular pedido / No-Show
+            </button>
+          </>
         ) : order.status === "ready" ? (
           <>
             <button
@@ -315,7 +328,7 @@ export function TicketCard({
               disabled={!connected || busy}
               onClick={() => setNoShow(true)}
             >
-              Cancelar / No-Show
+              Anular pedido / No-Show
             </button>
           </>
         ) : (
@@ -329,10 +342,14 @@ export function TicketCard({
           </button>
         )}
         {noShow && (
-          <Modal title="¿Marcar como No-Show?" onClose={() => setNoShow(false)}>
+          <Modal
+            title="¿Anular pedido / marcar No-Show?"
+            onClose={() => setNoShow(false)}
+          >
             <p className="mb-5">
               Se quitará {orderLabel(order)} de la fila. El historial conservará
-              el pedido como cancelado / No-Show, sin ingreso de efectivo.
+              sus platillos y cantidades como No-Show; no se registrará ningún
+              ingreso de efectivo.
             </p>
             <div className="flex gap-3">
               <button className="btn flex-1" onClick={() => setNoShow(false)}>
@@ -350,7 +367,7 @@ export function TicketCard({
                   if (reply.ok) setNoShow(false);
                 }}
               >
-                Confirmar cancelación
+                Confirmar No-Show
               </button>
             </div>
           </Modal>
