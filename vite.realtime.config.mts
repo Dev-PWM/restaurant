@@ -15,7 +15,7 @@ export default defineConfig(({ mode, command }) => {
     loadEnv(mode, repo, "MASAFLOW_").MASAFLOW_DATA_DIR;
   return {
     root,
-    publicDir: false,
+    publicDir: path.join(repo, "shared/pwa"),
     plugins: [tailwindcss()],
     base:
       command === "build"

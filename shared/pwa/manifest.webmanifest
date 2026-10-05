@@ -1,0 +1,19 @@
+{
+  "id": "./",
+  "name": "MasaFlow",
+  "short_name": "MasaFlow",
+  "description": "Pedidos y operación de restaurante en tiempo real.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f5ef",
+  "theme_color": "#a64930",
+  "icons": [
+    {
+      "src": "./masaflow.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

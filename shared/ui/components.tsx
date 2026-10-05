@@ -66,6 +66,97 @@ export function ConnectionBanner() {
     </>
   );
 }
+interface InstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+}
+let deferredInstallPrompt: InstallPromptEvent | null = null;
+const installPromptListeners = new Set<
+  (event: InstallPromptEvent | null) => void
+>();
+function updateInstallPrompt(event: InstallPromptEvent | null) {
+  deferredInstallPrompt = event;
+  for (const listener of installPromptListeners) listener(event);
+}
+if (typeof window !== "undefined")
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    updateInstallPrompt(event as InstallPromptEvent);
+  });
+export function PWAServiceWorker() {
+  useEffect(() => {
+    if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+    void navigator.serviceWorker
+      .register(`${import.meta.env.BASE_URL}sw.js`, {
+        scope: import.meta.env.BASE_URL,
+      })
+      .catch((error: unknown) =>
+        console.error("MasaFlow service worker registration failed.", error),
+      );
+  }, []);
+  return null;
+}
+export function PWAInstallButton() {
+  const [installPrompt, setInstallPrompt] =
+    useState<InstallPromptEvent | null>(() => deferredInstallPrompt);
+  const [ios, setIos] = useState(false);
+  const [installed, setInstalled] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  useEffect(() => {
+    setIos(
+      window.isSecureContext &&
+        (/iphone|ipad|ipod/i.test(navigator.userAgent) ||
+          (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)),
+    );
+    const standalone = window.matchMedia("(display-mode: standalone)");
+    setInstalled(
+      standalone.matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true,
+    );
+    const onInstalled = () => {
+      setInstalled(true);
+      updateInstallPrompt(null);
+    };
+    installPromptListeners.add(setInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    standalone.addEventListener("change", onInstalled);
+    return () => {
+      installPromptListeners.delete(setInstallPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+      standalone.removeEventListener("change", onInstalled);
+    };
+  }, []);
+  if (installed || (!installPrompt && !ios)) return null;
+  return (
+    <>
+      <button
+        type="button"
+        className="btn min-h-11 px-3"
+        onClick={async () => {
+          if (installPrompt) {
+            await installPrompt.prompt();
+            const choice = await installPrompt.userChoice;
+            updateInstallPrompt(null);
+            if (choice.outcome === "accepted") setInstalled(true);
+          } else {
+            setShowHelp(true);
+          }
+        }}
+      >
+        Instalar app
+      </button>
+      {showHelp && (
+        <Modal title="Instalar MasaFlow" onClose={() => setShowHelp(false)}>
+          <p>
+            En Safari, pulsa <strong>Compartir</strong> y elige{" "}
+            <strong>Añadir a pantalla de inicio</strong> para abrir MasaFlow
+            como una aplicación.
+          </p>
+        </Modal>
+      )}
+    </>
+  );
+}
 export function Modal({
   title,
   children,
@@ -328,6 +419,7 @@ export function StaffHeader({
               </span>
             )}
           </span>
+          <PWAInstallButton />
           {children}
           <button className="btn" onClick={logout} aria-label="Bloquear sesión">
             <LockKeyhole size={16} />

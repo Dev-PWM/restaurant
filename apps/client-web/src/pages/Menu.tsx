@@ -19,11 +19,13 @@ import {
   enableAudio,
   Modal,
   mxn,
+  PWAInstallButton,
   Quantity,
 } from "../../../../shared/ui/components";
 import { OrderStatus } from "./OrderStatus";
 export const activeKey = "masaflow.v3.orderId",
-  pendingKey = "masaflow.v3.pending";
+  pendingKey = "masaflow.v3.pending",
+  pendingTotalKey = "masaflow.v3.pendingTotalCents";
 type CartLine = OrderInput["items"][number];
 export function itemAvailable(
   item: MenuItem,
@@ -159,6 +161,10 @@ export function Menu() {
     [category, setCategory] = useState("Todo");
   const [activeId, setActiveId] = useState(() => readStorage(activeKey)),
     [pending, setPending] = useState(restoredPending),
+    [pendingTotalCents, setPendingTotalCents] = useState(() => {
+      const value = Number(readStorage(pendingTotalKey));
+      return Number.isSafeInteger(value) && value >= 0 ? value : null;
+    }),
     [busy, setBusy] = useState(false),
     [localError, setLocalError] = useState("");
   useEffect(() => {
@@ -170,11 +176,28 @@ export function Menu() {
   const order = orders.find(
     (o) => o.id === activeId || o.id === pending?.orderId,
   );
+  const pendingExpired = pending && pending.shiftId !== snapshot?.shiftId;
+  const pendingEstimate = pending && snapshot
+    ? pending.items.reduce((sum, line) => {
+        const item = snapshot.menuItems.find((entry) => entry.id === line.menuItemId);
+        const modifiers = line.modifierIds.reduce(
+          (amount, id) =>
+            amount +
+            (snapshot.modifiers.find((modifier) => modifier.id === id)
+              ?.priceCents || 0),
+          0,
+        );
+        return sum + ((item?.priceCents || 0) + modifiers) * line.quantity;
+      }, 0)
+      : null;
+  const pendingTotal = pendingTotalCents ?? pendingEstimate ?? 0;
   useEffect(() => {
     if (order) {
       setActiveId(order.id);
       setPending(null);
       writeStorage(pendingKey, null);
+      setPendingTotalCents(null);
+      writeStorage(pendingTotalKey, null);
       setCart([]);
     }
   }, [order?.id]);
@@ -192,12 +215,67 @@ export function Menu() {
         onNewOrder={() => {
           setActiveId(null);
           setPending(null);
+          setPendingTotalCents(null);
           setCheckout(false);
           setCart([]);
           writeStorage(activeKey, null);
           writeStorage(pendingKey, null);
+          writeStorage(pendingTotalKey, null);
         }}
       />
+    );
+  if (pending && snapshot)
+    return (
+      <div className="min-h-screen bg-stone-50 px-5 py-7">
+        <main className="mx-auto max-w-lg">
+          <header className="flex flex-wrap items-center justify-between gap-3">
+            <Brand />
+            <PWAInstallButton />
+          </header>
+          <section className="py-10 text-center" aria-live="polite">
+            <p className="eyebrow mb-2">Tu pedido</p>
+            <h1 className="display text-4xl">
+              {pendingExpired ? "Consulta en el mostrador." : "Estamos confirmando."}
+            </h1>
+            <p
+              role="status"
+              className="my-6 rounded-xl border border-amber-300 bg-amber-100 p-5 text-left font-semibold text-amber-950"
+            >
+              {pendingExpired
+                ? "El turno anterior cerró. Consulta al mostrador antes de volver a pedir."
+                : `Tu orden está en pausa. Paga ${mxn(pendingTotal || 0)} MXN en el mostrador para que empecemos a cocinar.`}
+            </p>
+            {!pendingExpired && (
+              <p className="mb-5 text-sm text-stone-600">
+                {busy
+                  ? "Estamos enviando tu pedido. Conserva esta pantalla."
+                  : "Si no aparece la orden, puedes verificarla con la misma referencia."}
+              </p>
+            )}
+            {pendingExpired ? (
+              <button
+                className="btn w-full"
+                onClick={() => {
+                  setPending(null);
+                  setPendingTotalCents(null);
+                  writeStorage(pendingKey, null);
+                  writeStorage(pendingTotalKey, null);
+                }}
+              >
+                Entendido, volver al menú
+              </button>
+            ) : (
+              <button
+                className="btn btn-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!connected || busy}
+                onClick={() => void submit()}
+              >
+                {busy ? "Enviando…" : "Verificar y reintentar"}
+              </button>
+            )}
+          </section>
+        </main>
+      </div>
     );
   if (activeId)
     return (
@@ -259,7 +337,6 @@ export function Menu() {
     (sum, line) => sum + price(line) * line.quantity,
     0,
   );
-  const pendingExpired = pending && pending.shiftId !== snapshot.shiftId;
   async function submit() {
     if (!snapshot || !connected) return;
     enableAudio();
@@ -272,7 +349,17 @@ export function Menu() {
       customerName: name.trim(),
       items: cart,
     };
-    if (!writeStorage(pendingKey, JSON.stringify(request))) {
+    const quotedTotalCents = pending
+      ? (pendingTotalCents ?? pendingEstimate ?? total)
+      : total;
+    const storedRequest = writeStorage(pendingKey, JSON.stringify(request));
+    const storedTotal = writeStorage(
+      pendingTotalKey,
+      String(quotedTotalCents),
+    );
+    if (!storedRequest || !storedTotal) {
+      writeStorage(pendingKey, null);
+      writeStorage(pendingTotalKey, null);
       setLocalError(
         "Activa el almacenamiento del navegador para conservar tu pedido.",
       );
@@ -280,29 +367,33 @@ export function Menu() {
       return;
     }
     setPending(request);
+    setPendingTotalCents(quotedTotalCents);
     const reply = await command("submit_client_order", request);
     if (reply.ok) {
       setActiveId(reply.orderId || request.orderId);
       setCart([]);
       setCheckout(false);
       writeStorage(activeKey, reply.orderId || request.orderId);
-      writeStorage(pendingKey, null);
-      setPending(null);
     } else if (!["ACK_TIMEOUT", "OFFLINE"].includes(reply.code)) {
       setPending(null);
       writeStorage(pendingKey, null);
+      setPendingTotalCents(null);
+      writeStorage(pendingTotalKey, null);
       setLocalError(reply.error);
     }
     setBusy(false);
   }
   return (
-    <>
+    <div className="min-h-screen bg-stone-50">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-5 py-5">
           <Brand />
-          <span className="text-xs font-semibold text-stone-500">
-            HECHO AL MOMENTO
-          </span>
+          <div className="flex items-center gap-3">
+            <span className="hidden text-xs font-semibold text-stone-500 sm:inline">
+              HECHO AL MOMENTO
+            </span>
+            <PWAInstallButton />
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-5 pb-36 pt-9 md:pt-14">
@@ -333,33 +424,6 @@ export function Menu() {
             </p>
           </div>
         </div>
-        {pending && (
-          <div role="alert" className="mb-6 rounded-xl bg-amber-100 p-5">
-            <p className="font-bold">
-              {pendingExpired
-                ? "El turno anterior cerró."
-                : "Tu envío necesita confirmación."}
-            </p>
-            <p className="my-2 text-sm">
-              {pendingExpired
-                ? "Consulta al mostrador antes de enviar un pedido nuevo."
-                : "Puedes reintentar con la misma referencia sin duplicar tu pedido."}
-            </p>
-            <button
-              className="btn"
-              disabled={!connected || busy}
-              onClick={() =>
-                pendingExpired
-                  ? (setPending(null), writeStorage(pendingKey, null))
-                  : void submit()
-              }
-            >
-              {pendingExpired
-                ? "Entendido, volver al menú"
-                : "Verificar y reintentar"}
-            </button>
-          </div>
-        )}
         {localError && (
           <p
             role="alert"
@@ -368,71 +432,104 @@ export function Menu() {
             {localError}
           </p>
         )}
-        <nav className="mb-7 flex flex-wrap gap-2" aria-label="Categorías">
-          {["Todo", ...new Set(snapshot.menuItems.map((m) => m.category))].map(
-            (c) => (
-              <button
-                key={c}
-                className={`btn rounded-full ${c === category ? "border-stone-900 bg-stone-900 text-white hover:bg-stone-800" : ""}`}
-                aria-pressed={c === category}
-                onClick={() => setCategory(c)}
-              >
-                {c}
-              </button>
-            ),
-          )}
-        </nav>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {snapshot.menuItems
-            .filter((m) => category === "Todo" || m.category === category)
-            .map((item, index) => {
-              const available = itemAvailable(item, snapshot.modifiers);
-              return (
-                <article
-                  key={item.id}
-                  className={`panel flex flex-col ${!available ? "bg-stone-100 opacity-60" : ""}`}
-                >
-                  <div className="mb-5 flex items-center justify-between">
-                    <span className="eyebrow">{item.category}</span>
-                    <span className="display text-3xl text-clay-600">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-                  <h2 className="display text-3xl">{item.name}</h2>
-                  <p className="mb-6 mt-3 flex-1 text-sm leading-relaxed text-stone-600">
-                    {item.description}
-                  </p>
-                  <div className="flex items-center justify-between gap-3">
-                    <strong className="text-xl tabular-nums">
-                      {mxn(item.priceCents)}
-                    </strong>
-                    <button
-                      className="btn"
-                      disabled={!available || Boolean(pending)}
-                      aria-label={`Agregar ${item.name}`}
-                      onClick={() => setCustomizeId(item.id)}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-8">
+          <div className="min-w-0">
+            <nav className="mb-7 flex flex-wrap gap-2" aria-label="Categorías">
+              {["Todo", ...new Set(snapshot.menuItems.map((m) => m.category))].map(
+                (c) => (
+                  <button
+                    key={c}
+                    className={`btn rounded-full ${c === category ? "border-stone-900 bg-stone-900 text-white hover:bg-stone-800" : ""}`}
+                    aria-pressed={c === category}
+                    onClick={() => setCategory(c)}
+                  >
+                    {c}
+                  </button>
+                ),
+              )}
+            </nav>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {snapshot.menuItems
+                .filter((m) => category === "Todo" || m.category === category)
+                .map((item, index) => {
+                  const available = itemAvailable(item, snapshot.modifiers);
+                  return (
+                    <article
+                      key={item.id}
+                      className={`panel flex flex-col ${!available ? "bg-stone-100 opacity-60" : ""}`}
                     >
-                      {available ? (
-                        <>
-                          <Plus size={17} />
-                          Agregar
-                        </>
-                      ) : (
-                        <span>Agotado</span>
-                      )}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                      <div className="mb-5 flex items-center justify-between">
+                        <span className="eyebrow">{item.category}</span>
+                        <span className="display text-3xl text-clay-600">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                      </div>
+                      <h2 className="display text-3xl">{item.name}</h2>
+                      <p className="mb-6 mt-3 flex-1 text-sm leading-relaxed text-stone-600">
+                        {item.description}
+                      </p>
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="text-xl tabular-nums">
+                          {mxn(item.priceCents)}
+                        </strong>
+                        <button
+                          className="btn"
+                          disabled={!available}
+                          aria-label={`Agregar ${item.name}`}
+                          onClick={() => setCustomizeId(item.id)}
+                        >
+                          {available ? (
+                            <>
+                              <Plus size={17} />
+                              Agregar
+                            </>
+                          ) : (
+                            <span>Agotado</span>
+                          )}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+            </div>
+            <p className="mt-8 text-xs text-stone-500">
+              Precios finales en pesos mexicanos (MXN). Disponibilidad
+              actualizada en vivo.
+            </p>
+          </div>
+          {cart.length > 0 && (
+            <aside className="sticky top-6 hidden rounded-2xl border border-stone-200 bg-white p-5 shadow-sm lg:block">
+              <p className="eyebrow mb-4">Tu pedido</p>
+              <ul className="mb-5 space-y-3">
+                {cart.map((line, index) => (
+                  <li key={`${line.menuItemId}-${index}`} className="flex justify-between gap-3 text-sm">
+                    <span>
+                      {line.quantity} ×{" "}
+                      {snapshot.menuItems.find((item) => item.id === line.menuItemId)?.name}
+                    </span>
+                    <strong className="shrink-0 tabular-nums">
+                      {mxn(price(line) * line.quantity)}
+                    </strong>
+                  </li>
+                ))}
+              </ul>
+              <div className="mb-4 flex justify-between border-t border-stone-200 pt-4 font-bold">
+                <span>Total</span>
+                <span className="tabular-nums">{mxn(total)} MXN</span>
+              </div>
+              <button
+                className="btn btn-primary w-full"
+                disabled={!validCart}
+                onClick={() => setCheckout(true)}
+              >
+                <ShoppingBag size={18} /> Revisar pedido
+              </button>
+            </aside>
+          )}
         </div>
-        <p className="mt-8 text-xs text-stone-500">
-          Precios finales en pesos mexicanos (MXN). Disponibilidad actualizada
-          en vivo.
-        </p>
       </main>
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 border-t border-stone-200 bg-white p-4">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden">
           <button
             className="btn btn-primary mx-auto flex w-full max-w-xl justify-between"
             onClick={() => setCheckout(true)}
@@ -480,7 +577,7 @@ export function Menu() {
                   </div>
                   <button
                     className="btn"
-                    disabled={busy || Boolean(pending)}
+                    disabled={busy}
                     aria-label={`Quitar platillo ${i + 1}`}
                     onClick={() =>
                       setCart((previous) =>
@@ -525,7 +622,7 @@ export function Menu() {
           <button
             className="btn btn-primary w-full"
             disabled={
-              !connected || busy || (!pending && (!validCart || !name.trim()))
+              !connected || busy || !validCart || !name.trim()
             }
             onClick={() => void submit()}
           >
@@ -538,6 +635,6 @@ export function Menu() {
           </button>
         </Modal>
       )}
-    </>
+    </div>
   );
 }

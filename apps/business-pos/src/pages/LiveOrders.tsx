@@ -67,7 +67,7 @@ export function CashTender({
         Efectivo recibido (MXN)
         <input
           autoFocus
-          className="field mt-2 text-2xl"
+          className="field mt-2 text-2xl tabular-nums"
           inputMode="decimal"
           value={value}
           placeholder="0.00"
@@ -78,10 +78,10 @@ export function CashTender({
           }}
         />
       </label>
-      <div className="my-3 grid grid-cols-3 gap-2">
-        {[50, 100, 500].map((preset) => (
+      <div className="my-4 grid grid-cols-2 gap-3">
+        {[100, 200, 500].map((preset) => (
           <button
-            className="btn"
+            className="btn min-h-16 text-xl tabular-nums"
             key={preset}
             disabled={busy}
             onClick={() => {
@@ -92,6 +92,16 @@ export function CashTender({
             {mxn(preset * 100)}
           </button>
         ))}
+        <button
+          className="btn min-h-16 text-lg tabular-nums"
+          disabled={busy}
+          onClick={() => {
+            setValue((order.totalCents / 100).toFixed(2));
+            setKeepChange(false);
+          }}
+        >
+          Exacto · {mxn(order.totalCents)}
+        </button>
       </div>
       <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm font-semibold">
         <input
@@ -178,7 +188,7 @@ export function TicketCard({
           className={`flex items-start gap-1 text-xs ${aging ? "font-bold text-red-700" : "text-stone-500"}`}
         >
           <Clock3 size={14} />
-          {minutes} min
+          <span className="tabular-nums">{minutes} min</span>
         </span>
       </div>
       <OrderLines order={order} />
@@ -248,7 +258,10 @@ export function LiveOrders() {
   const { snapshot, connected, command } = useRealtime();
   const [inventory, setInventory] = useState(false),
     [payId, setPayId] = useState<string | null>(null),
-    [pausing, setPausing] = useState(false);
+    [pausing, setPausing] = useState(false),
+    [activeLane, setActiveLane] = useState<"unpaid" | "cooking" | "ready">(
+      "unpaid",
+    );
   const previous = useRef<Set<string> | null>(null);
   const now = useTicketTimer();
   useEffect(() => {
@@ -285,7 +298,14 @@ export function LiveOrders() {
       note: "Todo listo para entregar.",
       color: "bg-emerald-700",
     },
-  ];
+  ] as const;
+  const laneCounts = Object.fromEntries(
+    lanes.map((lane) => [
+      lane.status,
+      snapshot.activeOrders.filter((order) => order.status === lane.status)
+        .length,
+    ]),
+  );
   return (
     <>
       <StaffHeader page="pos">
@@ -310,6 +330,29 @@ export function LiveOrders() {
           Pausar Pedidos Web
         </button>
       </StaffHeader>
+      <nav
+        className="sticky top-0 z-20 flex border-b border-stone-200 bg-white shadow-sm md:hidden"
+        role="tablist"
+        aria-label="Filas de pedidos"
+      >
+        {lanes.map((lane) => (
+          <button
+            key={lane.status}
+            id={`lane-tab-${lane.status}`}
+            type="button"
+            role="tab"
+            aria-selected={activeLane === lane.status}
+            aria-controls={`lane-panel-${lane.status}`}
+            className={`min-h-12 flex-1 border-b-4 px-2 py-3 text-center text-sm font-bold ${activeLane === lane.status ? "border-clay-600 text-clay-700" : "border-transparent text-stone-500"}`}
+            onClick={() => setActiveLane(lane.status)}
+          >
+            {lane.title}
+            <span className="ml-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs tabular-nums">
+              {laneCounts[lane.status]}
+            </span>
+          </button>
+        ))}
+      </nav>
       <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
           <div>
@@ -339,8 +382,11 @@ export function LiveOrders() {
             return (
               <section
                 key={lane.status}
-                className="min-w-0 rounded-2xl bg-stone-100 p-3"
+                id={`lane-panel-${lane.status}`}
+                role="tabpanel"
+                aria-labelledby={`lane-tab-${lane.status}`}
                 aria-label={lane.title}
+                className={`${activeLane === lane.status ? "flex" : "hidden"} min-w-0 flex-col rounded-2xl bg-stone-100 p-3 md:flex`}
               >
                 <header className="px-2 pb-5 pt-2">
                   <div className="flex items-center justify-between">

@@ -7,6 +7,7 @@ import {
   mxn,
   OrderLines,
   orderLabel,
+  PWAInstallButton,
   SoundButton,
 } from "../../../../shared/ui/components";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
@@ -34,11 +35,16 @@ export function OrderStatus({
     no_show: "Tu pedido fue cerrado.",
   };
   return (
-    <div className={`min-h-screen px-5 py-7 ${ready ? "bg-emerald-50" : ""}`}>
+    <div
+      className={`min-h-screen bg-stone-50 px-5 py-7 ${ready ? "bg-emerald-50" : ""}`}
+    >
       <div className="mx-auto max-w-lg">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Brand />
-          <SoundButton />
+          <div className="flex items-center gap-2">
+            <PWAInstallButton />
+            <SoundButton />
+          </div>
         </header>
         <section className="py-10 text-center" aria-live="polite">
           <div
@@ -57,7 +63,7 @@ export function OrderStatus({
           <h1 className="display text-4xl">{titles[order.status]}</h1>
           <p className="mt-4 text-stone-600">
             {order.status === "unpaid"
-              ? `Paga ${mxn(order.totalCents)} MXN en efectivo para empezar a cocinar.`
+              ? "Tu pedido está pendiente de pago en el mostrador."
               : ready
                 ? "Acércate al mostrador y recoge tu pedido."
                 : order.status === "cooking"
@@ -67,6 +73,16 @@ export function OrderStatus({
                     : "Gracias por compartir nuestra mesa."}
           </p>
         </section>
+        {order.status === "unpaid" && (
+          <p
+            role="status"
+            className="sticky top-2 z-10 mb-5 rounded-xl border border-amber-300 bg-amber-100 p-4 font-semibold text-amber-950 shadow-sm"
+            aria-live="polite"
+          >
+            Tu orden está en pausa. Paga {mxn(order.totalCents)} MXN en el
+            mostrador para que empecemos a cocinar.
+          </p>
+        )}
         <section className="panel">
           <OrderLines order={order} />
           <div className="mt-5 flex justify-between border-t border-stone-200 pt-4 font-bold">
