@@ -3,7 +3,10 @@ import {
   ArrowDownToLine,
   ArrowUpRight,
   Banknote,
+  Calculator,
   Check,
+  Coins,
+  Printer,
   SlidersHorizontal,
 } from "lucide-react";
 import type { Order } from "../../../../../shared/types/realtime";
@@ -14,6 +17,7 @@ import {
   Modal,
   mxn,
   orderLabel,
+  printThermalTicket,
   StaffHeader,
   time,
 } from "../../../../../shared/ui/components";
@@ -107,7 +111,17 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
             {rows.slice(current * 50, current * 50 + 50).map((o) => (
               <tr key={o.id} className="border-b border-stone-100 align-top">
                 <td className="px-3 py-4">
-                  <strong>{orderLabel(o)}</strong>
+                  <div className="flex items-center gap-1.5">
+                    <strong>{orderLabel(o)}</strong>
+                    <button
+                      className="p-1 text-stone-400 hover:text-stone-700 transition-colors"
+                      title="Imprimir comanda térmica"
+                      aria-label={`Imprimir comanda ${orderLabel(o)}`}
+                      onClick={() => printThermalTicket(o)}
+                    >
+                      <Printer size={13} />
+                    </button>
+                  </div>
                   <span className="mt-1 block text-xs text-stone-500">
                     {time(
                       o.transaction?.paidAt || o.completedAt || o.createdAt,
@@ -224,6 +238,107 @@ function exportLedger(orders: Order[]) {
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
+const DENOMINATIONS = [
+  { label: "$1,000", valueCents: 100000 },
+  { label: "$500", valueCents: 50000 },
+  { label: "$200", valueCents: 20000 },
+  { label: "$100", valueCents: 10000 },
+  { label: "$50", valueCents: 5000 },
+  { label: "$20", valueCents: 2000 },
+  { label: "$10", valueCents: 1000 },
+  { label: "$5", valueCents: 500 },
+  { label: "$2", valueCents: 200 },
+  { label: "$1", valueCents: 100 },
+  { label: "50¢", valueCents: 50 },
+];
+
+export function DenominationCounter({
+  expectedCents,
+}: {
+  expectedCents: number;
+}) {
+  const [counts, setCounts] = useState<Record<number, number>>({});
+  const totalCents = Object.entries(counts).reduce(
+    (sum, [idx, count]) =>
+      sum + (DENOMINATIONS[Number(idx)]?.valueCents || 0) * (count || 0),
+    0,
+  );
+  const diff = totalCents - expectedCents;
+
+  return (
+    <div className="mb-5 rounded-xl border border-stone-200 bg-stone-50 p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="flex items-center gap-1.5 text-sm font-bold text-stone-900">
+          <Coins size={16} className="text-clay-600" />
+          <span>Arqueo de gaveta (Billetes y monedas)</span>
+        </h3>
+        <button
+          type="button"
+          className="cursor-pointer text-xs text-stone-500 underline hover:text-stone-800"
+          onClick={() => setCounts({})}
+        >
+          Limpiar
+        </button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-3">
+        {DENOMINATIONS.map((d, index) => (
+          <div
+            key={d.label}
+            className="flex items-center justify-between rounded-lg border border-stone-200 bg-white p-2 shadow-2xs"
+          >
+            <span className="font-semibold text-stone-700">{d.label}</span>
+            <input
+              type="number"
+              min="0"
+              placeholder="0"
+              className="field h-8 w-14 px-1 py-0 text-center text-sm font-bold"
+              value={counts[index] || ""}
+              onChange={(e) => {
+                const val = Math.max(0, parseInt(e.target.value, 10) || 0);
+                setCounts((prev) => ({ ...prev, [index]: val }));
+              }}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-3 text-sm">
+        <div>
+          <span className="block text-xs text-stone-500">Total contado:</span>
+          <strong className="text-lg font-bold tabular-nums text-stone-900">
+            {mxn(totalCents)}
+          </strong>
+        </div>
+        <div className="text-right">
+          <span className="block text-xs text-stone-500">
+            Diferencia vs sistema:
+          </span>
+          <strong
+            className={`text-sm font-bold tabular-nums ${
+              totalCents === 0
+                ? "text-stone-400"
+                : diff === 0
+                  ? "text-emerald-700"
+                  : diff > 0
+                    ? "text-blue-700"
+                    : "text-red-700"
+            }`}
+          >
+            {totalCents === 0
+              ? "Sin contar"
+              : diff === 0
+                ? "Cuadrada ($0.00)"
+                : diff > 0
+                  ? `+${mxn(diff)} (Sobrante)`
+                  : `-${mxn(Math.abs(diff))} (Faltante)`}
+          </strong>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Analytics() {
   const { snapshot, connected, command } = useRealtime();
   const [inventory, setInventory] = useState(false),
@@ -418,6 +533,7 @@ export function Analytics() {
             Se guardará un archivo permanente con el historial y los totales. El
             nuevo turno empezará en cero.
           </p>
+          <DenominationCounter expectedCents={metrics.cashHeldCents} />
           <dl className="mb-5 space-y-3 rounded-xl bg-stone-100 p-4">
             <div className="flex justify-between">
               <dt>Ventas cobradas</dt>

@@ -4,16 +4,22 @@ import {
   Check,
   ChefHat,
   LockKeyhole,
+  Maximize2,
+  Minimize2,
   Minus,
   Package,
   Plus,
+  Volume1,
   Volume2,
+  VolumeX,
   Wifi,
   WifiOff,
   X,
 } from "lucide-react";
 import type { Modifier, Order } from "../types/realtime";
 import { useRealtime } from "./RealtimeProvider";
+import { PWAInstallButton } from "./PWAInstallButton";
+export { printThermalTicket } from "./thermalPrint";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     cents / 100,
@@ -287,6 +293,35 @@ export function Brand() {
     </div>
   );
 }
+export function FullscreenButton() {
+  const [fullscreen, setFullscreen] = useState(false);
+  useEffect(() => {
+    const onChange = () => setFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+  const toggle = () => {
+    if (!document.fullscreenElement) {
+      void document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+      void document.exitFullscreen().catch(() => {});
+    }
+  };
+  return (
+    <button
+      className="btn"
+      onClick={toggle}
+      title={
+        fullscreen
+          ? "Salir de pantalla completa"
+          : "Modo Kiosko / Pantalla completa"
+      }
+      aria-label="Pantalla completa"
+    >
+      {fullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+    </button>
+  );
+}
 export function StaffHeader({
   page,
   children,
@@ -328,6 +363,8 @@ export function StaffHeader({
               </span>
             )}
           </span>
+          <PWAInstallButton />
+          <FullscreenButton />
           {children}
           <button className="btn" onClick={logout} aria-label="Bloquear sesión">
             <LockKeyhole size={16} />
@@ -369,47 +406,118 @@ export function OrderLines({ order }: { order: Order }) {
     </ul>
   );
 }
-export function useTicketTimer() {
+export function useTicketTimer(intervalMs = 1000) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 15000);
+    const id = setInterval(() => setNow(Date.now()), intervalMs);
     return () => clearInterval(id);
-  }, []);
+  }, [intervalMs]);
   return now;
 }
 let audio: AudioContext | undefined;
 export function enableAudio() {
-  audio ||= new AudioContext();
-  void audio.resume();
+  try {
+    if (typeof window === "undefined") return;
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    audio ||= new AudioCtx();
+    if (audio.state === "suspended") {
+      void audio.resume();
+    }
+  } catch {
+    // Ignore restricted audio context gracefully
+  }
 }
-export function chime(ready = false) {
-  if (!audio || audio.state !== "running") return;
-  [ready ? 660 : 440, ready ? 880 : 660].forEach((frequency, index) => {
-    const oscillator = audio!.createOscillator(),
-      gain = audio!.createGain(),
-      at = audio!.currentTime + index * 0.16;
-    oscillator.frequency.value = frequency;
-    gain.gain.setValueAtTime(0.12, at);
-    gain.gain.exponentialRampToValueAtTime(0.001, at + 0.3);
-    oscillator.connect(gain);
-    gain.connect(audio!.destination);
-    oscillator.start(at);
-    oscillator.stop(at + 0.31);
-  });
+let volumeScale = 1.0;
+export function setChimeVolume(vol: number) {
+  volumeScale = Math.max(0, Math.min(2.0, vol));
+}
+export function getChimeVolume() {
+  return volumeScale;
+}
+export function chime(type: "new" | "kitchen" | "ready" | boolean = "new") {
+  try {
+    if (volumeScale <= 0) return;
+    enableAudio();
+    if (!audio || audio.state !== "running") return;
+    const isKitchen = type === "kitchen" || type === true;
+    const isReady = type === "ready";
+    const notes = isReady
+      ? [659.25, 783.99, 1046.5]
+      : isKitchen
+        ? [587.33, 880]
+        : [523.25, 659.25];
+    notes.forEach((frequency, index) => {
+      const oscillator = audio!.createOscillator();
+      const gain = audio!.createGain();
+      const at = audio!.currentTime + index * 0.15;
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(frequency, at);
+      gain.gain.setValueAtTime(0.0001, at);
+      gain.gain.exponentialRampToValueAtTime(0.08 * volumeScale, at + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.32);
+      oscillator.connect(gain);
+      gain.connect(audio!.destination);
+      oscillator.start(at);
+      oscillator.stop(at + 0.33);
+    });
+  } catch {
+    // Ignore audio play errors
+  }
 }
 export function SoundButton() {
-  const [enabled, setEnabled] = useState(false);
+  // mode: "normal" (1.0), "soft" (0.5), "mute" (0.0)
+  const [mode, setMode] = useState<"normal" | "soft" | "mute">("normal");
+  useEffect(() => {
+    if (volumeScale === 0) setMode("mute");
+    else if (volumeScale <= 0.6) setMode("soft");
+    else setMode("normal");
+  }, []);
+  const cycle = () => {
+    enableAudio();
+    if (mode === "normal") {
+      setMode("soft");
+      setChimeVolume(0.5);
+      chime("new");
+    } else if (mode === "soft") {
+      setMode("mute");
+      setChimeVolume(0);
+    } else {
+      setMode("normal");
+      setChimeVolume(1.0);
+      chime("new");
+    }
+  };
   return (
     <button
-      className="btn"
-      onClick={() => {
-        enableAudio();
-        setEnabled(true);
-        chime();
-      }}
+      className={`btn transition-colors ${
+        mode === "mute"
+          ? "border-stone-300 text-stone-400 line-through"
+          : mode === "soft"
+            ? "border-amber-300 bg-amber-50 text-amber-900"
+            : "border-stone-300 text-stone-800"
+      }`}
+      onClick={cycle}
+      title="Alternar volumen del timbre: Normal → Suave → Silenciado"
+      aria-label={`Sonido: ${mode === "mute" ? "Silenciado" : mode === "soft" ? "Suave" : "Normal"}`}
     >
-      <Volume2 size={16} />
-      {enabled ? "Sonido activo" : "Activar sonido"}
+      {mode === "mute" ? (
+        <VolumeX size={16} />
+      ) : mode === "soft" ? (
+        <Volume1 size={16} className="text-amber-700" />
+      ) : (
+        <Volume2 size={16} className="text-emerald-700" />
+      )}
+      <span>
+        {mode === "mute"
+          ? "Silencio"
+          : mode === "soft"
+            ? "Sonido Suave"
+            : "Sonido Activo"}
+      </span>
     </button>
   );
 }

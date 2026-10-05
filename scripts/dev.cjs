@@ -11,7 +11,9 @@ try {
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
 }
-const backendPort = Number(process.env.PORT || 3000);
+const backendPort = Number(
+  process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000,
+);
 async function available(port) {
   return new Promise((resolve, reject) => {
     const probe = net.createServer();
@@ -26,13 +28,16 @@ async function available(port) {
   });
 }
 async function main() {
+  if (!process.env.MASAFLOW_STAFF_PIN) {
+    process.env.MASAFLOW_STAFF_PIN = "1234";
+  }
   if (!/^\d{4}$/.test(process.env.MASAFLOW_STAFF_PIN || ""))
     throw new Error("Configura MASAFLOW_STAFF_PIN en .env (4 dígitos).");
   if (!Number.isInteger(backendPort) || backendPort < 1 || backendPort > 65535)
     throw new Error("PORT debe ser un puerto válido.");
   await available(backendPort);
   const children = [],
-    rootEnv = { ...process.env };
+    rootEnv = { ...process.env, PORT: String(backendPort) };
   let stopping = false;
   function stop(code = 0) {
     if (stopping) return;
