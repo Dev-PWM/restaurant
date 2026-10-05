@@ -23,6 +23,7 @@ import {
   enableAudio,
   mxn,
   SoundButton,
+  PWAInstallButton,
 } from "../../../../shared/ui/components";
 import { CartDrawer } from "./CartDrawer";
 import { CustomizeModal, itemAvailable } from "./CustomizeModal";
@@ -30,6 +31,7 @@ import { OrderStatus } from "./OrderStatus";
 
 export const activeKey = "masaflow.v3.orderId";
 export const pendingKey = "masaflow.v3.pending";
+export const pendingTotalKey = "masaflow.v3.pendingTotalCents";
 
 type CartLine = OrderInput["items"][number];
 
@@ -59,6 +61,12 @@ export function Menu() {
 
   const [activeId, setActiveId] = useState(() => readStorage(activeKey));
   const [pending, setPending] = useState(restoredPending);
+  const [pendingTotalCents, setPendingTotalCents] = useState(() => {
+    const storedValue = readStorage(pendingTotalKey);
+    if (storedValue === null) return null;
+    const value = Number(storedValue);
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  });
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState("");
 
@@ -215,8 +223,14 @@ export function Menu() {
       customerName: name.trim(),
       items: cart,
     };
+    const quotedTotalCents = pending ? pendingTotalCents : total;
 
-    if (!writeStorage(pendingKey, JSON.stringify(request))) {
+    if (
+      (quotedTotalCents !== null &&
+        !writeStorage(pendingTotalKey, String(quotedTotalCents))) ||
+      !writeStorage(pendingKey, JSON.stringify(request))
+    ) {
+      writeStorage(pendingTotalKey, null);
       setLocalError(
         "Activa el almacenamiento del navegador para conservar tu pedido.",
       );
@@ -235,7 +249,9 @@ export function Menu() {
       setCheckout(false);
       writeStorage(activeKey, confirmedId);
       writeStorage(pendingKey, null);
+      writeStorage(pendingTotalKey, null);
       setPending(null);
+      setPendingTotalCents(null);
     } else if (!["ACK_TIMEOUT", "OFFLINE"].includes(reply.code)) {
       setPending(null);
       writeStorage(pendingKey, null);
@@ -244,6 +260,50 @@ export function Menu() {
       setLocalError(reply.error);
     }
     setBusy(false);
+  }
+
+  if (pending && !pendingExpired) {
+    return (
+      <main className="mx-auto flex min-h-[90dvh] max-w-lg flex-col justify-center gap-6 p-6 text-center">
+        <header className="flex items-center justify-between gap-3">
+          <Brand />
+          <PWAInstallButton />
+        </header>
+        <section
+          className="rounded-2xl border-2 border-amber-400 bg-amber-50 p-6 text-left shadow-xs"
+          aria-live="polite"
+        >
+          <h1 className="display text-2xl font-bold text-amber-950">
+            Tu orden está en pausa.
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-amber-950">
+            Paga{" "}
+            <strong className="tabular-nums">
+              {pendingTotalCents === null
+                ? "el total confirmado en mostrador"
+                : `${mxn(pendingTotalCents)} MXN`}
+            </strong>{" "}
+            en el mostrador para que empecemos a cocinar.
+          </p>
+          <p className="mt-3 text-sm text-amber-900">
+            Tu pedido se enviará con la misma referencia al verificarlo; no se
+            crearán pedidos duplicados.
+          </p>
+          <button
+            className="btn btn-primary mt-5 min-h-12 w-full"
+            disabled={!connected || busy}
+            onClick={() => void submit()}
+          >
+            {busy ? "Verificando pedido…" : "Verificar y reintentar"}
+          </button>
+          {!connected && (
+            <p className="mt-3 text-sm font-semibold text-red-700">
+              Sin conexión. El pedido quedó guardado en este dispositivo.
+            </p>
+          )}
+        </section>
+      </main>
+    );
   }
 
   const categories = [
@@ -263,6 +323,7 @@ export function Menu() {
               Comal Caliente
             </span>
             <SoundButton />
+            <PWAInstallButton />
             {totalItemsCount > 0 && (
               <button
                 className="btn btn-primary text-xs font-bold py-1.5 px-3 sm:hidden"
@@ -276,7 +337,7 @@ export function Menu() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 pb-36 pt-6 sm:px-6 sm:pt-10">
+      <main className="mx-auto max-w-[90rem] px-4 pb-36 pt-6 sm:px-6 sm:pt-10 lg:pr-[22rem]">
         {/* Hero & Cash Upfront Guidance */}
         <div className="mb-8 grid items-stretch gap-6 md:grid-cols-[1.5fr_1fr]">
           <div className="flex flex-col justify-center rounded-3xl bg-gradient-to-br from-clay-900 to-clay-950 p-6 sm:p-8 text-white shadow-xs">
@@ -337,7 +398,10 @@ export function Menu() {
               disabled={!connected || busy}
               onClick={() =>
                 pendingExpired
-                  ? (setPending(null), writeStorage(pendingKey, null))
+                  ? (setPending(null),
+                    setPendingTotalCents(null),
+                    writeStorage(pendingKey, null),
+                    writeStorage(pendingTotalKey, null))
                   : void submit()
               }
             >
@@ -347,6 +411,52 @@ export function Menu() {
             </button>
           </div>
         )}
+
+        <aside
+          className="fixed right-6 top-28 z-20 hidden max-h-[calc(100dvh-9rem)] w-80 flex-col overflow-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-lg lg:flex"
+          aria-label="Carrito"
+        >
+          <h2 className="text-lg font-bold text-stone-900">Tu pedido</h2>
+          {cart.length === 0 ? (
+            <p className="py-6 text-sm text-stone-500">
+              Agrega un antojito para empezar.
+            </p>
+          ) : (
+            <ul className="my-4 space-y-3">
+              {cart.map((line, index) => {
+                const item = snapshot.menuItems.find(
+                  (entry) => entry.id === line.menuItemId,
+                );
+                return (
+                  <li
+                    className="flex justify-between gap-3 border-b border-stone-100 pb-3 text-sm"
+                    key={`${line.menuItemId}-${index}`}
+                  >
+                    <span>
+                      {line.quantity} × {item?.name ?? "Platillo"}
+                    </span>
+                    <strong className="tabular-nums">
+                      {mxn(price(line) * line.quantity)}
+                    </strong>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <div className="mt-auto border-t border-stone-200 pt-4">
+            <div className="flex justify-between text-sm">
+              <span>Total estimado</span>
+              <strong className="tabular-nums">{mxn(total)} MXN</strong>
+            </div>
+            <button
+              className="btn btn-primary mt-4 min-h-12 w-full"
+              disabled={cart.length === 0 || Boolean(pending)}
+              onClick={() => setCheckout(true)}
+            >
+              Ver mi pedido ({totalItemsCount})
+            </button>
+          </div>
+        </aside>
 
         {localError && (
           <p
@@ -507,7 +617,7 @@ export function Menu() {
 
       {/* Floating Sticky Cart Bar */}
       {cart.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 p-3.5 backdrop-blur-md shadow-lg">
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-stone-200 bg-white/95 p-3.5 shadow-lg backdrop-blur-md lg:hidden">
           <div className="mx-auto flex max-w-xl items-center justify-between gap-4">
             <div>
               <span className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider">
@@ -553,6 +663,6 @@ export function Menu() {
           connected={connected}
         />
       )}
-    </div>
+    </>
   );
 }

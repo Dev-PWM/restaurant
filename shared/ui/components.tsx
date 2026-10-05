@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import type { Modifier, Order } from "../types/realtime";
 import { useRealtime } from "./RealtimeProvider";
-import { PWAInstallButton } from "./PWAInstallButton";
 export { printThermalTicket } from "./thermalPrint";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(

@@ -19,6 +19,7 @@ import {
   mxn,
   OrderLines,
   orderLabel,
+  PWAInstallButton,
   printThermalTicket,
   SoundButton,
   time,
@@ -116,6 +117,7 @@ export function OrderStatus({
               <span>{testedSound ? "Sonido listo ✓" : "Probar timbre"}</span>
             </button>
             <SoundButton />
+            <PWAInstallButton />
           </div>
         </header>
 

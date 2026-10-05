@@ -728,7 +728,15 @@ export function LiveOrders() {
   const { snapshot, connected, command } = useRealtime();
   const [inventory, setInventory] = useState(false),
     [payId, setPayId] = useState<string | null>(null),
-    [pausing, setPausing] = useState(false);
+    [pausing, setPausing] = useState(false),
+    [kitchenOnly, setKitchenOnly] = useState(false),
+    [showComalDetails, setShowComalDetails] = useState(false),
+    [activeTab, setActiveTab] = useState<
+      "queue" | "batching" | "completed"
+    >("queue"),
+    [activeLane, setActiveLane] = useState<"unpaid" | "cooking" | "ready">(
+      "unpaid",
+    );
   const previousActive = useRef<Set<string> | null>(null);
   const previousCooking = useRef<Set<string> | null>(null);
   const now = useTicketTimer();
@@ -772,19 +780,8 @@ export function LiveOrders() {
     previousActive.current = currentActive;
     previousCooking.current = currentCooking;
   }, [snapshot]);
-  if (!snapshot) return null;
-  const payOrder = snapshot.activeOrders.find(
-    (o) => o.id === payId && o.status === "unpaid",
-  );
-  const [kitchenOnly, setKitchenOnly] = useState(false);
-  const [showComalDetails, setShowComalDetails] = useState(false);
-  const [activeTab, setActiveTab] = useState<
-    "queue" | "batching" | "completed"
-  >("queue");
-
-  const cookingOrders = snapshot.activeOrders.filter(
-    (o) => o.status === "cooking",
-  );
+  const cookingOrders =
+    snapshot?.activeOrders.filter((o) => o.status === "cooking") ?? [];
 
   const comalSummary = useMemo(() => {
     const itemMap = new Map<
@@ -812,6 +809,10 @@ export function LiveOrders() {
       totalPieces,
     };
   }, [cookingOrders]);
+  if (!snapshot) return null;
+  const payOrder = snapshot.activeOrders.find(
+    (o) => o.id === payId && o.status === "unpaid",
+  );
 
   const lanes = [
     {
@@ -832,11 +833,18 @@ export function LiveOrders() {
       note: "Todo listo para entregar.",
       color: "bg-emerald-700",
     },
-  ];
+  ] as const;
 
   const visibleLanes = kitchenOnly
     ? lanes.filter((lane) => lane.status !== "unpaid")
     : lanes;
+  const laneCounts = {
+    unpaid: snapshot.activeOrders.filter((order) => order.status === "unpaid")
+      .length,
+    cooking: cookingOrders.length,
+    ready: snapshot.activeOrders.filter((order) => order.status === "ready")
+      .length,
+  };
 
   return (
     <>
@@ -862,12 +870,13 @@ export function LiveOrders() {
           Pausar Pedidos Web
         </button>
       </StaffHeader>
-      <nav
-        className="sticky top-0 z-20 flex border-b border-stone-200 bg-white shadow-sm md:hidden"
-        role="tablist"
-        aria-label="Filas de pedidos"
-      >
-        {lanes.map((lane) => (
+      {activeTab === "queue" && (
+        <nav
+          className="sticky top-0 z-20 flex border-b border-stone-200 bg-white shadow-sm md:hidden"
+          role="tablist"
+          aria-label="Filas de pedidos"
+        >
+        {visibleLanes.map((lane) => (
           <button
             key={lane.status}
             id={`lane-tab-${lane.status}`}
@@ -884,7 +893,8 @@ export function LiveOrders() {
             </span>
           </button>
         ))}
-      </nav>
+        </nav>
+      )}
       <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
         <div className="mb-6 flex flex-wrap items-end justify-between gap-5">
           <div>
@@ -908,7 +918,11 @@ export function LiveOrders() {
                     ? "border-clay-600 bg-clay-50 text-clay-900 font-bold"
                     : "border-stone-300 text-stone-700"
                 }`}
-                onClick={() => setKitchenOnly(!kitchenOnly)}
+                onClick={() => {
+                  const next = !kitchenOnly;
+                  setKitchenOnly(next);
+                  if (next && activeLane === "unpaid") setActiveLane("cooking");
+                }}
                 title="Ocultar o mostrar fila de caja"
               >
                 <ChefHat size={16} />
@@ -1078,7 +1092,7 @@ export function LiveOrders() {
                 return (
                   <section
                     key={lane.status}
-                    className="min-w-0 rounded-2xl bg-stone-100 p-3"
+                    className={`${lane.status === activeLane ? "flex" : "hidden"} min-w-0 flex-col rounded-2xl bg-stone-100 p-3 md:flex`}
                     aria-label={lane.title}
                   >
                     <header className="px-2 pb-5 pt-2">
