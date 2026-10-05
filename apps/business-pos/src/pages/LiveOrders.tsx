@@ -5,7 +5,7 @@ import {
   ChefHat,
   Clock3,
   Flame,
-  History,
+  GraduationCap,
   LayoutGrid,
   Pause,
   Play,
@@ -15,6 +15,12 @@ import {
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
+import {
+  advanceDemoOrder,
+  createDemoOrder,
+  markDemoNoShow,
+  payDemoOrder,
+} from "../simulator.js";
 import {
   chime,
   EmptyState,
@@ -32,9 +38,19 @@ import {
 export function CashTender({
   order,
   onClose,
+  simulator = false,
+  onSimulatorPayment,
+  onSimulatorTenderSelected,
+  onExitSimulator,
+  trainingMessage,
 }: {
   order: Order;
   onClose: () => void;
+  simulator?: boolean;
+  onSimulatorPayment?: (orderId: string, tenderedCents: number) => void;
+  onSimulatorTenderSelected?: (tenderedCents: number) => void;
+  onExitSimulator?: () => void;
+  trainingMessage?: string;
 }) {
   const { command, connected } = useRealtime();
   const [value, setValue] = useState(""),
@@ -47,6 +63,11 @@ export function CashTender({
   const change = cents - order.totalCents;
   async function pay(amount: number) {
     setBusy(true);
+    if (simulator) {
+      onSimulatorPayment?.(order.id, amount);
+      setBusy(false);
+      return;
+    }
     const result = await command("pos_order_paid", {
       orderId: order.id,
       tenderedCents: amount,
@@ -60,6 +81,14 @@ export function CashTender({
       onClose={onClose}
     >
       <OrderLines order={order} />
+      {simulator && trainingMessage && (
+        <p
+          className="my-4 rounded-xl border-2 border-yellow-500 bg-yellow-50 p-4 font-semibold text-stone-900"
+          role="status"
+        >
+          {trainingMessage}
+        </p>
+      )}
       <div className="my-6 flex items-end justify-between border-t border-stone-200 pt-5">
         <span>Total a cobrar</span>
         <strong className="text-4xl tabular-nums">
@@ -81,10 +110,16 @@ export function CashTender({
       <div className="my-4 grid grid-cols-2 gap-3">
         {[100, 200, 500].map((preset) => (
           <button
-            className="btn min-h-16 text-xl tabular-nums"
+            className={`btn min-h-16 text-xl tabular-nums ${simulator && preset === 200 && trainingMessage?.toLowerCase().includes("elige $200") ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
             key={preset}
-            disabled={busy}
-            onClick={() => setValue(String(preset))}
+            data-tour-target={
+              simulator && preset === 200 ? "tender-200" : undefined
+            }
+            disabled={(!simulator && !connected) || busy}
+            onClick={() => {
+              setValue(String(preset));
+              if (simulator) onSimulatorTenderSelected?.(preset * 100);
+            }}
           >
             {mxn(preset * 100)}
           </button>
@@ -109,7 +144,13 @@ export function CashTender({
       </div>
       <button
         className="btn btn-primary w-full"
-        disabled={!connected || busy || !valid || change < 0}
+        data-tour-target={simulator ? "confirm-demo-payment" : undefined}
+        disabled={(!simulator && !connected) || busy || !valid || change < 0}
+        style={
+          simulator && trainingMessage?.includes("confirma el pago simulado")
+            ? { outline: "4px solid #facc15" }
+            : undefined
+        }
         onClick={() => void pay(cents)}
       >
         Confirmar pago y entregar
@@ -117,7 +158,7 @@ export function CashTender({
       </button>
       <button
         className="btn mt-3 w-full"
-        disabled={!connected || busy}
+        disabled={(!simulator && !connected) || busy}
         onClick={() => void pay(order.totalCents)}
       >
         Efectivo exacto · Cobrar y entregar {mxn(order.totalCents)}
@@ -125,6 +166,11 @@ export function CashTender({
       <p className="mt-4 text-center text-xs text-stone-500">
         Confirma solo después de recibir el efectivo.
       </p>
+      {simulator && onExitSimulator && (
+        <button className="btn mt-3 w-full" onClick={onExitSimulator}>
+          Salir del simulador
+        </button>
+      )}
     </Modal>
   );
 }
@@ -132,10 +178,18 @@ export function TicketCard({
   order,
   now,
   onPay,
+  simulator = false,
+  highlighted = false,
+  onSimulatorAdvance,
+  onSimulatorNoShow,
 }: {
   order: Order;
   now: number;
   onPay: () => void;
+  simulator?: boolean;
+  highlighted?: boolean;
+  onSimulatorAdvance?: (order: Order) => void;
+  onSimulatorNoShow?: (orderId: string) => void;
 }) {
   const { command, connected } = useRealtime();
   const [noShow, setNoShow] = useState(false),
@@ -154,10 +208,8 @@ export function TicketCard({
   const formattedTimer = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
   const aging =
-    (isReview && elapsedSeconds > 180) ||
-    (isCooking && elapsedSeconds > 900);
-  const isWarning =
-    (isCooking && minutes >= 5) || (isReview && minutes >= 2);
+    (isReview && elapsedSeconds > 180) || (isCooking && elapsedSeconds > 900);
+  const isWarning = (isCooking && minutes >= 5) || (isReview && minutes >= 2);
   const agingLimitSeconds = isReview ? 180 : 900;
   const progressPercent = Math.min(
     100,
@@ -165,6 +217,11 @@ export function TicketCard({
   );
   async function advance() {
     setBusy(true);
+    if (simulator) {
+      onSimulatorAdvance?.(order);
+      setBusy(false);
+      return;
+    }
     await command("pos_update_status", {
       orderId: order.id,
       status: order.status === "review" ? "cooking" : "ready",
@@ -174,7 +231,9 @@ export function TicketCard({
   return (
     <article
       data-order-id={order.id}
-      className={`overflow-hidden rounded-xl border-2 bg-white shadow-xs transition-colors ${
+      className={`relative overflow-hidden rounded-xl border-2 bg-white shadow-xs transition-colors ${
+        highlighted ? "z-40 ring-4 ring-yellow-400" : ""
+      } ${
         aging
           ? "animate-pulse border-red-500 bg-red-50/40"
           : order.status === "cooking" && minutes >= 5
@@ -209,7 +268,9 @@ export function TicketCard({
       <div className="p-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <strong className="text-xl tracking-tight">{orderLabel(order)}</strong>
+            <strong className="text-xl tracking-tight">
+              {orderLabel(order)}
+            </strong>
             <p className="font-semibold text-stone-900">{order.customerName}</p>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
@@ -252,10 +313,10 @@ export function TicketCard({
                 : isWarning
                   ? "Atención"
                   : order.status === "review"
-                      ? "En revisión"
+                    ? "En revisión"
                     : order.status === "cooking"
                       ? "Cocinando"
-                        : "Lista para recoger"}
+                      : "Lista para recoger"}
             </span>
           </div>
         </div>
@@ -270,7 +331,7 @@ export function TicketCard({
           <>
             <button
               className="btn btn-primary mt-4 w-full"
-              disabled={!connected || busy}
+              disabled={(!simulator && !connected) || busy}
               onClick={() => void advance()}
             >
               <Check size={17} />
@@ -278,7 +339,7 @@ export function TicketCard({
             </button>
             <button
               className="btn btn-danger mt-2 w-full"
-              disabled={!connected || busy}
+              disabled={(!simulator && !connected) || busy}
               onClick={() => setNoShow(true)}
             >
               Anular pedido / No-Show
@@ -288,7 +349,7 @@ export function TicketCard({
           <>
             <button
               className="btn mt-4 w-full border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900"
-              disabled={!connected || busy}
+              disabled={(!simulator && !connected) || busy}
               onClick={onPay}
             >
               Cobrar al entregar
@@ -296,7 +357,7 @@ export function TicketCard({
             </button>
             <button
               className="btn btn-danger mt-2 w-full"
-              disabled={!connected || busy}
+              disabled={(!simulator && !connected) || busy}
               onClick={() => setNoShow(true)}
             >
               Anular pedido / No-Show
@@ -305,7 +366,7 @@ export function TicketCard({
         ) : (
           <button
             className="btn btn-primary mt-4 w-full"
-            disabled={!connected || busy}
+            disabled={(!simulator && !connected) || busy}
             onClick={() => void advance()}
           >
             <Check size={17} />
@@ -328,9 +389,15 @@ export function TicketCard({
               </button>
               <button
                 className="btn btn-danger flex-1"
-                disabled={!connected || busy}
+                disabled={(!simulator && !connected) || busy}
                 onClick={async () => {
                   setBusy(true);
+                  if (simulator) {
+                    onSimulatorNoShow?.(order.id);
+                    setBusy(false);
+                    setNoShow(false);
+                    return;
+                  }
                   const reply = await command("pos_mark_noshow", {
                     orderId: order.id,
                   });
@@ -350,10 +417,7 @@ export function TicketCard({
 
 function TicketSkeleton() {
   return (
-    <div
-      className="panel animate-pulse space-y-4"
-      aria-hidden="true"
-    >
+    <div className="panel animate-pulse space-y-4" aria-hidden="true">
       <div className="flex justify-between gap-3">
         <div className="h-6 w-20 rounded bg-stone-200" />
         <div className="h-6 w-14 rounded bg-stone-200" />
@@ -410,7 +474,8 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
               </h2>
             </div>
             <p className="mt-1 text-xs text-stone-500">
-              Verifica el historial de comandas entregadas, montos cobrados y tiempos originales de este turno sin necesidad de cerrar turno.
+              Verifica el historial de comandas entregadas, montos cobrados y
+              tiempos originales de este turno sin necesidad de cerrar turno.
             </p>
           </div>
 
@@ -565,8 +630,8 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                     <td className="px-4 py-3 text-[11px] text-stone-500">
                       {order.transaction ? (
                         <span>
-                          Recibido: {mxn(order.transaction.tenderedCents)} · Cambio:{" "}
-                          {mxn(order.transaction.changeCents)}
+                          Recibido: {mxn(order.transaction.tenderedCents)} ·
+                          Cambio: {mxn(order.transaction.changeCents)}
                         </span>
                       ) : (
                         "--"
@@ -641,14 +706,18 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                   {/* Audit Timestamps */}
                   <div className="mt-2.5 rounded-lg bg-stone-50 p-2.5 border border-stone-100 space-y-1 text-[11px] text-stone-600">
                     <div className="flex justify-between">
-                      <span className="text-stone-500">Hora original (Creado):</span>
+                      <span className="text-stone-500">
+                        Hora original (Creado):
+                      </span>
                       <strong className="font-mono text-stone-800">
                         {time(order.createdAt)}
                       </strong>
                     </div>
                     {order.paidAt && (
                       <div className="flex justify-between">
-                        <span className="text-stone-500">Hora cobrado (Caja):</span>
+                        <span className="text-stone-500">
+                          Hora cobrado (Caja):
+                        </span>
                         <strong className="font-mono text-stone-800">
                           {time(order.paidAt)}
                         </strong>
@@ -684,8 +753,8 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                   </div>
                   {order.transaction && (
                     <p className="mt-1 text-xs text-stone-500">
-                      Efectivo recibido: {mxn(order.transaction.tenderedCents)} · Cambio:{" "}
-                      {mxn(order.transaction.changeCents)}
+                      Efectivo recibido: {mxn(order.transaction.tenderedCents)}{" "}
+                      · Cambio: {mxn(order.transaction.changeCents)}
                     </p>
                   )}
                 </div>
@@ -699,16 +768,28 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
 }
 
 export function LiveOrders() {
-  const { snapshot, connected, command } = useRealtime();
+  const { snapshot: liveSnapshot, connected, command } = useRealtime();
   const [inventory, setInventory] = useState(false),
     [payId, setPayId] = useState<string | null>(null),
     [pausing, setPausing] = useState(false),
     [kitchenOnly, setKitchenOnly] = useState(false),
     [showComalDetails, setShowComalDetails] = useState(false),
+    [simulator, setSimulator] = useState(false),
+    [demoOrders, setDemoOrders] = useState<Order[]>([]),
+    [demoCompletedOrders, setDemoCompletedOrders] = useState<Order[]>([]),
+    [tourStep, setTourStep] = useState(0),
     [activeTab, setActiveTab] = useState<"queue" | "completed">("queue"),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
+  const snapshot =
+    simulator && liveSnapshot
+      ? {
+          ...liveSnapshot,
+          activeOrders: demoOrders,
+          completedOrders: demoCompletedOrders,
+        }
+      : liveSnapshot;
   const previousActive = useRef<Set<string> | null>(null);
   const previousCooking = useRef<Set<string> | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -717,8 +798,59 @@ export function LiveOrders() {
   );
   const now = useTicketTimer();
   const layoutKey =
-    snapshot?.activeOrders.map((order) => `${order.id}:${order.status}`).join("|") ??
-    "";
+    snapshot?.activeOrders
+      .map((order) => `${order.id}:${order.status}`)
+      .join("|") ?? "";
+
+  function startSimulator() {
+    setSimulator(true);
+    setDemoOrders([createDemoOrder()]);
+    setDemoCompletedOrders([]);
+    setPayId(null);
+    setTourStep(1);
+    setActiveTab("queue");
+    setActiveLane("review");
+  }
+
+  function exitSimulator() {
+    setSimulator(false);
+    setDemoOrders([]);
+    setDemoCompletedOrders([]);
+    setPayId(null);
+    setTourStep(0);
+  }
+
+  function advanceSimulatorOrder(order: Order) {
+    const next = advanceDemoOrder(order);
+    setDemoOrders((orders) =>
+      orders.map((current) => (current.id === order.id ? next : current)),
+    );
+    setTourStep(order.status === "review" ? 2 : 3);
+    setActiveLane(next.status === "cooking" ? "cooking" : "ready");
+  }
+
+  function markSimulatorNoShow(orderId: string) {
+    const order = demoOrders.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    const noShow = markDemoNoShow(order);
+    setDemoOrders((orders) =>
+      orders.filter((candidate) => candidate.id !== orderId),
+    );
+    setDemoCompletedOrders((completed) => [...completed, noShow]);
+  }
+
+  function completeSimulatorPayment(orderId: string, tenderedCents: number) {
+    const order = demoOrders.find((candidate) => candidate.id === orderId);
+    if (!order) return;
+    const completed = payDemoOrder(order, tenderedCents);
+    setDemoOrders((orders) =>
+      orders.filter((candidate) => candidate.id !== orderId),
+    );
+    setDemoCompletedOrders((previous) => [...previous, completed]);
+    setPayId(null);
+    setActiveTab("completed");
+    setTourStep(5);
+  }
 
   useEffect(() => {
     const unlock = () => {
@@ -733,15 +865,15 @@ export function LiveOrders() {
   }, []);
 
   useEffect(() => {
-    if (!snapshot) return;
-    const currentActive = new Set(snapshot.activeOrders.map((o) => o.id));
+    if (!liveSnapshot) return;
+    const currentActive = new Set(liveSnapshot.activeOrders.map((o) => o.id));
     const currentCooking = new Set(
-      snapshot.activeOrders
+      liveSnapshot.activeOrders
         .filter((o) => o.status === "cooking")
         .map((o) => o.id),
     );
 
-    if (previousActive.current !== null) {
+    if (!simulator && previousActive.current !== null) {
       const hasNewCooking = [...currentCooking].some(
         (id) => !previousCooking.current?.has(id),
       );
@@ -758,7 +890,7 @@ export function LiveOrders() {
 
     previousActive.current = currentActive;
     previousCooking.current = currentCooking;
-  }, [snapshot]);
+  }, [liveSnapshot, simulator]);
   const cookingOrders =
     snapshot?.activeOrders.filter((o) => o.status === "cooking") ?? [];
 
@@ -840,7 +972,10 @@ export function LiveOrders() {
         <h1 className="display mb-6 text-3xl">Conectando con la cocina…</h1>
         <div className="grid gap-5 md:grid-cols-3">
           {["En revisión", "Cocinando", "Lista para recoger"].map((lane) => (
-            <section key={lane} className="space-y-3 rounded-2xl bg-stone-100 p-3">
+            <section
+              key={lane}
+              className="space-y-3 rounded-2xl bg-stone-100 p-3"
+            >
               <h2 className="px-2 py-2 font-bold text-stone-700">{lane}</h2>
               <TicketSkeleton />
               <TicketSkeleton />
@@ -885,32 +1020,77 @@ export function LiveOrders() {
     ready: snapshot.activeOrders.filter((order) => order.status === "ready")
       .length,
   };
+  const trainingMessage =
+    tourStep === 1
+      ? "Paso 1 de 5 · Pedido nuevo. Acepta el ticket para iniciar la cocina."
+      : tourStep === 2
+        ? "Paso 2 de 5 · La cocina está preparando el pedido. Márcalo listo al terminar."
+        : tourStep === 3
+          ? "Paso 3 de 5 · El pedido está listo. Tócalo para cobrar al entregar."
+          : tourStep === 4
+            ? "Paso 4 de 5 · El cliente paga con $200. Elige $200 y confirma el pago de práctica."
+            : tourStep === 4.5
+              ? "Paso 4 de 5 · Ahora confirma el pago simulado; no se registra dinero real."
+              : tourStep === 5
+                ? "Paso 5 de 5 · Revisa el historial de práctica. La venta no aparece en el ledger real."
+                : "";
 
   return (
-    <>
+    <div
+      className={`min-h-screen ${simulator ? "border-8 border-dashed border-yellow-400" : ""}`}
+      style={
+        simulator
+          ? {
+              borderImage:
+                "repeating-linear-gradient(45deg, #facc15 0 12px, #171717 12px 24px) 8",
+            }
+          : undefined
+      }
+    >
+      {simulator && (
+        <div className="sticky top-0 z-[70] flex flex-wrap items-center justify-between gap-3 bg-yellow-300 px-4 py-3 font-extrabold text-stone-950 shadow-md">
+          <span>
+            MODO DE PRUEBA — Las ventas no se registran ni se envían pedidos.
+          </span>
+          <button
+            className="btn border-stone-950 bg-stone-950 text-white hover:bg-stone-800"
+            onClick={exitSimulator}
+          >
+            Salir del simulador
+          </button>
+        </div>
+      )}
       <StaffHeader page="pos">
-        <button className="btn" onClick={() => setInventory(true)}>
-          <SlidersHorizontal size={16} />
-          Inventario
-        </button>
-        <button
-          role="switch"
-          aria-checked={!snapshot.acceptingOrders}
-          className={`btn ${snapshot.acceptingOrders ? "" : "btn-danger"}`}
-          disabled={!connected || pausing}
-          onClick={async () => {
-            setPausing(true);
-            await command("pos_toggle_accepting_orders", {
-              acceptingOrders: !snapshot.acceptingOrders,
-            });
-            setPausing(false);
-          }}
-        >
-          {snapshot.acceptingOrders ? <Pause size={16} /> : <Play size={16} />}
-          {snapshot.acceptingOrders
-            ? "Pausar pedidos web"
-            : "Reanudar pedidos web"}
-        </button>
+        {!simulator && (
+          <>
+            <button className="btn" onClick={() => setInventory(true)}>
+              <SlidersHorizontal size={16} />
+              Inventario
+            </button>
+            <button
+              role="switch"
+              aria-checked={!snapshot.acceptingOrders}
+              className={`btn ${snapshot.acceptingOrders ? "" : "btn-danger"}`}
+              disabled={!connected || pausing}
+              onClick={async () => {
+                setPausing(true);
+                await command("pos_toggle_accepting_orders", {
+                  acceptingOrders: !snapshot.acceptingOrders,
+                });
+                setPausing(false);
+              }}
+            >
+              {snapshot.acceptingOrders ? (
+                <Pause size={16} />
+              ) : (
+                <Play size={16} />
+              )}
+              {snapshot.acceptingOrders
+                ? "Pausar pedidos web"
+                : "Reanudar pedidos web"}
+            </button>
+          </>
+        )}
       </StaffHeader>
       {activeTab === "queue" && (
         <nav
@@ -918,23 +1098,23 @@ export function LiveOrders() {
           role="tablist"
           aria-label="Filas de pedidos"
         >
-        {visibleLanes.map((lane) => (
-          <button
-            key={lane.status}
-            id={`lane-tab-${lane.status}`}
-            type="button"
-            role="tab"
-            aria-selected={activeLane === lane.status}
-            aria-controls={`lane-panel-${lane.status}`}
-            className={`min-h-12 flex-1 border-b-4 px-2 py-3 text-center text-sm font-bold ${activeLane === lane.status ? "border-clay-600 text-clay-700" : "border-transparent text-stone-500"}`}
-            onClick={() => setActiveLane(lane.status)}
-          >
-            {lane.title}
-            <span className="ml-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs tabular-nums">
-              {laneCounts[lane.status]}
-            </span>
-          </button>
-        ))}
+          {visibleLanes.map((lane) => (
+            <button
+              key={lane.status}
+              id={`lane-tab-${lane.status}`}
+              type="button"
+              role="tab"
+              aria-selected={activeLane === lane.status}
+              aria-controls={`lane-panel-${lane.status}`}
+              className={`min-h-12 flex-1 border-b-4 px-2 py-3 text-center text-sm font-bold ${activeLane === lane.status ? "border-clay-600 text-clay-700" : "border-transparent text-stone-500"}`}
+              onClick={() => setActiveLane(lane.status)}
+            >
+              {lane.title}
+              <span className="ml-1 rounded-full bg-stone-100 px-2 py-0.5 text-xs tabular-nums">
+                {laneCounts[lane.status]}
+              </span>
+            </button>
+          ))}
         </nav>
       )}
       <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
@@ -951,6 +1131,16 @@ export function LiveOrders() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {!simulator && (
+              <button
+                className="btn border-yellow-600 bg-yellow-50 font-bold text-stone-900 hover:bg-yellow-100"
+                onClick={startSimulator}
+                title="Practica el flujo de cocina y caja sin cambiar los datos reales"
+              >
+                <GraduationCap size={16} />
+                Guía interactiva
+              </button>
+            )}
             {activeTab === "queue" && (
               <button
                 className={`btn transition-colors ${
@@ -1123,7 +1313,19 @@ export function LiveOrders() {
                           key={order.id}
                           order={order}
                           now={now}
-                          onPay={() => setPayId(order.id)}
+                          simulator={simulator}
+                          highlighted={
+                            simulator &&
+                            ((tourStep === 1 && order.status === "review") ||
+                              (tourStep === 2 && order.status === "cooking") ||
+                              (tourStep === 3 && order.status === "ready"))
+                          }
+                          onSimulatorAdvance={advanceSimulatorOrder}
+                          onSimulatorNoShow={markSimulatorNoShow}
+                          onPay={() => {
+                            setPayId(order.id);
+                            if (simulator) setTourStep(4);
+                          }}
                         />
                       ))}
                       {!connected && <TicketSkeleton />}
@@ -1142,14 +1344,57 @@ export function LiveOrders() {
         <footer className="mt-8 flex flex-wrap justify-between gap-3 text-xs text-stone-500">
           <span>Hecho con masa. Servido con cuidado.</span>
           <span>
-            Venta del turno: {mxn(snapshot.salesMetrics?.revenueCents || 0)} MXN
+            {simulator
+              ? "Las ventas reales del turno no se modifican en el simulador."
+              : `Venta del turno: ${mxn(snapshot.salesMetrics?.revenueCents || 0)} MXN`}
           </span>
         </footer>
       </main>
       {inventory && <InventoryControl onClose={() => setInventory(false)} />}{" "}
       {payOrder && (
-        <CashTender order={payOrder} onClose={() => setPayId(null)} />
+        <CashTender
+          order={payOrder}
+          onClose={() => {
+            setPayId(null);
+            if (simulator) setTourStep(3);
+          }}
+          simulator={simulator}
+          onExitSimulator={exitSimulator}
+          trainingMessage={simulator ? trainingMessage : undefined}
+          onSimulatorTenderSelected={(tenderedCents) => {
+            if (tenderedCents === 20000) setTourStep(4.5);
+          }}
+          onSimulatorPayment={completeSimulatorPayment}
+        />
       )}
-    </>
+      {simulator && tourStep > 0 && (
+        <>
+          <div
+            className="pointer-events-none fixed inset-0 z-30 bg-black/45"
+            aria-hidden="true"
+          />
+          <aside
+            className="pointer-events-none fixed bottom-4 right-4 z-50 max-w-sm rounded-2xl border-2 border-yellow-400 bg-white p-5 text-stone-950 shadow-2xl"
+            role="status"
+            aria-live="polite"
+          >
+            <strong className="block text-sm font-black uppercase tracking-wide text-clay-800">
+              Guía de MasaFlow
+            </strong>
+            <p className="mt-2 text-sm font-semibold leading-relaxed">
+              {trainingMessage}
+            </p>
+            {tourStep === 5 && (
+              <button
+                className="btn btn-primary pointer-events-auto mt-4 w-full"
+                onClick={exitSimulator}
+              >
+                Finalizar guía y volver al turno real
+              </button>
+            )}
+          </aside>
+        </>
+      )}
+    </div>
   );
 }
