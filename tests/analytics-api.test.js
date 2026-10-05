@@ -9,7 +9,7 @@ const { initialState } = require('../assets/masaflow-store.js');
 
 async function service(t, options = {}) {
   const directory = options.dataDirectory || await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-api-'));
-  const app = await createService({ dataDirectory: directory, printerHost: '', summaryOptions: { apiKey: '' }, ...options });
+  const app = await createService({ dataDirectory: directory, summaryOptions: { apiKey: '' }, ...options });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await app.close(); await fs.rm(directory, { recursive: true, force: true }); });
   return { ...app, url: `http://127.0.0.1:${app.server.address().port}` };
@@ -59,11 +59,12 @@ test('summary API rejects cross-origin actions and accepts an explicitly request
   const summary = await response.json(); assert.equal(summary.summary.headline, 'Sales summary'); assert.equal(summary.summary.findings[0].value, 0); assert.equal(requests, 1);
 });
 
-test('an inconsistent pending receipt does not block service restart or send a drawer pulse', async t => {
+test('an inconsistent legacy hardware receipt does not block service startup or leak into analytics', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-invalid-recovery-'));
   const state = initialState(); state.payments.push({ id: 'invalid-payment', orderId: 'missing-order', drawerKickStatus: 'pending' });
   await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
   const app = await service(t, { dataDirectory: directory });
   assert.equal(app.engine.getState().hardwareJobs.length, 0);
   const dto = await (await fetch(`${app.url}/api/analytics`)).json(); assert.equal(dto.quality.excludedReceipts, 1); assert.equal(dto.sales.ticketCount, 0);
+  assert.equal('drawerExceptions' in dto.operations, false);
 });

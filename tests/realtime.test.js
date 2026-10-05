@@ -32,19 +32,62 @@ function submit(engine, extra) {
   engine.dispatch("submit_client_order", data);
   return data;
 }
-function pay(engine, orderId, tenderedCents = 20000) {
-  return engine.dispatch("pos_order_paid", { orderId, tenderedCents });
+function prepareForPickup(engine, orderId) {
+  const order = [...engine.getState().activeOrders, ...engine.getState().completedOrders]
+    .find((candidate) => candidate.id === orderId);
+  if (order?.status === "review") {
+    engine.dispatch("pos_update_status", { orderId, status: "cooking" });
+    engine.dispatch("pos_update_status", { orderId, status: "ready" });
+  } else if (order?.status === "cooking") {
+    engine.dispatch("pos_update_status", { orderId, status: "ready" });
+  }
+}
+function pay(engine, orderId, tenderedCents = 20000, tipCents = 0) {
+  prepareForPickup(engine, orderId);
+  return engine.dispatch("pos_order_paid", {
+    orderId,
+    tenderedCents,
+    tipCents,
+  });
 }
 function complete(engine, orderId) {
-  engine.dispatch("pos_update_status", { orderId, status: "ready" });
-  engine.dispatch("pos_update_status", { orderId, status: "completed" });
+  if (engine.getState().completedOrders.some((order) => order.id === orderId))
+    return;
+  pay(engine, orderId);
 }
 
 test("cash is recognized only on payment, exactly once, with server prices and immutable centavos", (t) => {
   const { engine } = fixture(t);
   const order = submit(engine, { totalCents: 1 });
+  assert.equal(engine.getState().activeOrders[0].status, "review");
   assert.equal(engine.getState().salesMetrics.revenueCents, 0);
   assert.equal(engine.getState().activeOrders[0].totalCents, 19000);
+  assert.throws(
+    () =>
+      engine.dispatch("pos_order_paid", {
+        orderId: order.orderId,
+        tenderedCents: 20000,
+      }),
+    /listo para entregar/,
+  );
+  engine.dispatch("pos_update_status", {
+    orderId: order.orderId,
+    status: "cooking",
+  });
+  assert.equal(engine.getState().salesMetrics.revenueCents, 0);
+  assert.throws(
+    () =>
+      engine.dispatch("pos_order_paid", {
+        orderId: order.orderId,
+        tenderedCents: 20000,
+      }),
+    /listo para entregar/,
+  );
+  engine.dispatch("pos_update_status", {
+    orderId: order.orderId,
+    status: "ready",
+  });
+  assert.equal(engine.getState().salesMetrics.revenueCents, 0);
   assert.throws(() => pay(engine, order.orderId, 18999), /no cubre/);
   assert.throws(() => pay(engine, order.orderId, 20000.5), /centavos/);
   assert.throws(() => pay(engine, order.orderId, "20000"), /centavos/);
@@ -52,15 +95,15 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   const revision = engine.getState().revision;
   pay(engine, order.orderId);
   assert.equal(engine.getState().revision, revision);
-  assert.equal(engine.getState().activeOrders[0].status, "cooking");
+  assert.equal(engine.getState().activeOrders.length, 0);
+  assert.equal(engine.getState().completedOrders[0].status, "completed");
   const m = engine.getState().salesMetrics;
   assert.equal(m.revenueCents, 19000);
   assert.equal(m.tenderedCents, 20000);
   assert.equal(m.changeCents, 1000);
   assert.equal(m.paidOrders, 1);
-  assert.equal(m.itemPerformance.length, 0);
+  assert.equal(m.itemPerformance.length, 1);
   assert.throws(() => pay(engine, order.orderId, 50000), /otro importe/);
-  complete(engine, order.orderId);
   assert.deepEqual(engine.getState().salesMetrics.itemPerformance, [
     { id: "huarache", name: "Huarache", quantity: 2, revenueCents: 19000 },
   ]);
@@ -82,27 +125,30 @@ test("no-show leaves the queue, remains in history, never contributes to cash or
   assert.equal(state.salesMetrics.noShows, 1);
   assert.equal(state.salesMetrics.revenueCents, 0);
   assert.equal(state.salesMetrics.itemPerformance.length, 0);
-  assert.throws(() => pay(engine, order.orderId), /por pagar/);
+  assert.throws(() => pay(engine, order.orderId), /listo para entregar/);
 });
-test("transition validation prevents unpaid cooking, skipping handoff, and deleting a paid ticket", (t) => {
+test("transition validation requires staff acceptance, cooking, pickup, and payment", (t) => {
   const { engine } = fixture(t);
   const { orderId } = submit(engine);
   assert.throws(
     () => engine.dispatch("pos_update_status", { orderId, status: "ready" }),
     /Transición/,
   );
+  assert.throws(
+    () => engine.dispatch("pos_order_paid", { orderId, tenderedCents: 20000 }),
+    /listo para entregar/,
+  );
+  engine.dispatch("pos_update_status", { orderId, status: "cooking" });
+  engine.dispatch("pos_update_status", { orderId, status: "ready" });
   pay(engine, orderId);
   assert.throws(
-    () =>
-      engine.dispatch("pos_update_status", { orderId, status: "completed" }),
-    /Transición/,
+    () => engine.dispatch("pos_mark_noshow", { orderId }),
+    /sin cobrar/,
   );
   assert.throws(
-    () => engine.dispatch("pos_mark_noshow", { orderId }),
-    /sin pagar/,
+    () => engine.dispatch("pos_update_status", { orderId, status: "cooking" }),
+    /Transición/,
   );
-  complete(engine, orderId);
-  complete(engine, orderId);
   assert.equal(engine.getState().completedOrders.length, 1);
 });
 test("order idempotency survives restart, stock changes, and pause; conflicts reject", (t) => {
@@ -112,6 +158,21 @@ test("order idempotency survives restart, stock changes, and pause; conflicts re
     id: "blue",
     kind: "modifier",
     available: false,
+  });
+  test("existing v3 unpaid tickets migrate to the review queue without recording revenue", (t) => {
+    const { engine, directory } = fixture(t);
+    const { orderId } = submit(engine);
+    const oldState = engine.getState();
+    oldState.activeOrders[0].status = "unpaid";
+    delete oldState.activeOrders[0].acceptedAt;
+    writeAtomic(engine.file, oldState);
+
+    const restored = createEngine({ directory });
+    const order = restored.getState().activeOrders[0];
+    assert.equal(order.id, orderId);
+    assert.equal(order.status, "review");
+    assert.equal(order.acceptedAt, null);
+    assert.equal(restored.getState().salesMetrics.revenueCents, 0);
   });
   engine.dispatch("pos_toggle_accepting_orders", { acceptingOrders: false });
   const recovered = createEngine({ directory });
@@ -167,8 +228,9 @@ test("failed durable payment leaves state, revision and receipt unchanged", (t) 
       writeAtomic(file, state);
     },
   });
-  const { orderId } = submit(engine),
-    before = engine.getState();
+  const { orderId } = submit(engine);
+  prepareForPickup(engine, orderId);
+  const before = engine.getState();
   fail = true;
   assert.throws(() => pay(engine, orderId), /full/);
   assert.deepEqual(engine.getState(), before);
@@ -252,7 +314,7 @@ test("recovery rejects corrupt paid receipts without overwriting the original da
   const order = submit(engine);
   pay(engine, order.orderId);
   const corrupt = engine.getState();
-  corrupt.activeOrders[0].transaction.changeCents++;
+  corrupt.completedOrders[0].transaction.changeCents++;
   const file = path.join(directory, "data.json");
   fs.writeFileSync(file, JSON.stringify(corrupt));
   const bytes = fs.readFileSync(file, "utf8");
@@ -334,6 +396,20 @@ test("Socket.io PIN gates every staff event and protects other customers and fin
   assert.equal(other.salesMetrics, null);
   assert.ok(!JSON.stringify(other).includes("Ana"));
   assert.equal(
+    (await ack(staff.socket, "pos_update_status", {
+      orderId: order.orderId,
+      status: "cooking",
+    })).ok,
+    true,
+  );
+  assert.equal(
+    (await ack(staff.socket, "pos_update_status", {
+      orderId: order.orderId,
+      status: "ready",
+    })).ok,
+    true,
+  );
+  assert.equal(
     (
       await ack(staff.socket, "pos_order_paid", {
         orderId: order.orderId,
@@ -372,9 +448,9 @@ test("reconnect snapshots reconcile missed tickets and menu updates; logout revo
     id: "blue",
     available: false,
   });
-  await ack(staff.socket, "pos_order_paid", {
+  await ack(staff.socket, "pos_update_status", {
     orderId: order.orderId,
-    tenderedCents: 20000,
+    status: "cooking",
   });
   const reconnect = await connect(customer.sessionId);
   assert.equal(reconnect.initial.activeOrders[0].status, "cooking");
@@ -382,6 +458,10 @@ test("reconnect snapshots reconcile missed tickets and menu updates; logout revo
     reconnect.initial.modifiers.find((m) => m.id === "blue").available,
     false,
   );
+  await ack(staff.socket, "pos_update_status", {
+    orderId: order.orderId,
+    status: "ready",
+  });
   const resumedStaff = await connect(randomUUID(), login.token);
   assert.equal(resumedStaff.initial.staff, true);
   await staff.socket.timeout(2000).emitWithAck("staff_logout");
@@ -470,10 +550,10 @@ test("keep-the-change tips reconcile separately from revenue, survive restart, a
   const { engine, directory } = fixture(t);
   const { orderId } = submit(engine);
   const request = { orderId, tenderedCents: 20000, tipCents: 1000 };
-  engine.dispatch("pos_order_paid", request);
+  pay(engine, orderId, request.tenderedCents, request.tipCents);
   engine.dispatch("pos_order_paid", request);
   let s = engine.getState();
-  assert.equal(s.activeOrders[0].transaction.changeCents, 0);
+  assert.equal(s.completedOrders[0].transaction.changeCents, 0);
   assert.equal(s.salesMetrics.revenueCents, 19000);
   assert.equal(s.salesMetrics.tipsCents, 1000);
   assert.equal(s.salesMetrics.cashHeldCents, 20000);
@@ -510,6 +590,7 @@ test("keep-the-change tips reconcile separately from revenue, survive restart, a
 test("partial tips and centavos calculate exact residual change; invalid tips never create a receipt", (t) => {
   const { engine } = fixture(t);
   const { orderId } = submit(engine);
+  prepareForPickup(engine, orderId);
   const before = engine.getState();
   for (const tipCents of [
     -1,
@@ -534,7 +615,7 @@ test("partial tips and centavos calculate exact residual change; invalid tips ne
     tenderedCents: 20001,
     tipCents: 551,
   });
-  const t1 = engine.getState().activeOrders[0].transaction;
+  const t1 = engine.getState().completedOrders[0].transaction;
   assert.equal(t1.changeCents, 450);
   assert.equal(t1.totalCents + t1.tipCents + t1.changeCents, t1.tenderedCents);
 });
@@ -543,13 +624,13 @@ test("older v3 receipts migrate missing tips to zero and corrupted tip equations
   const { orderId } = submit(engine);
   pay(engine, orderId);
   const previous = engine.getState();
-  delete previous.activeOrders[0].transaction.tipCents;
+  delete previous.completedOrders[0].transaction.tipCents;
   writeAtomic(engine.file, previous);
   const restored = createEngine({ directory });
-  assert.equal(restored.getState().activeOrders[0].transaction.tipCents, 0);
+  assert.equal(restored.getState().completedOrders[0].transaction.tipCents, 0);
   assert.equal(restored.getState().salesMetrics.cashHeldCents, 19000);
   const corrupt = restored.getState();
-  corrupt.activeOrders[0].transaction.tipCents = 1;
+  corrupt.completedOrders[0].transaction.tipCents = 1;
   writeAtomic(engine.file, corrupt);
   assert.throws(() => createEngine({ directory }), /inconsistente/);
 });
@@ -562,6 +643,7 @@ test("failed tip persistence leaves no cash receipt or kitchen dispatch", (t) =>
     },
   });
   const { orderId } = submit(engine);
+  prepareForPickup(engine, orderId);
   const before = engine.getState();
   fail = true;
   assert.throws(
@@ -632,19 +714,7 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash 
   assert.equal(engine.getState().activeOrders.length, 40);
   const paid = requests.filter((_, i) => i % 5 !== 0),
     absent = requests.filter((_, i) => i % 5 === 0);
-  const payments = await Promise.all(
-    paid.flatMap((order) =>
-      Array.from({ length: 2 }, () =>
-        ack(staff.socket, "pos_order_paid", {
-          orderId: order.orderId,
-          tenderedCents: 10000,
-          tipCents: 500,
-        }),
-      ),
-    ),
-  );
-  assert.ok(payments.every((reply) => reply.ok));
-  for (const status of ["ready", "completed"])
+  for (const status of ["cooking", "ready"])
     assert.ok(
       (
         await Promise.all(
@@ -657,6 +727,18 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash 
         )
       ).every((reply) => reply.ok),
     );
+  const payments = await Promise.all(
+    paid.flatMap((order) =>
+      Array.from({ length: 2 }, () =>
+        ack(staff.socket, "pos_order_paid", {
+          orderId: order.orderId,
+          tenderedCents: 10000,
+          tipCents: 500,
+        }),
+      ),
+    ),
+  );
+  assert.ok(payments.every((reply) => reply.ok));
   assert.ok(
     (
       await Promise.all(
@@ -690,6 +772,7 @@ test("uncertain directory flush blocks mutations and restart recovers the paymen
     },
   });
   const { orderId } = submit(engine);
+  prepareForPickup(engine, orderId);
   fail = true;
   assert.throws(() => pay(engine, orderId), { code: "PERSISTENCE_UNCERTAIN" });
   assert.equal(engine.getState().salesMetrics.revenueCents, 19000);

@@ -60,10 +60,6 @@
           <i class="fa-solid fa-bell" aria-hidden="true"></i>
           <span data-mf-bell-dot hidden class="absolute top-3 right-3 w-2 h-2 bg-brand-orange rounded-full border-2 border-white"></span>
         </a>
-        <button type="button" id="manual-drawer" data-testid="manual-drawer-kick" class="bg-brand-orange hover:bg-orange-700 text-white font-semibold rounded-2xl px-6 py-3 shadow-lg shadow-orange-100 flex items-center justify-center gap-2.5 transition-all active:scale-95 w-full md:w-auto disabled:opacity-50">
-          <i class="fa-solid fa-cash-register text-sm" aria-hidden="true"></i>
-          Open Cash Drawer
-        </button>
       </div>
     </header>
 
@@ -122,9 +118,6 @@
             <button type="button" id="export-csv" data-testid="export-csv" disabled class="flex-1 sm:flex-none px-4 py-2.5 bg-white border border-stone-100 rounded-xl text-xs font-bold text-stone-500 hover:border-brand-orange transition-colors min-h-[44px] md:min-h-0 disabled:opacity-50">
               <i class="fa-solid fa-download mr-2" aria-hidden="true"></i> Export
             </button>
-            <button type="button" id="print-report" data-testid="print-report" class="flex-1 sm:flex-none px-4 py-2.5 bg-brand-obsidian text-white rounded-xl text-xs font-bold hover:bg-stone-800 transition-colors min-h-[44px] md:min-h-0">
-              <i class="fa-solid fa-print mr-2" aria-hidden="true"></i> Print Report
-            </button>
           </div>
         </div>
         <div class="overflow-x-auto print:overflow-visible">
@@ -137,7 +130,6 @@
                 <th scope="col" class="px-3 xl:px-6 min-[1400px]:px-8 first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8 py-5">Items</th>
                 <th scope="col" class="px-3 xl:px-6 min-[1400px]:px-8 first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8 py-5 text-right">Amount</th>
                 <th scope="col" class="px-3 xl:px-6 min-[1400px]:px-8 first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8 py-5">Status</th>
-                <th scope="col" class="px-3 xl:px-6 min-[1400px]:px-8 first:pl-6 last:pr-6 md:first:pl-8 md:last:pr-8 py-5 text-center print:hidden">Action</th>
               </tr>
             </thead>
             <tbody id="transactions-body" class="divide-y divide-stone-50"></tbody>
@@ -145,7 +137,7 @@
             <!-- Empty State -->
             <tbody id="empty-state" class="hidden">
               <tr>
-                <td colspan="7" class="px-8 py-20 text-center">
+                <td colspan="6" class="px-8 py-20 text-center">
                   <div class="flex flex-col items-center justify-center">
                     <div class="w-20 h-20 bg-stone-50 rounded-full flex items-center justify-center mb-4 border border-stone-100">
                       <i class="fa-solid fa-receipt text-3xl text-stone-200" aria-hidden="true"></i>
@@ -260,7 +252,6 @@ window.addEventListener('DOMContentLoaded', () => {
   const PAGE_SIZE = 10;
   const filters = { search: '', status: 'all', range: 'all', from: '', to: '', scope: 'all' };
   let page = 1;
-  let printing = false;
   let loaded = false;
   let loadFailed = false;
   let activeShiftId;
@@ -504,7 +495,6 @@ window.addEventListener('DOMContentLoaded', () => {
       <td class="${CELL}"><div class="flex flex-wrap gap-1 min-w-[9.5rem]">${itemChips(order)}</div></td>
       <td class="${CELL} text-right font-bold text-brand-orange">${money(payment.totalCents, payment.currency)}<p class="${META} whitespace-nowrap"><span class="block xl:inline">Tendered ${money(payment.tenderedCents, payment.currency)}</span><span class="hidden xl:inline"> · </span><span class="block xl:inline">Change ${money(payment.changeCents, payment.currency)}</span></p></td>
       <td class="${CELL}"><span class="${status.chip}">${escape(status.label)}</span></td>
-      <td class="${CELL} text-center print:hidden"><button type="button" class="w-11 h-11 md:w-8 md:h-8 rounded-lg text-stone-400 hover:text-brand-orange hover:bg-orange-50 transition-all disabled:opacity-50" data-receipt="${escape(order.id)}" data-testid="reprint-${escape(order.id)}" aria-label="Reprint receipt for ${escape(number)}"><i class="fa-solid fa-receipt" aria-hidden="true"></i></button></td>
     </tr>`;
   }
 
@@ -526,8 +516,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
     page = Math.min(Math.max(1, page), pages);
     const start = (page - 1) * PAGE_SIZE;
-    // A printed report lists every matching row, not just the page on screen.
-    const visible = printing ? rows : rows.slice(start, start + PAGE_SIZE);
+    const visible = rows.slice(start, start + PAGE_SIZE);
     exportRows = rows;
 
     const count = rows.length + ' cash ' + (rows.length === 1 ? 'transaction' : 'transactions') + ' shown · unpaid orders are excluded';
@@ -545,7 +534,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 
     $('transaction-range').textContent = rows.length
-      ? 'Showing ' + (printing ? 1 : start + 1) + '–' + (printing ? rows.length : start + visible.length) + ' of ' + rows.length.toLocaleString(MasaFlowI18n.getLocale() === 'en' ? 'en-US' : 'es-MX') + ' ' + (rows.length === 1 ? 'transaction' : 'transactions')
+      ? 'Showing ' + (start + 1) + '–' + (start + visible.length) + ' of ' + rows.length.toLocaleString(MasaFlowI18n.getLocale() === 'en' ? 'en-US' : 'es-MX') + ' ' + (rows.length === 1 ? 'transaction' : 'transactions')
       : 'No transactions to show';
     const pager = $('transaction-pager');
     pager.hidden = pages < 2;
@@ -707,7 +696,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.addEventListener('click', async event => {
+  document.addEventListener('click', event => {
     const status = event.target.closest('[data-status-filter]');
     if (status) return applyFilters({ status: status.dataset.statusFilter });
     const range = event.target.closest('[data-range]');
@@ -728,28 +717,7 @@ window.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (event.target.closest('#export-csv')) { try { exportCsv(); } catch (error) { setError(error); } return; }
-    if (event.target.closest('#print-report')) return window.print();
-
-    const receipt = event.target.closest('[data-receipt]');
-    const drawer = event.target.closest('#manual-drawer');
-    if (!receipt && !drawer) return;
-    // With the drawer closed the service answers 400 and manualKick reports it as an unrecorded
-    // pulse ("inspect the physical drawer"), which is wrong. Give the engine's real reason up front
-    // (same wording as the service) and show where to open a shift.
-    if (drawer && !MasaFlow.getOpenShift()) {
-      MasaFlowUI.toast('Open a drawer shift before a manual drawer pulse.', 'error');
-      $('drawer').scrollIntoView();
-      return $('opening-float')?.focus({ preventScroll: true });
-    }
-    const button = receipt || drawer;
-    button.disabled = true;
-    setError(null);
-    try { if (receipt) await MasaFlowUI.printReceipt(receipt.dataset.receipt); if (drawer) await MasaFlowUI.manualKick(); }
-    catch (error) { setError(error); } finally { button.disabled = false; }
   });
-
-  window.addEventListener('beforeprint', () => { printing = true; refreshLedger(); });
-  window.addEventListener('afterprint', () => { printing = false; refreshLedger(); });
 
   /* ---------- Start ---------- */
 

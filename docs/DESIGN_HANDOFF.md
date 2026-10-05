@@ -1,7 +1,8 @@
-# MasaFlow design handoff
+# MasaFlow legacy HTML design handoff
 
 The spec for building and changing MasaFlow screens so they match the UXPilot designs. It describes what is
-implemented in `apps/html/`. Where the app differs from the mockup export, section 9 says so and explains why.
+implemented in the legacy HTML/SSE runtime under `apps/html/`. The current realtime React workflow is documented in
+[`REALTIME_ARCHITECTURE.md`](REALTIME_ARCHITECTURE.md).
 
 ## 1. Overview
 
@@ -110,7 +111,7 @@ Class lists are exact. Shared components are defined in `styles/masaflow.css` (`
 | Awaiting-cash bell | `[data-mf-bell]` with `[data-mf-bell-dot]` | dot hidden when no unpaid orders | Label says how many orders are waiting |
 | Connection pill | `.mf-sync` `[data-mf-sync]` | connected: green with ping, "Live Sync Connected"; offline: red, "Reconnecting…" | Driven by the `masaflow:connection` event |
 | Offline notice | `.mf-service-banner`, floating pill under the header | hidden when connected | Staff wording on staff pages, "Reconnecting… your order is saved." on customer pages |
-| Ticket card | neutral: `bg-white rounded-[32px] border border-stone-100 p-6 flex flex-col shadow-sm`; highlighted: `border-2 border-orange-500 shadow-xl shadow-orange-100 order-card-pulse` | draft (Collect Cash + Cancel order), kitchen (next-step button + Print receipt), placeholder (dashed `bg-stone-100/50 border-dashed`) | Highlight comes from `MasaFlowUI.needsAttention(order, nowMs)` |
+| Ticket card | neutral: `bg-white rounded-[32px] border border-stone-100 p-6 flex flex-col shadow-sm`; highlighted: `border-2 border-orange-500 shadow-xl shadow-orange-100 order-card-pulse` | draft (Collect Cash + Cancel order), kitchen (next-step button), placeholder (dashed `bg-stone-100/50 border-dashed`) | Highlight comes from `MasaFlowUI.needsAttention(order, nowMs)` |
 | Item row | `flex items-center justify-between p-3 bg-stone-50 rounded-2xl` + `w-6 h-6 rounded bg-stone-900` quantity | ready: green check | Second line: modifiers, "No Cilantro", "Toppings on the side"; notes in orange-600 |
 | Status pill | `text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-md` | New orange-50/600, Preparing blue-50/700, Ready green-50/700, Completed emerald | Ledger chips add a matching border |
 | Stat tile | `p-4 rounded-3xl border` in a tint (`bg-orange-50 border-orange-100`, `bg-green-50 border-green-100`) | — | Label in the tint's 400, value `text-2xl font-bold` in the tint's 600 |
@@ -144,7 +145,7 @@ Hooks listed here are relied on by tests and other screens; keep them.
   Kitchen Queue** (filters, ticket grid 1/2/3/4 columns at base/md/lg/xl, dashed placeholder last). From `xl`, a
   right column shows Live Statistics (Active, Done today, then Awaiting cash / New / Preparing / Ready), Kitchen Alert
   (out-of-stock dishes and options, prep totals across active tickets, average wait once three orders are done), the
-  expected drawer cash, and Print Daily Summary.
+  expected cash totals.
 - **States:** no drawer shift (orange warning linking to the drawer); no unpaid orders (one muted line); empty queue
   (only the placeholder); a filter with no matches (placeholder text names the filter); service down (red notice,
   en-dash counts); saving (the button is disabled).
@@ -190,17 +191,17 @@ Hooks listed here are relied on by tests and other screens; keep them.
 - **Layout:** search and Open Cash Drawer. Status filter (All / In Kitchen / Completed), a from–to date range, a shift
   filter, and quick ranges (All Time / Today / Yesterday / Last 7 Days).
 - **Transaction History:** table columns are Order, Date & Time with cashier, Customer and phone, Items as chips
-  (three, then "+N more"), Amount with tendered and change, Status, and Reprint. Export CSV and Print Report above
-  it; pagination below.
+  (three, then "+N more"), Amount with tendered and change, and Status. Export CSV is available above the table;
+  pagination is below.
 - **Below the table:** System Audit Log (last 20 entries, icon by type) beside the **Shift Cash Drawer**
   (`#drawer`). When closed, the drawer card shows the open-shift form. When open, it shows four tiles, tendered and
   change, the acting cashier, Record a cash drop, and Close & audit with a live over/short preview. Shift Drawer
   Audits and Cash Drops follow.
 - **States:** no transactions; no matches (empty state with Clear All Filters); a closed drawer; a drop that exceeds
   the balance; short / over / balanced.
-- **Hooks:** as in the baseline (`transaction-*`, `shift-*`, `opening-float`, `cashier-id`, `drop-*`, `drawer-count`,
-  `count-preview`, `close-shift`, `audit-trail`, `cash-drops`, `shift-audit-table`, `manual-drawer-kick`) plus
-  `export-csv`, `print-report`, `range-from`, `range-to`, `reset-filters`, `transaction-pager`.
+- **Hooks:** `transaction-*`, `shift-*`, `opening-float`, `cashier-id`, `drop-*`, `drawer-count`, `count-preview`,
+  `close-shift`, `audit-trail`, `cash-drops`, `shift-audit-table`, `export-csv`, `range-from`, `range-to`,
+  `reset-filters`, and `transaction-pager`.
 
 ### Order Tracking and Pickup Board — `readypickupUI.html`
 

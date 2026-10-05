@@ -1,6 +1,6 @@
 # MasaFlow
 
-A local, cash-only restaurant suite built with **React, TypeScript, Tailwind CSS, Express and Socket.io**. Customers order on their phones; the cashier receives cash; the kitchen starts only after payment is saved. All prices and receipts use integer MXN centavos.
+A local, cash-only restaurant suite built with **React, TypeScript, Tailwind CSS, Express and Socket.io**. Customers order on their phones; staff review and accept orders before cooking; the cashier records cash when the customer picks up. All prices and digital receipts use integer MXN centavos.
 
 ## Start on your Mac
 
@@ -47,15 +47,16 @@ Docker execution has not been verified on this workstation; the local Node runti
 
 ## Restaurant workflow
 
-- **Por Pagar:** phone orders arrive here. Staff ignore them until payment. Open **Cobrar en efectivo**, use $50/$100/$500 presets, type another amount, or press **Efectivo Exacto** after receiving the cash.
+- **En revisión:** phone orders arrive here without a payment. Staff inspect the digital ticket and accept it to start cooking.
 - **Propinas:** en el cobro, selecciona **El cliente deja el cambio como propina** solo cuando el cliente lo pida. El excedente queda como propina, el cambio pasa a cero y la venta de comida conserva su importe. Cambiar el efectivo recibido desactiva esa selección para evitar propinas accidentales.
-- **Cocinando:** payment is durably saved, exact change is displayed, revenue updates, and the customer's tracking screen changes. Modifiers are explicit: red omissions, green extras, neutral masa choices. Tickets age to amber at five minutes and pulse red at ten.
-- **Lista:** tap **Marcar lista** to notify the customer. Tap **Entregado** when handed off. Audio needs one user gesture; use **Activar sonido** on the device.
-- **No-Show:** confirm on an unpaid card. The ticket leaves the queue and stays in history with zero sales.
+- **Cocinando:** accepting the order starts preparation and updates the customer's live tracking screen. Modifiers are explicit: red omissions, green extras, neutral masa choices. Tickets age to amber at five minutes and pulse red at ten.
+- **Lista para recoger:** tap **Marcar lista para recoger** to notify the customer in the app; customers can opt into browser notifications and hear the ready chime. At pickup, use **Cobrar al entregar** to calculate change and record cash; successful payment also records the handoff.
+- **Cancelar / No-Show:** an uncollected, unpaid ticket can be cancelled from the queue and stays in digital history with zero sales.
+- **Sin impresora ni periféricos:** tickets, receipts, payment calculations, and shift records stay in the app; the workflow does not send print or cash-drawer commands.
 - **Inventario:** toggle dishes or modifiers. Every connected customer sees **Agotado** immediately. The server also rejects stale carts containing unavailable choices.
 - **Pausar Pedidos Web:** customers see “La cocina está a tope. Por favor, ordena directamente en el mostrador.” Existing orders remain trackable.
 - **Caja y ventas:** shows food revenue, tips, expected cash held (revenue + tips), gross cash received, change, paid count, average ticket and peak payment hour. Completed orders feed item-volume and revenue/favorite rankings. Search/filter/export the ledger.
-- **Cerrar Turno:** finish paid orders and resolve unpaid tickets first. Confirm to archive the final state and start an empty shift. Current menu availability is retained.
+- **Cerrar Turno:** deliver and collect payment for ready orders, or cancel unpaid tickets first. Confirm to archive the final state and start an empty shift. Current menu availability is retained.
 
 `Sin Conexión` disables submissions and staff mutations. Reconnection requests fresh server state. The customer session, pending submission ID, and active order ID survive refresh/tab closure in the same browser; clearing browser storage removes that recovery capability. Unknown acknowledgement results must be checked before retrying; the existing request/payment IDs prevent duplicate orders or cash recognition.
 

@@ -154,10 +154,6 @@
       <div id="drawer-status" data-testid="drawer-status" class="empty:hidden mt-8 pt-6 border-t border-stone-200 flex-shrink-0"></div>
     </div>
 
-    <button type="button" id="print-summary" data-testid="print-summary" class="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-3 active:scale-95 transition-transform flex-shrink-0">
-      <i class="fa-solid fa-print" aria-hidden="true"></i>
-      Print Daily Summary
-    </button>
   </aside>
 
   <!-- Phone tab bar -->
@@ -314,7 +310,6 @@ window.addEventListener('DOMContentLoaded', () => {
           <span class="${TOTAL[tone]}">${M.money(order.totalCents, order.currency)}</span>
         </div>
         <button type="button" data-advance="${id}" data-status="${order.status}" data-testid="advance-${id}"${saving.has(order.id) ? ' disabled' : ''} class="w-full bg-stone-900 text-white py-4 rounded-2xl font-bold hover:bg-orange-600 transition-colors shadow-lg active:scale-95 disabled:opacity-50">${stage.next}</button>
-        <button type="button" data-receipt="${id}" data-testid="receipt-${id}" class="${QUIET} hover:text-stone-600">Print receipt</button>
       </div>
     </article>`;
   }
@@ -461,19 +456,14 @@ window.addEventListener('DOMContentLoaded', () => {
   main.addEventListener('click', event => {
     const filter = event.target.closest('[data-filter]');
     if (filter) { setFilter(filter.dataset.filter); return; }
-    const button = event.target.closest('[data-tender], [data-cancel], [data-advance], [data-receipt]');
+    const button = event.target.closest('[data-tender], [data-cancel], [data-advance]');
     if (!button || button.disabled) return;
     setError(null);
     try {
       if (button.dataset.tender) UI.tender(button.dataset.tender);
-      else if (button.dataset.receipt) UI.printReceipt(button.dataset.receipt);
       else if (button.dataset.advance) advance(button);
       else if (button.dataset.cancel) cancelDraft(button);
     } catch (error) { setError(error); }
-  });
-  byId('print-summary').addEventListener('click', () => {
-    if (!loaded) { setError('The order service is not responding, so there is no summary to print yet.'); return; }
-    UI.printDailySummary();
   });
 
   let knownOrderIds = new Set();

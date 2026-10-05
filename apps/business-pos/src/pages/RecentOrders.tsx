@@ -24,7 +24,6 @@ export interface Transaction {
   method: 'cash';
   paidAt: string;
   cashierId: string;
-  drawerKickStatus: string;
   itemCount: number;
   items: OrderItem[];
 }
@@ -441,10 +440,6 @@ export function RecentOrders({
                 <div className="flex items-center justify-between text-xs text-stone-600">
                   <span>Cashier Register</span>
                   <span className="font-mono text-stone-800">{selectedTx.cashierId || 'Cashier 1'}</span>
-                </div>
-                <div className="flex items-center justify-between text-xs text-stone-600">
-                  <span>Drawer Pulse Status</span>
-                  <span className="font-mono text-stone-800 capitalize">{selectedTx.drawerKickStatus || 'Sent'}</span>
                 </div>
                 <div className="pt-2 border-t border-stone-200/60 space-y-1.5 font-mono text-xs">
                   <div className="flex justify-between text-stone-600">

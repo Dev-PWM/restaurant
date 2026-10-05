@@ -279,6 +279,15 @@ function validate(s) {
     s.closedShifts,
   ])
     ensure(Array.isArray(rows), "Colección de datos inválida.");
+  for (const order of [...s.activeOrders, ...s.completedOrders]) {
+    if (String(order.status) === "unpaid") order.status = "review";
+    if (!Object.hasOwn(order, "acceptedAt"))
+      order.acceptedAt =
+        order.status === "cooking" || order.status === "ready" ||
+        order.status === "completed"
+          ? order.paidAt || order.createdAt
+          : null;
+  }
   for (const item of [...s.menuItems, ...s.modifiers]) {
     money(item.priceCents);
     ensure(
@@ -301,7 +310,7 @@ function validate(s) {
     ids.add(order.id);
     ensure(
       (s.activeOrders.includes(order)
-        ? ["unpaid", "cooking", "ready"]
+        ? ["review", "cooking", "ready"]
         : ["completed", "no_show"]
       ).includes(order.status),
       "Estado de pedido inválido.",
@@ -323,9 +332,10 @@ function validate(s) {
         order.totalCents,
       "Total de pedido inconsistente.",
     );
-    const paid = ["cooking", "ready", "completed"].includes(order.status);
     ensure(
-      paid === Boolean(order.transaction),
+      (order.status !== "completed" || Boolean(order.transaction)) &&
+        (!order.transaction ||
+          ["cooking", "ready", "completed"].includes(order.status)),
       "Pago y estado inconsistentes.",
     );
     if (order.transaction) {
@@ -495,12 +505,13 @@ function createEngine({ directory, persist = writeAtomic }) {
         fingerprint,
         number: next.nextOrderNumber++,
         customerName: data.customerName.trim(),
-        status: "unpaid",
+        status: "review",
         items,
         totalCents: money(
           items.reduce((sum, line) => sum + line.lineTotalCents, 0),
         ),
         createdAt: at,
+        acceptedAt: null,
         paidAt: null,
         readyAt: null,
         completedAt: null,
@@ -583,10 +594,7 @@ function createEngine({ directory, persist = writeAtomic }) {
           );
           return { ok: true };
         }
-        ensure(
-          order.status === "unpaid",
-          "Solo puedes cobrar un pedido por pagar.",
-        );
+        ensure(order.status === "ready", "Solo puedes cobrar un pedido listo para entregar.");
         ensure(
           data.tenderedCents >= order.totalCents + tipCents,
           "El efectivo no cubre el total.",
@@ -602,35 +610,32 @@ function createEngine({ directory, persist = writeAtomic }) {
           method: "cash",
           currency: "MXN",
         };
-        order.status = "cooking";
+        order.status = "completed";
         order.paidAt = at;
+        finish(order, next);
       } else if (event === "pos_mark_noshow") {
         if (order.status === "no_show") return { ok: true };
         ensure(
-          order.status === "unpaid" && !order.transaction,
-          "Solo un pedido sin pagar puede ser No-Show.",
+          ["review", "cooking", "ready"].includes(order.status) &&
+            !order.transaction,
+          "Solo puedes cancelar o marcar como No-Show un pedido sin cobrar.",
         );
         order.status = "no_show";
         finish(order, next);
       } else if (event === "pos_update_status") {
         ensure(
-          ["ready", "completed"].includes(data.status),
+          ["cooking", "ready"].includes(data.status),
           "Estado inválido.",
         );
-        if (
-          order.status === data.status ||
-          (order.status === "completed" && data.status === "ready")
-        )
-          return { ok: true };
+        if (order.status === data.status) return { ok: true };
         ensure(
-          order.transaction &&
-            ((order.status === "cooking" && data.status === "ready") ||
-              (order.status === "ready" && data.status === "completed")),
+          (order.status === "review" && data.status === "cooking") ||
+            (order.status === "cooking" && data.status === "ready"),
           "Transición no permitida.",
         );
         order.status = data.status;
-        if (data.status === "ready") order.readyAt = at;
-        else finish(order, next);
+        if (data.status === "cooking") order.acceptedAt = at;
+        else order.readyAt = at;
       } else throw new Error("Evento no permitido.");
     }
     next.revision++;

@@ -35,14 +35,14 @@ Staff screens use a sidebar on tablets and desktops and a top bar with a tab bar
 
 Customer pages use a dedicated public API and live stream. Each private order link shows only that ticket. The public pickup board displays order numbers and kitchen stages. Staff APIs and reports require a signed-in session when `MASAFLOW_STAFF_PASSWORD` is configured. The shared English/Spanish sign-in page is `/staff-login.html`; sessions expire after twelve hours and can be signed out from the staff session link.
 
-Historical deployment note: the current Docker/Caddy package now runs v0.3. For this legacy runtime, consult the pre-migration revision of the Docker/Caddy package on an always-on host with persistent storage, a domain, HTTPS and a staff password. See [public website setup](PUBLIC_WEBSITE.md) for exact configuration, customer/business links, deployment, backups, and counter hardware considerations. Public hosting and a domain have not been provisioned. Localhost remains available for development.
+This explicitly launched legacy runtime retains its older cash-before-cooking order flow; use the current React POS for the review-first flow. The current Docker/Caddy package runs v0.3, not this legacy runtime. Public hosting and a domain have not been provisioned. Localhost remains available for development.
 
 ## Complete a cash shift
 
 1. Open Cash Ledger and record the starting float and cashier name.
 2. In Customer Menu, pick a masa, remove included toppings or ask for them on the side, add up to two extras, and submit with a name (the phone number is optional). The ticket awaits cash and stays outside the kitchen queue, and the customer lands on tracking, which says to pay at the counter. A saved submission UUID lets a lost response be retried without creating another order.
 3. On Orders, the ticket appears under Awaiting Cash with a new-order toast. Choose Collect Cash (or Cancel order for one nobody paid for). Enter tender or select $20, $50, $100, $200, $500, or Exact. Presets set the entire tendered amount. Check the displayed total and change, then finalize. Short tender is blocked.
-4. The service saves one verified cash payment and dispatches the ticket. Repeated finalization returns the original payment and does not request another drawer pulse.
+4. The service saves one verified cash payment and dispatches the ticket. Repeated finalization returns the original payment without triggering any peripheral action.
 5. Move the ticket through Start Preparing → Mark as Ready → Complete Pickup. Customer tracking shows each committed step with its time, and a full-screen "¡Está listo!" when the order is ready.
 6. Record a cash drop, count the drawer, and close the shift. Expected cash, actual cash and signed variance are frozen in the closed audit.
 
@@ -50,15 +50,9 @@ New records use MXN integer centavos and `America/Mexico_City`. Editable demo pr
 
 Version-one data migrates with its original currency and exact amounts. USD and MXN totals are never added or converted. Close a legacy USD shift before opening MXN. Explicitly reprice legacy dishes and priced modifiers in menu management before creating new MXN orders; existing receipts and closed audits remain unchanged.
 
-## Drawer hardware
+## Digital-only operation
 
-Without a printer, the service records and displays a **simulated pulse**. For a TCP ESC/POS printer:
-
-```sh
-MASAFLOW_PRINTER_HOST=192.168.1.50 MASAFLOW_PRINTER_PORT=9100 PORT=4173 MASAFLOW_HOST=127.0.0.1 npm run legacy:start
-```
-
-The command is `1B 70 00 19 FA`, following [Epson's ESC p reference](https://download4.epson.biz/sec_pubs/pos/reference_en/escpos/esc_lp.html). A durable reservation keyed to the payment prevents duplicate delivery. A restart during delivery records an unknown result; inspect the drawer before an intentional manual pulse. Hardware failure retains the payment. Sending bytes cannot confirm physical opening. Manual pulses require an open shift and are audited. Receipt reprints use the browser print dialog.
+The legacy runtime records cash tender, change, shifts, and audits in its digital ledger. It does not connect to printers or cash-drawer hardware and has no receipt-printing or manual drawer controls. Historical hardware metadata in existing backups is preserved as inert data and is never replayed.
 
 ## Live analytics and summaries
 
@@ -76,9 +70,9 @@ Only aggregates and definitions are sent to Gateway; customer names, cashier ide
 
 Serialized transactions save `.masaflow/state.json` with file sync and atomic replacement; failed persistence retains the previous committed state. One writer holds the canonical data directory's lock until requests and saves finish. `MASAFLOW_DATA_DIR` selects an alternate store.
 
-Automatic snapshots run at startup, after a changed revision at least an hour after the last automatic snapshot, and when a shift closes. Run `npm run legacy:backup` for a manual snapshot, `npm run legacy:backups` to list them, and `npm run legacy:backup:verify -- BACKUP_FILE` to verify one. `GET /api/health` reports the last successful backup and any backup error. Restore requires a stopped server, a verified source and `npm run legacy:restore -- BACKUP_FILE --confirm`; it first preserves the previous ledger and never replays uncertain drawer pulses. See [backup and restore instructions](BACKUPS.md). Keep a separate private copy on another disk to protect against losing the Mac.
+Automatic snapshots run at startup, after a changed revision at least an hour after the last automatic snapshot, and when a shift closes. Run `npm run legacy:backup` for a manual snapshot, `npm run legacy:backups` to list them, and `npm run legacy:backup:verify -- BACKUP_FILE` to verify one. `GET /api/health` reports the last successful backup and any backup error. Restore requires a stopped server, a verified source and `npm run legacy:restore -- BACKUP_FILE --confirm`; it first preserves the previous ledger and keeps historical hardware metadata inert. See [backup and restore instructions](BACKUPS.md). Keep a separate private copy on another disk to protect against losing the Mac.
 
-This app serves one restaurant with a single serialized store. Staff access uses one shared business password; individual staff roles, restaurant isolation, refunds, voids, payouts, silent thermal printing and ingredient depletion are outside this revision.
+This app serves one restaurant with a single serialized store. Staff access uses one shared business password; individual staff roles, restaurant isolation, refunds, voids, payouts, and ingredient depletion are outside this revision.
 
 HTML screens use shared `assets/`: the order store, translations, UI helpers, the compiled stylesheet and vendored icons/charts (`assets/vendor/`: FontAwesome Free 6.4 solid, Plotly 3.1 basic), so the counter keeps working offline apart from the two Google web fonts. The English/Spanish catalog is [assets/masaflow-catalog.json](../assets/masaflow-catalog.json). HTML pages load its `html` namespace through `masaflow-i18n.js`; React imports its `analytics` namespace at build time. The HTML script keeps an inline fallback for immediate rendering and failed asset requests. A language selected in the URL takes precedence over saved `masaflow.locale`; otherwise the saved preference applies, initially Spanish.
 
@@ -104,4 +98,4 @@ npm install --no-save --package-lock=false playwright
 node tests/browser-acceptance.cjs
 ```
 
-If Playwright is supplied by an existing runtime, set `PLAYWRIGHT_MODULE` to that installation's absolute module path instead of installing another copy. The suite starts its own service against a temporary data directory, uses a mocked Gateway, and removes that temporary store when it finishes. It checks API/card/table reconciliation, source inspection, request races, reconnects, URL/language restoration, malformed summaries, keyboard/touch chart interaction and desktop / 390px / 430px analytics layouts. It also completes mobile customer ordering with a lost response, short/full cash tender, kitchen dispatch and pickup tracking, a cash drop and a signed shift audit, then verifies initial-failure recovery on all six HTML screens. Screenshots and a result report are written to Git-ignored `artifacts/qa/`; no QA receipts enter `.masaflow`. Live Gateway access and physical drawer opening require separate checks with the configured credentials and actual printer.
+If Playwright is supplied by an existing runtime, set `PLAYWRIGHT_MODULE` to that installation's absolute module path instead of installing another copy. The suite starts its own service against a temporary data directory, uses a mocked Gateway, and removes that temporary store when it finishes. It checks API/card/table reconciliation, source inspection, request races, reconnects, URL/language restoration, malformed summaries, keyboard/touch chart interaction and desktop / 390px / 430px analytics layouts. It also completes mobile customer ordering with a lost response, short/full cash tender, kitchen dispatch and pickup tracking, a cash drop and a signed shift audit, then verifies initial-failure recovery on all six HTML screens. Screenshots and a result report are written to Git-ignored `artifacts/qa/`; no QA receipts enter `.masaflow`.

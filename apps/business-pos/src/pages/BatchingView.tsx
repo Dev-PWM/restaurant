@@ -8,7 +8,6 @@ import {
   Coffee,
   Flame,
   Layers,
-  Printer,
   Sparkles,
   UtensilsCrossed,
 } from "lucide-react";
@@ -17,7 +16,6 @@ import {
   EmptyState,
   mxn,
   orderLabel,
-  printThermalTicket,
   time,
 } from "../../../../shared/ui/components";
 
@@ -64,12 +62,12 @@ export function BatchingView({
   orders: Order[];
   command: (
     cmd: "pos_update_status",
-    args: { orderId: string; status: "ready" | "completed" },
+    args: { orderId: string; status: "cooking" | "ready" },
   ) => Promise<{ ok: boolean; error?: string }>;
   connected: boolean;
 }) {
   const [groupBy, setGroupBy] = useState<GroupByMode>("station");
-  const [statusFilter, setStatusFilter] = useState<"cooking" | "all_active">(
+  const [statusFilter, setStatusFilter] = useState<"cooking" | "accepted">(
     "cooking",
   );
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -83,7 +81,7 @@ export function BatchingView({
     return orders.filter((o) =>
       statusFilter === "cooking"
         ? o.status === "cooking"
-        : o.status === "cooking" || o.status === "unpaid",
+        : o.status === "cooking" || o.status === "ready",
     );
   }, [orders, statusFilter]);
 
@@ -371,11 +369,11 @@ export function BatchingView({
               className="field h-8 py-0 text-xs font-semibold"
               value={statusFilter}
               onChange={(e) =>
-                setStatusFilter(e.target.value as "cooking" | "all_active")
+              setStatusFilter(e.target.value as "cooking" | "accepted")
               }
             >
               <option value="cooking">Solo Cocinando ({activeOrders.filter((o) => o.status === "cooking").length})</option>
-              <option value="all_active">Cocinando + Por Pagar ({activeOrders.length})</option>
+              <option value="accepted">En preparación y listos ({activeOrders.length})</option>
             </select>
           </div>
 
@@ -650,7 +648,9 @@ export function BatchingView({
                           : "bg-stone-100 text-stone-600"
                       }`}
                     >
-                      {order.status === "cooking" ? "Cocinando" : "Por pagar"}
+                      {order.status === "cooking"
+                        ? "Cocinando"
+                        : "Lista para recoger"}
                     </span>
                   </div>
 

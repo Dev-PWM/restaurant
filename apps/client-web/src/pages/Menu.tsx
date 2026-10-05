@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ChefHat,
@@ -69,6 +69,20 @@ export function Menu() {
   });
   const [busy, setBusy] = useState(false);
   const [localError, setLocalError] = useState("");
+  const [cartBumped, setCartBumped] = useState(false);
+  const totalItemsCount = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const previousItemCount = useRef(totalItemsCount);
+
+  useEffect(() => {
+    if (totalItemsCount <= previousItemCount.current) {
+      previousItemCount.current = totalItemsCount;
+      return;
+    }
+    previousItemCount.current = totalItemsCount;
+    setCartBumped(true);
+    const timer = window.setTimeout(() => setCartBumped(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [totalItemsCount]);
 
   useEffect(() => {
     writeStorage(activeKey, activeId);
@@ -206,8 +220,6 @@ export function Menu() {
     (sum, line) => sum + price(line) * line.quantity,
     0,
   );
-  const totalItemsCount = cart.reduce((sum, line) => sum + line.quantity, 0);
-
   const pendingExpired = pending && pending.shiftId !== snapshot.shiftId;
 
   async function submit() {
@@ -326,11 +338,16 @@ export function Menu() {
             <PWAInstallButton />
             {totalItemsCount > 0 && (
               <button
-                className="btn btn-primary text-xs font-bold py-1.5 px-3 sm:hidden"
+                className="btn btn-primary text-xs font-bold transition-transform duration-200 active:scale-90 py-1.5 px-3 sm:hidden"
                 onClick={() => setCheckout(true)}
               >
                 <ShoppingBag size={14} />
-                <span>{totalItemsCount}</span>
+                <span
+                  key={totalItemsCount}
+                  className={cartBumped ? "animate-bump" : ""}
+                >
+                  {totalItemsCount}
+                </span>
               </button>
             )}
           </div>
@@ -449,7 +466,7 @@ export function Menu() {
               <strong className="tabular-nums">{mxn(total)} MXN</strong>
             </div>
             <button
-              className="btn btn-primary mt-4 min-h-12 w-full"
+              className="btn btn-primary mt-4 min-h-12 w-full transition-transform duration-200 active:scale-90"
               disabled={cart.length === 0 || Boolean(pending)}
               onClick={() => setCheckout(true)}
             >
@@ -629,7 +646,7 @@ export function Menu() {
             </div>
 
             <button
-              className="btn btn-primary flex-1 py-3 text-sm font-bold shadow-md"
+              className="btn btn-primary flex-1 py-3 text-sm font-bold shadow-md transition-transform duration-200 active:scale-90"
               onClick={() => setCheckout(true)}
             >
               <ShoppingBag size={18} />

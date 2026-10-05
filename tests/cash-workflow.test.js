@@ -4,10 +4,9 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const net = require('node:net');
 const vm = require('node:vm');
 const { createEngine, initialState, migrateState, verifiedReceipts, money, parseMoney } = require('../assets/masaflow-store.js');
-const { createService, DRAWER_PULSE } = require('../legacy-server.cjs');
+const { createService } = require('../legacy-server.cjs');
 const draftData = (quantity = 1) => ({ customerName: 'Ana', orderType: 'takeout', tableNumber: null, items: [{ menuItemId: 'huarache', quantity, optionIds: ['blue', 'cheese'], notes: 'No onions' }] });
 const copy = value => JSON.parse(JSON.stringify(value));
 
@@ -244,51 +243,20 @@ test('concurrent stale kitchen actions cannot skip a fulfillment stage', async (
   assert.equal(store.getOrder(order.id).status, 'preparing');
 });
 
-test('restart safely recovers paid receipts with no pulse reservation and marks uncertain reservations unknown', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-recovery-'));
-  const store = createEngine(); await store.openShift(0);
-  const first = await store.createDraft(draftData()); const firstPayment = (await store.payOrder(first.id, 10000)).payment;
-  const second = await store.createDraft(draftData()); const secondPayment = (await store.payOrder(second.id, 10000)).payment;
-  await store.reserveHardwareJob(`payment:${secondPayment.id}`, secondPayment.id);
-  await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(store.getState()));
-  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
-  const state = service.engine.getState();
-  assert.equal(state.payments.find(p => p.id === firstPayment.id).drawerKickStatus, 'simulated');
-  assert.equal(state.payments.find(p => p.id === secondPayment.id).drawerKickStatus, 'unknown');
-  assert.equal(state.hardwareJobs.length, 2);
-});
-
-test('null legacy records do not block startup pulse recovery or duplicate payment and pulse prevention', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-null-recovery-'));
-  const store = createEngine(); await store.openShift(0);
-  const order = await store.createDraft(draftData()); const payment = (await store.payOrder(order.id, 10000)).payment;
-  const state = store.getState(); state.hardwareJobs.unshift(null); state.payments.unshift(null); state.orders.unshift(null);
-  await fs.writeFile(path.join(directory, 'state.json'), JSON.stringify(state));
-  const service = await createService({ dataDirectory: directory, printerHost: '' }); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
-  assert.equal(service.engine.getState().payments.find(p => p && p.id === payment.id).drawerKickStatus, 'simulated');
-  const retry = await service.engine.payOrder(order.id, 10000);
-  assert.equal(retry.alreadyPaid, true); assert.equal(retry.payment.id, payment.id);
-  assert.equal((await service.kick(payment.id)).duplicate, true);
-  assert.equal(service.engine.getState().hardwareJobs.filter(Boolean).length, 1);
-  assert.equal(service.engine.verifiedReceipts().receipts.length, 1); assert.equal(service.engine.verifiedReceipts().excluded, 1);
-});
-
-test('service persists payment, automatically pulses exact ESC/POS bytes, and suppresses duplicate pulses across restart', async t => {
+test('service records payments digitally without exposing cash-drawer hardware controls', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-test-'));
-  const received = []; const printer = net.createServer(socket => { let data = Buffer.alloc(0); socket.on('data', bytes => { data = Buffer.concat([data, bytes]); }); socket.on('end', () => { received.push(data); socket.end(); }); });
-  await new Promise(resolve => printer.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => printer.close(resolve)));
-  const config = { dataDirectory: directory, printerHost: '127.0.0.1', printerPort: printer.address().port };
-  let service = await createService(config);
+  const service = await createService({ dataDirectory: directory });
+  t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
   async function listen() { await new Promise(resolve => service.server.listen(0, '127.0.0.1', resolve)); return `http://127.0.0.1:${service.server.address().port}`; }
-  let url = await listen(); t.after(async () => { await service.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const url = await listen();
   async function action(name, ...args) { const response = await fetch(`${url}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: name, args }) }); const body = await response.json(); assert.equal(response.status, 200, JSON.stringify(body)); return body.result; }
   await action('openShift', 20000, 'QA'); const order = await action('createDraft', draftData());
   const response = await fetch(`${url}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'payOrder', args: [order.id, 1000] }) }); assert.equal(response.status, 400);
-  const paid = await action('payOrder', order.id, 10000, 'QA'); assert.equal(received.length, 1); assert.deepEqual(received[0], DRAWER_PULSE);
-  await action('payOrder', order.id, 20000, 'QA'); assert.equal(received.length, 1);
+  const paid = await action('payOrder', order.id, 10000, 'QA');
+  assert.equal(paid.payment.totalCents, 9500);
   const crossOrigin = await fetch(`${url}/api/action`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: 'https://example.com' }, body: JSON.stringify({ action: 'openShift', args: [0] }) }); assert.equal(crossOrigin.status, 403);
-  const invalidKick = await fetch(`${url}/api/cash-drawer/kick`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: order.id }) }); assert.equal(invalidKick.status, 400);
-  await service.close(); service = await createService(config); url = await listen();
+  assert.equal((await fetch(`${url}/api/cash-drawer/kick`, { method: 'POST' })).status, 404);
   assert.equal(service.engine.getOrder(order.id).paymentStatus, 'paid');
-  const retry = await fetch(`${url}/api/cash-drawer/kick`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ paymentId: paid.payment.id }) }); const pulse = await retry.json(); assert.equal(pulse.duplicate, true); assert.equal(received.length, 1);
+  assert.equal('drawerKickStatus' in service.engine.getState().payments[0], false);
+  assert.deepEqual(service.engine.getState().hardwareJobs, []);
 });

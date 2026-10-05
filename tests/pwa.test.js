@@ -29,3 +29,49 @@ test("realtime apps expose an installable, scoped offline app shell", () => {
   assert.match(worker, /url\.pathname\.startsWith\("\/api\/"\)/);
   assert.match(worker, /url\.pathname\.startsWith\("\/socket\.io\/"\)/);
 });
+
+test("quick UI feedback animations stay brief and honor reduced motion", () => {
+  const styles = fs.readFileSync(
+    path.join(repo, "shared/ui/styles.css"),
+    "utf8",
+  );
+  for (const duration of [200, 260, 280]) {
+    assert.match(styles, new RegExp(`animation:[^;]+ ${duration}ms`));
+  }
+  assert.match(styles, /prefers-reduced-motion: reduce/);
+
+  const pos = fs.readFileSync(
+    path.join(repo, "apps/business-pos/src/pages/LiveOrders.tsx"),
+    "utf8",
+  );
+  assert.match(pos, /duration: 220/);
+  assert.match(pos, /function TicketSkeleton/);
+  assert.match(pos, /card\.animate/);
+
+  const customer = fs.readFileSync(
+    path.join(repo, "apps/client-web/src/pages/OrderStatus.tsx"),
+    "utf8",
+  );
+  assert.match(customer, /animate-ready-rise/);
+  assert.doesNotMatch(customer, /duration-1000/);
+});
+
+test("digital order tracking and pickup payment contain no print controls", () => {
+  const files = [
+    "apps/business-pos/src/pages/LiveOrders.tsx",
+    "apps/business-pos/src/pages/BatchingView.tsx",
+    "apps/client-web/src/pages/OrderStatus.tsx",
+    "apps/analytics/src/content/realtime/Analytics.tsx",
+    "shared/ui/components.tsx",
+  ];
+  for (const file of files) {
+    const source = fs.readFileSync(path.join(repo, file), "utf8");
+    assert.doesNotMatch(source, /printThermalTicket|thermalPrint|window\.print/);
+  }
+  const engine = fs.readFileSync(
+    path.join(repo, "shared/realtime/engine.js"),
+    "utf8",
+  );
+  assert.match(engine, /status: "review"/);
+  assert.match(engine, /order\.status === "ready"/);
+});

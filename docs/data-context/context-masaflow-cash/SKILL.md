@@ -5,7 +5,7 @@ description: "Use when analyzing MasaFlow cash POS records or preparing its Oper
 
 # MasaFlow cash data context
 
-Use for operational and sales analysis in this project. The user-approved upfront cash-only plan governs payment behavior; the blueprint supplies product context. This reusable context is saved with the project and is not installed into a personal or team plugin.
+Use for operational and sales analysis of the legacy HTML/SSE cash ledger. Its historical upfront-cash workflow is separate from the current realtime React order lifecycle, which records payment at pickup. This reusable context is saved with the project and is not installed into a personal or team plugin.
 
 ## Entities
 
@@ -17,7 +17,7 @@ Use for operational and sales analysis in this project. The user-approved upfron
 | Drawer shift | One session with starting float. Closing freezes expected balance, physical count, signed variance and closing time. One session may be open. | Shift UUID; payment/drop `shiftId`. | [Engine](../../../assets/masaflow-store.js) |
 | Cash drop | Positive safe removal in an open shift, no greater than expected balance. | Drop UUID and shift currency. | [Engine](../../../assets/masaflow-store.js) |
 | Menu item | Editable demo dish and modifiers. Availability is an 86 flag; ingredient quantity is not modeled. | Menu ID and local modifier IDs. | [Contract](../../../shared/types/menu.ts) |
-| Hardware job | Durable pulse reservation and simulated/sent/failed/unknown result. Reserved becomes unknown after restart. | Payment ID or explicit manual request UUID. | [Service](../../../server.js) |
+| Historical hardware metadata | Inert compatibility fields from older backups; never displayed, replayed, or counted as current activity. | Legacy payment or hardware-job record. | [Backup handling](../../BACKUPS.md) |
 
 ## Metrics
 
@@ -69,7 +69,7 @@ Use for operational and sales analysis in this project. The user-approved upfron
 
 ## Customer and staff access
 
-The public customer API serves menu data and a single ticket selected by its private order or submission UUID. Public pickup-board rows contain numbers and kitchen stages only. These redacted customer payloads are not financial-analysis datasets. Staff sign-in grants access to the full verified analytics, ledger and summary endpoints. Both interfaces use the same persisted server state. Online order submission remains unpaid until the cashier records physical MXN cash; daily, monthly and yearly popularity continues to count purchased quantities from verified receipts.
+The legacy public customer API serves menu data and a single ticket selected by its private order or submission UUID. Public pickup-board rows contain numbers and kitchen stages only. These redacted customer payloads are not financial-analysis datasets. Staff sign-in grants access to the full verified analytics, ledger and summary endpoints. Legacy online orders remain unpaid until cash is recorded; the current realtime app instead permits review and cooking before payment at pickup. Daily, monthly and yearly legacy popularity counts purchased quantities from verified receipts.
 
 ## Open Questions
 
@@ -79,7 +79,7 @@ No unresolved KPI definition questions remain from the approved plan. Tax policy
 
 | Source | Authority / use | Checked / limits |
 | --- | --- | --- |
-| User-approved implementation plan | Governs cash, currencies, dates, KPI definitions, AI constraints and approved layouts. | Approved in this task; blueprint is subordinate product context. |
+| Legacy cash-ledger model | Governs the legacy cash, currency, date and KPI definitions documented here. | Not the payment lifecycle for the current realtime React app. |
 | `.masaflow/state.json` | Local committed operational store. | Created at service startup, Git-ignored; not bundled with context. |
 | [Engine](../../../assets/masaflow-store.js) | Pricing, snapshots, validator, migration, balances. | Workflow, malformed-record and restart tests. |
 | [Analytics](../../../shared/analytics.js) | Scope, receipts, active queue, completion cohort, evidence DTO. | Mexico City boundaries, empty cohorts, currency separation and frozen audits tested. |

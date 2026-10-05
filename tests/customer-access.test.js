@@ -10,7 +10,7 @@ const PASSWORD = 'test-only-staff-password';
 const input = name => ({ submissionId: crypto.randomUUID(), customerName: name, customerPhone: '5551234567', orderType: 'takeout', items: [{ menuItemId: 'huarache', quantity: 1, optionIds: ['white', 'cheese'], notes: 'Salsa on the side' }] });
 async function fixture(t, options = {}) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'masaflow-access-'));
-  const app = await createService({ dataDirectory: directory, printerHost: '', staffPassword: PASSWORD, summaryOptions: { apiKey: '' }, ...options });
+  const app = await createService({ dataDirectory: directory, staffPassword: PASSWORD, summaryOptions: { apiKey: '' }, ...options });
   await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { await app.close(); await fs.rm(directory, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${app.server.address().port}`;

@@ -1,4 +1,5 @@
 import { ArrowRight, Coins, Minus, Plus, Trash2, Utensils } from "lucide-react";
+import { useState } from "react";
 import type { OrderInput } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { Modal, mxn } from "../../../../shared/ui/components";
@@ -27,6 +28,8 @@ export function CartDrawer({
   connected: boolean;
 }) {
   const { snapshot } = useRealtime();
+  const [nameError, setNameError] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   if (!snapshot) return null;
 
   const price = (line: CartLine) => {
@@ -165,18 +168,33 @@ export function CartDrawer({
       <label className="block text-sm font-bold text-stone-800">
         ¿A nombre de quién sale la orden?
         <input
-          className="field mt-1.5 w-full text-base font-semibold"
+          key={shakeKey}
+          className={`field mt-1.5 w-full text-base font-semibold ${nameError ? "animate-shake" : ""}`}
+          aria-invalid={nameError}
+          aria-describedby={nameError ? "customer-name-error" : undefined}
           placeholder="Ej. Juan, María, Don Pedro…"
           autoComplete="given-name"
           maxLength={60}
           value={name}
           disabled={busy || Boolean(pending)}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (e.target.value.trim()) setNameError(false);
+          }}
         />
         <span className="mt-1 block text-xs text-stone-500 font-normal">
           Con este nombre te llamaremos en el mostrador cuando esté listo.
         </span>
       </label>
+      {nameError && (
+        <p
+          id="customer-name-error"
+          role="alert"
+          className="mt-2 text-sm font-semibold text-red-700"
+        >
+          Escribe el nombre para identificar tu pedido.
+        </p>
+      )}
 
       {!validCart && (
         <p role="alert" className="my-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-800">
@@ -198,9 +216,16 @@ export function CartDrawer({
       <button
         className="btn btn-primary w-full py-3.5 text-base font-bold shadow-sm"
         disabled={
-          !connected || busy || (!pending && (!validCart || !name.trim()))
+          !connected || busy || (!pending && !validCart)
         }
-        onClick={onSubmit}
+        onClick={() => {
+          if (!pending && !name.trim()) {
+            setNameError(true);
+            setShakeKey((key) => key + 1);
+            return;
+          }
+          onSubmit();
+        }}
       >
         {busy ? (
           "Enviando al comal…"

@@ -63,7 +63,7 @@ function definitions(lang, currency, timeZone, taxConfigured, taxBasisPoints) {
     { id: 'drawer_variance', label: es ? 'Diferencia de caja' : 'Drawer variance', definition: es ? 'Conteo físico menos el saldo esperado congelado al cerrar cada turno, en la moneda de ese turno. Cero representa conciliación exacta.' : 'Physical count minus frozen expected cash for each closed shift, in that shift currency. Zero is exact reconciliation.', formula: 'actualCents - expectedCentsAtClose', unit: currency },
     { id: 'pickup_minutes', label: es ? 'Pago a entrega' : 'Paid to pickup', definition: es ? `Mediana de completedAt − paidAt para tickets verificados entregados hoy en ${timeZone}. Incluye la espera antes de preparar; muestra tamaño de muestra.` : `Median completedAt − paidAt for verified tickets completed today in ${timeZone}. Includes waiting before preparation; sample size is shown.`, formula: 'median(completedAt - paidAt) / 60000', unit: 'minutes' },
     { id: 'active_tickets', label: es ? 'Tickets en cocina' : 'Kitchen tickets', definition: es ? 'Todos los tickets verificados recibidos, en preparación o listos, independientemente del filtro de ventas.' : 'All verified received, preparing or ready tickets, independent of sales filters.', formula: 'count(verifiedOrder where status in pending,preparing,ready)', unit: 'count' },
-    { id: 'expected_cash', label: es ? 'Efectivo esperado' : 'Expected drawer cash', definition: es ? 'Fondo inicial más efectivo recibido menos cambio y retiros. El envío del pulso no confirma apertura física.' : 'Starting float plus cash tendered minus change and drops. Sending a pulse does not confirm physical opening.', formula: 'floatCents + tenderedCents - changeCents - dropsCents', unit: currency }
+    { id: 'expected_cash', label: es ? 'Efectivo esperado' : 'Expected drawer cash', definition: es ? 'Fondo inicial más efectivo recibido menos cambio y retiros registrados.' : 'Starting float plus cash tendered minus change and recorded drops.', formula: 'floatCents + tenderedCents - changeCents - dropsCents', unit: currency }
   ];
 }
 function buildAnalytics(state, input = {}, { observedAt = new Date().toISOString(), summaryAvailable = false } = {}) {
@@ -116,9 +116,6 @@ function buildAnalytics(state, input = {}, { observedAt = new Date().toISOString
   const validatedAudits = audits.filter(validAudit), invalidAudits = audits.length - validatedAudits.length;
   const audit = validatedAudits.sort((a, b) => Date.parse(b.closedAt) - Date.parse(a.closedAt) || a.id.localeCompare(b.id))[0];
   const latestAudit = audit ? { id: audit.id, currency: audit.currency, closedAt: audit.closedAt, expectedCents: audit.expectedCentsAtClose, actualCents: audit.actualCents, varianceCents: audit.varianceCents } : null;
-  const hardwareJobs = state.hardwareJobs.filter(x => x && typeof x === 'object');
-  const drawerExceptions = hardwareJobs.filter(x => ['failed', 'unknown'].includes(x.status)).map(x => ({ key: x.key, status: x.status, paymentId: typeof x.paymentId === 'string' ? x.paymentId : null, at: x.updatedAt || x.createdAt }));
-  for (const { payment } of verified.receipts) if (payment.drawerKickStatus === 'pending' && !hardwareJobs.some(x => x.paymentId === payment.id)) drawerExceptions.push({ key: `payment:${payment.id}`, status: 'unknown', paymentId: payment.id, at: payment.paidAt });
   const metricDefinitions = definitions(scope.lang, currency, timeZone, taxConfigured, taxBasisPoints).map(definition =>
     definition.id === 'drawer_variance' ? { ...definition, unit: latestAudit?.currency || currency } :
     definition.id === 'expected_cash' ? { ...definition, unit: currentShift?.currency || currency } : definition);
@@ -131,7 +128,7 @@ function buildAnalytics(state, input = {}, { observedAt = new Date().toISOString
       recentReceipts: selected.map(({ order, payment }) => ({ orderId: order.id, ticket: order.number, totalCents: payment.totalCents, subtotalCents: order.subtotalCents, taxCents: order.taxCents, currency: order.currency, status: order.status, paidAt: payment.paidAt })).sort((a, b) => Date.parse(b.paidAt) - Date.parse(a.paidAt) || a.orderId.localeCompare(b.orderId)) },
     operations: { activeCount: activeOrders.length, counts: { pending: activeOrders.filter(x => x.status === 'pending').length, preparing: activeOrders.filter(x => x.status === 'preparing').length, ready: activeOrders.filter(x => x.status === 'ready').length },
       oldestAgeMinutes: activeOrders.length ? Math.max(...activeOrders.map(x => x.ageMinutes)) : null,
-      medianPickupMinutes: median(durations), completedSampleCount: durations.length, completedDate: today, activeOrders, currentShift, latestAudit, drawerExceptions },
+      medianPickupMinutes: median(durations), completedSampleCount: durations.length, completedDate: today, activeOrders, currentShift, latestAudit },
     metricDefinitions,
     evidenceFlow: [
       { title: scope.lang === 'es' ? 'Consulta local confirmada' : 'Confirmed local request', detail: `GET /api/analytics?${query}; committed engine revision ${state.revision}; observedAt ${observedAt}; currency ${currency}; timeZone ${timeZone}.` },

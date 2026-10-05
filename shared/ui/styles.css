@@ -75,3 +75,37 @@
     @apply font-normal tracking-tight;
   }
 }
+@layer utilities {
+  @keyframes masaflow-bump {
+    50% {
+      transform: scale(1.2);
+    }
+  }
+  @keyframes masaflow-shake {
+    20%,
+    60% {
+      transform: translateX(-6px);
+    }
+    40%,
+    80% {
+      transform: translateX(6px);
+    }
+  }
+  @keyframes masaflow-ready-rise {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
+  }
+  .animate-bump {
+    animation: masaflow-bump 200ms ease-out;
+  }
+  .animate-shake {
+    animation: masaflow-shake 260ms ease-in-out;
+  }
+  .animate-ready-rise {
+    animation: masaflow-ready-rise 280ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}

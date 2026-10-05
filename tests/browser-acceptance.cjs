@@ -9,7 +9,7 @@ const {createService}=require('../legacy-server.cjs');
  const pass=name=>{results.push(name);process.stdout.write('PASS '+name+'\n');};
  try{
  let gatewayCalls=0;
- app=await createService({dataDirectory:directory,printerHost:'',summaryOptions:{apiKey:'test-only',fetchImpl:async()=>{gatewayCalls++;return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({headline:'sales_overview',findings:[{metricId:'cash_receipts',commentary:'scope_total'},{metricId:'ticket_count',commentary:'scope_total'}]})}}]})};}}});
+ app=await createService({dataDirectory:directory,summaryOptions:{apiKey:'test-only',fetchImpl:async()=>{gatewayCalls++;return {ok:true,json:async()=>({choices:[{message:{content:JSON.stringify({headline:'sales_overview',findings:[{metricId:'cash_receipts',commentary:'scope_total'},{metricId:'ticket_count',commentary:'scope_total'}]})}}]})};}}});
  const e=app.engine;await e.openShift(50000,'QA');const draft=await e.createDraft({customerName:'QA only',orderType:'takeout',items:[{menuItemId:'huarache',quantity:1,optionIds:['white','cheese']}]});await e.payOrder(draft.id,10000);for(let i=0;i<3;i++)await e.advanceOrder(draft.id);await e.recordCashDrop(20000,'QA only');await e.closeShift(39400);await e.openShift(50000,'QA');
  for(let i=0;i<12;i++){const o=await e.createDraft({customerName:'Fixture only',orderType:'takeout',items:[{menuItemId:['sope','pambazo','quesadilla'][i%3],quantity:1,optionIds:['white']}]});await e.payOrder(o.id,10000);if(i>=3)await e.advanceOrder(o.id);if(i>=7)await e.advanceOrder(o.id);}
  await new Promise(resolve=>app.server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${app.server.address().port}`;const dto=await(await fetch(base+'/api/analytics?tab=owner&lang=es')).json();
@@ -38,7 +38,7 @@ const {createService}=require('../legacy-server.cjs');
  for(const width of [1440,390,430])for(const tab of ['owner','operations']){await page.setViewportSize({width,height:width===1440?1100:900});await page.goto(`${base}/analytics/?tab=${tab}&lang=es`);await waitReady();assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,`overflow ${width}/${tab}`);await page.screenshot({path:`${artifacts}/analytics-${tab}-${width}.png`,fullPage:true});}pass('approved composition verified at desktop, 390px and 430px without document overflow');
  const failed=await context.newPage();await failed.route('**/api/analytics?*',r=>r.fulfill({status:503,body:'unavailable'}));await failed.route('**/api/events',r=>r.abort());await failed.goto(base+'/analytics/?tab=owner&lang=es');await failed.locator('.mf-first-load').waitFor();assert.equal(await failed.locator('.mf-kpis').count(),0);await failed.unrouteAll();await failed.getByRole('button',{name:'Reintentar',exact:true}).last().click();await failed.locator('.mf-kpis').waitFor();pass('initial HTTP and SSE failure recovers without showing seed metrics');await failed.close();
  // Exercise the redesigned HTML counter on a separate, empty local store.
- cashApp=await createService({dataDirectory:path.join(directory,'counter'),printerHost:'',staffPassword:'browser-fixture-password'});
+ cashApp=await createService({dataDirectory:path.join(directory,'counter'),staffPassword:'browser-fixture-password'});
  await new Promise(resolve=>cashApp.server.listen(0,'127.0.0.1',resolve));
  const counter=`http://127.0.0.1:${cashApp.server.address().port}`;
  const staff=await context.newPage();const customerContext=await browser.newContext();const customer=await customerContext.newPage();

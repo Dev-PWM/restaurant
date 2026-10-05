@@ -6,7 +6,6 @@ import {
   Calculator,
   Check,
   Coins,
-  Printer,
   SlidersHorizontal,
 } from "lucide-react";
 import type { Order } from "../../../../../shared/types/realtime";
@@ -17,12 +16,11 @@ import {
   Modal,
   mxn,
   orderLabel,
-  printThermalTicket,
   StaffHeader,
   time,
 } from "../../../../../shared/ui/components";
 const labels: Record<string, string> = {
-  unpaid: "Por pagar",
+  review: "En revisión",
   cooking: "Cocinando",
   ready: "Lista",
   completed: "Entregado",
@@ -111,17 +109,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
             {rows.slice(current * 50, current * 50 + 50).map((o) => (
               <tr key={o.id} className="border-b border-stone-100 align-top">
                 <td className="px-3 py-4">
-                  <div className="flex items-center gap-1.5">
-                    <strong>{orderLabel(o)}</strong>
-                    <button
-                      className="p-1 text-stone-400 hover:text-stone-700 transition-colors"
-                      title="Imprimir comanda térmica"
-                      aria-label={`Imprimir comanda ${orderLabel(o)}`}
-                      onClick={() => printThermalTicket(o)}
-                    >
-                      <Printer size={13} />
-                    </button>
-                  </div>
+                  <strong>{orderLabel(o)}</strong>
                   <span className="mt-1 block text-xs text-stone-500">
                     {time(
                       o.transaction?.paidAt || o.completedAt || o.createdAt,

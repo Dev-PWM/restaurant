@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import type { Modifier, Order } from "../types/realtime";
 import { useRealtime } from "./RealtimeProvider";
-export { printThermalTicket } from "./thermalPrint";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     cents / 100,
@@ -280,13 +279,15 @@ export function InventoryControl({ onClose }: { onClose: () => void }) {
   );
 }
 export function PinGate({ children }: { children: ReactNode }) {
-  const { snapshot, login, connected } = useRealtime();
+  const { snapshot, login, connected, error } = useRealtime();
   const [pin, setPin] = useState(""),
-    [busy, setBusy] = useState(false);
+    [busy, setBusy] = useState(false),
+    [shakeKey, setShakeKey] = useState(0);
   if (snapshot?.staff) return <>{children}</>;
   const enter = async () => {
     setBusy(true);
-    await login(pin);
+    const authenticated = await login(pin);
+    if (!authenticated && connected) setShakeKey((key) => key + 1);
     setPin("");
     setBusy(false);
   };
@@ -312,7 +313,8 @@ export function PinGate({ children }: { children: ReactNode }) {
           </label>
           <input
             id="staff-pin"
-            className="field text-center text-3xl tracking-[0.5em]"
+            key={shakeKey}
+            className={`field text-center text-3xl tracking-[0.5em] ${shakeKey ? "animate-shake" : ""}`}
             type="password"
             inputMode="numeric"
             autoComplete="off"
@@ -322,6 +324,11 @@ export function PinGate({ children }: { children: ReactNode }) {
               setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
             }
           />
+          {error && (
+            <p role="alert" className="mt-2 text-sm font-semibold text-red-700">
+              {error}
+            </p>
+          )}
           <div className="my-4 grid grid-cols-3 gap-3">
             {[
               "1",

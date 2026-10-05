@@ -77,12 +77,20 @@ test('no mockup placeholders or simulation code shipped', () => {
 
 test('the hooks the cash workflow depends on are still on each screen', () => {
   const required = {
-    'businessDashbord.html': ['id="queue-error"', 'id="awaiting-orders"', 'id="kitchen-orders"', 'id="shift-warning"', 'id="draft-count"', 'id="pending-count"', 'id="preparing-count"', 'id="ready-count"', 'data-tender=', 'data-advance=', 'data-receipt=', 'data-filter='],
+    'businessDashbord.html': ['id="queue-error"', 'id="awaiting-orders"', 'id="kitchen-orders"', 'id="shift-warning"', 'id="draft-count"', 'id="pending-count"', 'id="preparing-count"', 'id="ready-count"', 'data-tender=', 'data-advance=', 'data-filter='],
     'metricsDashbord.html': ['data-testid="cash-receipts"', 'data-testid="net-sales"', 'data-testid="transaction-count"', 'data-testid="average-ticket"', 'data-testid="revenue-chart"', 'data-testid="top-items"', 'data-testid="recent-paid-orders"', 'id="metrics-date"', 'data-period='],
     'MenuManagment.html': ['id="menu-search"', 'id="add-item"', 'id="menu-grid"', 'id="item-form"', 'id="item-name"', 'id="item-price"', 'id="save-item"', 'data-testid="menu-audit"', 'data-availability=', 'data-edit=', 'data-delete='],
-    'history.html': ['id="ledger-error"', 'id="shift-controls"', 'id="open-shift-form"', 'id="cash-drop-form"', 'id="close-shift-form"', 'id="transactions-body"', 'id="audits-body"', 'id="drops-feed"', 'id="activity-feed"', 'id="manual-drawer"', 'id="transaction-search"', 'id="transaction-scope"'],
+    'history.html': ['id="ledger-error"', 'id="shift-controls"', 'id="open-shift-form"', 'id="cash-drop-form"', 'id="close-shift-form"', 'id="transactions-body"', 'id="audits-body"', 'id="drops-feed"', 'id="activity-feed"', 'id="export-csv"', 'id="transaction-search"', 'id="transaction-scope"'],
     'MenuUI.html': ['id="menu-items"', 'id="categories"', 'id="customizer-modal"', 'id="masa-options"', 'id="extra-options"', 'id="add-to-cart"', 'id="view-cart"', 'id="checkout-form"', 'id="customer-name"', 'id="customer-phone"', 'id="place-order"', 'readypickupUI.html?order='],
     'readypickupUI.html': ['id="ready-overlay"', 'MenuUI.html']
   };
   for (const [page, hooks] of Object.entries(required)) { const html = read(page); for (const hook of hooks) assert.ok(html.includes(hook), `${page} lost ${hook}`); }
+});
+
+test('legacy screens expose no receipt printing, report printing, or cash-drawer hardware controls', () => {
+  for (const page of ['businessDashbord.html', 'history.html', 'readypickupUI.html']) {
+    const html = read(page);
+    assert.doesNotMatch(html, /printReceipt|printDailySummary|window\.print|data-receipt|tracking-print|print-summary|print-report|manual-drawer|cash-drawer\/kick/i, page);
+  }
+  assert.match(read('history.html'), /id="export-csv"/, 'digital CSV export should remain available');
 });

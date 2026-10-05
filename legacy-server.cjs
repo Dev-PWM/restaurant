@@ -2,7 +2,6 @@
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const net = require('node:net');
 const { createEngine, initialState, clientActions, verifiedReceipts } = require('./assets/masaflow-store.js');
 const { buildAnalytics } = require('./shared/analytics.js');
 const { createSummaryService } = require('./shared/sales-summary.js');
@@ -11,8 +10,7 @@ const { acquireLock, identity, validateState, atomicWrite, createBackupManager, 
 const { customerState, customerOrder, UUID } = require('./shared/customer-data.js');
 const { createStaffAccess } = require('./shared/staff-access.js');
 
-const DRAWER_PULSE = Buffer.from([0x1b, 0x70, 0x00, 0x19, 0xfa]);
-async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), printerHost = process.env.MASAFLOW_PRINTER_HOST, printerPort = Number(process.env.MASAFLOW_PRINTER_PORT || 9100), summaryOptions = {}, backupOptions = {}, staffPassword = process.env.MASAFLOW_STAFF_PASSWORD || '', publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || '' } = {}) {
+async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || path.join(__dirname, '.masaflow'), summaryOptions = {}, backupOptions = {}, staffPassword = process.env.MASAFLOW_STAFF_PASSWORD || '', publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || '' } = {}) {
   const access = createStaffAccess({ password: staffPassword, publicOrigin });
   const releaseLock = await acquireLock(dataDirectory);
   try {
@@ -34,7 +32,7 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     closedSignature = signature;
   }
   const engine = createEngine({ state, persist });
-  // Commit schema migration before serving requests or recovering hardware jobs.
+  // Commit schema migration before serving requests.
   await persist(engine.getState());
   const summaries = createSummaryService({ ...summaryOptions, getState: engine.getState });
   const streams = new Map();
@@ -43,41 +41,12 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     stream.write(`data: ${JSON.stringify(client.customer ? customerState(next, client.query) : next)}\n\n`);
   }
   engine.subscribe(next => streams.forEach((client, stream) => sendState(stream, client, next)));
-  for (const job of engine.getState().hardwareJobs.filter(j => j && j.status === 'reserved')) await engine.finishHardwareJob(job.key, 'unknown', 'Service restarted during this pulse. Check the physical drawer before requesting a manual pulse.');
   function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
   async function body(req) {
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) throw new Error('Send application/json.');
     let text = ''; for await (const chunk of req) { text += chunk; if (text.length > 262144) throw new Error('Request is too large.'); }
     try { return JSON.parse(text); } catch (_) { throw new Error('Invalid JSON.'); }
   }
-  async function kick(paymentId, manualKey) {
-    const key = paymentId ? `payment:${paymentId}` : `manual:${manualKey}`;
-    const reserved = await engine.reserveHardwareJob(key, paymentId);
-    if (reserved.duplicate) return { ...reserved.job, duplicate: true };
-    if (!printerHost) return engine.finishHardwareJob(key, 'simulated', 'Drawer pulse simulated. No physical printer is configured.');
-    let status = 'sent';
-    let message = 'ESC/POS pulse sent to the configured printer. Check the drawer; no physical-open sensor is connected.';
-    try {
-      await new Promise((resolve, reject) => {
-        let connected = false;
-        const socket = net.createConnection({ host: printerHost, port: printerPort });
-        socket.setTimeout(3000);
-        socket.on('connect', () => { connected = true; socket.end(DRAWER_PULSE); });
-        socket.on('timeout', () => socket.destroy(new Error('Printer connection timed out.')));
-        socket.on('error', error => { error.bytesMayHaveBeenSent = connected; reject(error); });
-        socket.on('close', hadError => { if (!hadError) resolve(); });
-      });
-    } catch (error) {
-      status = error.bytesMayHaveBeenSent ? 'unknown' : 'failed';
-      message = error.bytesMayHaveBeenSent ? 'Printer response is uncertain. Check the drawer before requesting another pulse.' : 'Could not connect to printer. Payment is saved; inspect the connection and use a manual pulse when ready.';
-    }
-    // A completion-save error after delivery must not be reported as a connection failure.
-    // The persisted reservation remains unknown until it can be reconciled.
-    return engine.finishHardwareJob(key, status, message);
-  }
-  // Payment may have committed immediately before a crash that prevented reservation.
-  // With no durable reservation, no pulse bytes could have been sent, so recovery is safe.
-  for (const { payment } of verifiedReceipts(engine.getState()).receipts.filter(({ payment }) => payment.drawerKickStatus === 'pending' && !engine.getState().hardwareJobs.some(j => j && j.paymentId === payment.id))) await kick(payment.id, null);
   await backups.automatic(engine.getState(), true);
   started = true;
   const root = path.join(__dirname, 'apps/html');
@@ -127,7 +96,6 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
           method: payment.method,
           paidAt: payment.paidAt,
           cashierId: payment.cashierId,
-          drawerKickStatus: payment.drawerKickStatus,
           itemCount: Array.isArray(order.items) ? order.items.reduce((acc, i) => acc + (i.quantity || 1), 0) : 0,
           items: Array.isArray(order.items) ? order.items.map(item => ({
             name: item.name,
@@ -172,21 +140,7 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
         const data = await body(req);
         if (!clientActions.includes(data.action) || !Array.isArray(data.args) || data.args.length > 4) throw new Error('Unsupported action.');
         const result = await engine[data.action](...data.args);
-        // The service owns this side effect: it still runs if the cashier browser closes immediately after payment.
-        if (data.action === 'payOrder') {
-          try { await kick(result.payment.id, null); }
-          catch (_) { result.hardwareWarning = 'Payment is saved. The drawer pulse result could not be recorded; inspect the drawer and service before requesting a manual pulse.'; }
-        }
         return json(res, 200, { result, state: engine.getState() });
-      }
-      if (requestUrl.pathname === '/api/cash-drawer/kick' && req.method === 'POST') {
-        const data = await body(req);
-        if (data.paymentId && !/^[a-f0-9-]{36}$/i.test(data.paymentId)) throw new Error('Invalid payment reference.');
-        if (!data.paymentId && !/^[a-f0-9-]{36}$/i.test(data.requestId || '')) throw new Error('Manual pulse requires a request ID.');
-        let result;
-        try { result = await kick(data.paymentId || null, data.requestId); }
-        catch (_) { throw new Error('Drawer pulse result could not be recorded. Inspect the physical drawer before requesting any new pulse.'); }
-        return json(res, 200, result);
       }
       if (requestUrl.pathname.startsWith('/api/')) return json(res, 404, { error: 'Endpoint not found.' });
       if (!['GET', 'HEAD'].includes(req.method)) return json(res, 405, { error: 'Method not allowed.' });
@@ -209,7 +163,7 @@ async function createService({ dataDirectory = process.env.MASAFLOW_DATA_DIR || 
     } catch (error) { if (!res.headersSent) json(res, error.code === 'ENOENT' ? 404 : error.statusCode || 400, { error: error.message, code: error.code || 'ACTION_REJECTED' }); else res.end(); }
   }
   let closePromise;
-  return { server, engine, dataFile, kick, close: () => {
+  return { server, engine, dataFile, close: () => {
     if (closePromise) return closePromise;
     closing = true;
     closePromise = (async () => {
@@ -237,4 +191,4 @@ if (require.main === module) {
     server.listen(port, host, () => process.stdout.write(`MasaFlow running at http://${host}:${port}\n`));
   }).catch(error => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
 }
-module.exports = { createService, DRAWER_PULSE };
+module.exports = { createService };

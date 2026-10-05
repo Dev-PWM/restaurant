@@ -66,7 +66,6 @@ export interface PaymentRecord {
   changeCents: number;
   paidAt: string;
   cashierId: string;
-  drawerKickStatus: 'pending' | 'simulated' | 'sent' | 'failed' | 'unknown';
 }
 export interface CashDrawerShift {
   id: string;

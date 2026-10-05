@@ -29,7 +29,7 @@ Uninstalling removes only this LaunchAgent. It preserves saved orders, drawer au
 
 Put server settings in the repository's ignored `.env` file. The wrapper reads it as dotenv data, with existing process environment values taking precedence. It never executes shell text from `.env`. The launcher binds to **127.0.0.1** to keep the existing trusted-counter deployment local.
 
-`PORT` defaults to `4173`. `MASAFLOW_DATA_DIR` defaults to `.masaflow` inside this repository and can be an absolute or repository-relative path. The installer freezes these two operational settings in the plist so each restart targets the same data directory and port. Reinstall login startup after deliberately changing either setting. AI Gateway and printer credentials/settings are read by the server from `.env`; credentials are never placed in the plist, shortcut, URL, or browser code.
+`PORT` defaults to `4173`. `MASAFLOW_DATA_DIR` defaults to `.masaflow` inside this repository and can be an absolute or repository-relative path. The installer freezes these two operational settings in the plist so each restart targets the same data directory and port. Reinstall login startup after deliberately changing either setting. AI Gateway credentials are read by the server from `.env`; credentials are never placed in the plist, shortcut, URL, or browser code.
 
 Logs live in the effective data directory under `logs/startup.log` and `logs/startup-error.log`. The default `.masaflow` directory is ignored by Git. On launch/installation, log files larger than 5 MB are rotated to a single `.previous` copy. Files are created with private permissions. Logs are not deleted by disabling startup.
 

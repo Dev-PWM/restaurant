@@ -1,6 +1,6 @@
 # Customer website and business POS
 
-MasaFlow has one shared server and two interfaces. Customers can place an order from any internet connection. Staff sign in to the business interface to receive the name, dishes, modifiers and notes, collect Mexican-peso cash, and control preparation and pickup. Customers pay the full amount at the physical counter before the kitchen starts. Submitting an order never charges money online.
+MasaFlow has one shared server and two interfaces. Customers can place an order from any internet connection. Staff sign in to review and accept each order, start cooking, and mark it ready for pickup. Customers follow those status changes live. Cash is collected at pickup; unpaid cancellations and no-shows do not count as revenue.
 
 | Address | Purpose |
 | --- | --- |
@@ -11,9 +11,9 @@ MasaFlow has one shared server and two interfaces. Customers can place an order 
 | `/insights` | Operations and Sales analytics; staff access required |
 | `/staff-login.html` | Staff sign-in, current session and sign-out |
 
-Customer checkout creates an awaiting-cash draft. Staff sees it immediately, takes cash, and records the tender and change. Saving that payment releases the ticket to the pending kitchen queue. Staff advances it to preparing, ready and completed. The customer's tracking screen follows the saved states without refreshing. Keep that screen open to receive updates; this version does not send SMS or background push notifications.
+Customer checkout creates an order in review. Staff acceptance moves it into cooking, and marking it ready notifies the customer's tracking screen. Staff records tender and change at pickup; only then is the cash receipt recorded and the order completed. Unpaid orders can be cancelled as no-shows without recording revenue. The customer tracking screen follows saved states without refreshing and can offer an opt-in browser notification when the order is ready; reliable background push and SMS are not configured.
 
-Sales, revenue charts and top dishes use verified paid orders for the selected day, month or year in `America/Mexico_City`. Unpaid online submissions do not inflate revenue or popularity. Drawer floats and cash drops affect drawer reconciliation separately from sales.
+Sales, revenue charts and top dishes use verified paid orders for the selected day, month or year in `America/Mexico_City`. Unpaid orders do not inflate revenue or popularity. The runtime is digital-only: it has no printer integration, receipt-print controls, or cash-drawer hardware commands.
 
 ## Access and live data
 
@@ -40,16 +40,16 @@ A domain and an always-on Linux host with Docker Compose are still required. No 
 1. Obtain a domain and Linux host. Point the chosen hostname's DNS to the host. Allow incoming TCP ports 80 and 443. UDP 443 is optional for HTTP/3.
 2. Copy the project to the host, and copy `.env.example` to `.env`. Set `MASAFLOW_DOMAIN=orders.your-domain.com` and a unique `MASAFLOW_STAFF_PASSWORD`. Optional AI Gateway credentials also belong in this private file. Restrict its permissions with `chmod 600 .env`. Compose derives `MASAFLOW_PUBLIC_ORIGIN=https://...` from the domain; a custom host must explicitly set that HTTPS origin itself.
 3. Run `docker compose up -d --build`. The build runs the automated tests and builds analytics. The app runs as the non-root Node user. Inspect `docker compose ps` and `docker compose logs --tail=100 app web` for startup status.
-4. Visit the customer address from a phone using cellular data. On another device, open `/pos`, sign in, open a drawer shift, and verify an order through cash collection, cooking, ready, pickup and the corresponding sales report.
+4. Visit the customer address from a phone using cellular data. On another device, open `/pos`, sign in, and verify an order through review, acceptance, cooking, ready, cash collection at pickup, and the corresponding sales report. Cancel an unpaid test order to verify it is excluded from revenue.
 5. Create a manual backup with `docker compose exec app npm run backup`. List snapshots with `docker compose exec app npm run backups`. Copy verified archives to a separate private backup location. Keep the named data volume when upgrading; `docker compose down -v` deletes it and must not be used for routine updates.
 
 Use one app instance with its existing serialized store and writer lock. Do not start separate local and cloud ledgers for the same business: all staff and customer devices should use the same public service. Independent restaurant instances and multiple writers would require a different storage model. A new host starts with editable demo menu prices and no operational receipts; migrating an existing ledger is a separate, deliberate backup/restore step.
 
-To restore a cloud snapshot, stop the app, then run the restore CLI in a one-off container using the same named volume: `docker compose stop app`, followed by `docker compose run --rm --no-deps app npm run restore -- /data/backups/FILE.json --confirm`, then `docker compose up -d app`. Verify the chosen snapshot first and follow [BACKUPS.md](BACKUPS.md); restoration preserves the previous ledger and suppresses uncertain drawer-pulse replay.
+To restore a cloud snapshot, stop the app, then run the restore CLI in a one-off container using the same named volume: `docker compose stop app`, followed by `docker compose run --rm --no-deps app npm run restore -- /data/backups/FILE.json --confirm`, then `docker compose up -d app`. Verify the chosen snapshot first and follow [BACKUPS.md](BACKUPS.md); restoration preserves the previous ledger and treats any historical hardware metadata as inert.
 
-## Physical counter hardware
+## Digital-only operation
 
-The current ESC/POS integration opens a configured TCP printer connection from the server. A cloud server cannot automatically reach a printer on the restaurant's private LAN. Leave the printer host empty for simulated pulses until a private network path or a local hardware bridge is configured and tested. Do not expose the printer port to the public internet. The browser print dialog continues to support receipt printing at the counter.
+Orders, status updates, receipts, tender calculations, and the ledger are stored digitally. No printer, cash-drawer pulse, or other peripheral command is issued. Staff may export transaction data as CSV.
 
 ## Verification
 

@@ -1,6 +1,6 @@
 # MasaFlow backups and restore
 
-MasaFlow saves the live ledger to `state.json` in its configured data directory and creates separate snapshots in that directory's `backups` folder. The default data directory is the Git-ignored `.masaflow` folder in this repository. A backup contains menu settings, draft and paid orders, payment snapshots, shifts and frozen audits, cash drops, audit events, and drawer delivery records. It contains the same private operational information as the ledger; keep copies in a location you control.
+MasaFlow saves the live ledger to `state.json` in its configured data directory and creates separate snapshots in that directory's `backups` folder. The default data directory is the Git-ignored `.masaflow` folder in this repository. A backup contains menu settings, orders, payment snapshots, shifts and frozen audits, cash drops, audit events, and any hardware metadata from older versions. It contains the same private operational information as the ledger; keep copies in a location you control.
 
 Automatic backups run at service startup, after the first changed committed revision at least one hour after the previous automatic backup, and whenever a shift closes. An hour without changes creates no extra snapshot. Snapshots are written to a temporary file, flushed, and atomically renamed. Each has a SHA-256 checksum that restore verifies before using its data. A failed automatic backup does not undo a saved cash payment or a closed audit. Check the health endpoint's `backup.error` and correct disk-space or folder-access issues promptly.
 
@@ -47,14 +47,14 @@ Restoration replaces the current operational ledger with the selected snapshot. 
    npm run restore -- "/absolute/path/to/backup.json" --confirm --data-dir "/absolute/path/to/restaurant-data"
    ```
 
-4. Read the resulting revision, source revision, safety-backup filename, and excluded-receipt count. Restart MasaFlow with **Start MasaFlow.command** or re-enable login startup. Review the shift, receipts, and drawer exception list before resuming service.
+4. Read the resulting revision, source revision, safety-backup filename, and excluded-receipt count. Restart MasaFlow with **Start MasaFlow.command** or re-enable login startup. Review the restored shift and receipts before resuming service.
 
 Restore verifies the source first, writes the safety snapshot successfully, and then atomically replaces `state.json`. If validation or safety-backup creation fails, it leaves the current ledger untouched. If the current ledger is damaged, restoration preserves its original text and checksum in a `pre-restore-damaged` archive before replacement. That archive is evidence for recovery, not a normal restorable snapshot, and its listing is marked damaged.
 
 The restored revision advances beyond both the source revision and the current saved revision. The ticket counter keeps the higher saved value to avoid reusing ticket numbers. Legacy USD records preserve their original amounts; migration does not convert them into MXN. Closed shift balances and variances remain frozen. Financial rows with inconsistent receipt evidence are preserved and continue to appear in exclusion counts rather than being silently repaired or deleted.
 
-Pending payments and reserved drawer jobs become **unknown** after restore. Restarting the service does not replay those drawer pulses. Inspect the physical drawer before deliberately requesting a new manual pulse; the restored snapshot cannot prove what happened at the printer after it was taken.
+Hardware metadata written by older versions is preserved unchanged for historical compatibility. The current runtime does not expose hardware controls or replay hardware actions, including when restoring a backup.
 
 ## Checks
 
-`node --test tests/local-data.test.js` uses isolated temporary data directories. It checks checksum rejection, one-writer locking, real launcher health identity, manual and automatic snapshots, retention, successful and failed restores, legacy currencies, frozen audits, uncertain drawer delivery, startup lock release, and backup failures during saved cash transactions. It does not restore or add transactions to the restaurant's operational ledger.
+`node --test tests/local-data.test.js` uses isolated temporary data directories. It checks checksum rejection, one-writer locking, real launcher health identity, manual and automatic snapshots, retention, successful and failed restores, legacy currencies, frozen audits, inert legacy hardware metadata, startup lock release, and backup failures during saved cash transactions. It does not restore or add transactions to the restaurant's operational ledger.

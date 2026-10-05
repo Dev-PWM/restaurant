@@ -105,11 +105,6 @@ function prepareRestore(backup, current) {
   restored.revision = revision + 1;
   restored.nextOrderNumber = Math.max(restored.nextOrderNumber, current?.nextOrderNumber || 0);
   const at = new Date().toISOString();
-  for (const job of restored.hardwareJobs) if (job && job.status === 'reserved') { job.status = 'unknown'; job.completedAt = at; job.message = 'Restored backup; physical drawer status is uncertain. Inspect before a manual pulse.'; }
-  for (const payment of restored.payments) if (payment && (payment.drawerKickStatus === 'pending' || restored.hardwareJobs.some(job => job && job.paymentId === payment.id && job.status === 'unknown'))) {
-    payment.drawerKickStatus = 'unknown';
-    if (typeof payment.id === 'string' && !restored.hardwareJobs.some(job => job && job.paymentId === payment.id)) restored.hardwareJobs.push({ key: `payment:${payment.id}`, paymentId: payment.id, status: 'unknown', createdAt: at, completedAt: at, message: 'Restored backup; automatic delivery suppressed.' });
-  }
   restored.audit.push({ id: crypto.randomUUID(), at, action: 'data_restore', message: `Backup from ${backup.createdAt} restored. Previous revision: ${current?.revision ?? 'none'}.`, data: { snapshotRevision: backup.revision, previousRevision: current?.revision ?? null, sha256: backup.sha256 } });
   return validateState(restored);
 }

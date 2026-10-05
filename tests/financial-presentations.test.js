@@ -24,41 +24,12 @@ async function mixedCurrencyState() {
   state.payments[2].currency = 'USD'; // An inconsistent record the shared validator must exclude everywhere.
   return state;
 }
-async function printedSummary(state) {
-  const engine = createEngine({ state }); let printed = '';
-  const popup = { document: { open() {}, write(html) { printed += html; }, close() {} }, focus() {}, print() {} };
-  const sandbox = {
-    window: { MasaFlow: engine, open: () => popup },
-    document: { addEventListener() {}, querySelector: () => null },
-    console, Intl, Date, setTimeout
-  };
-  vm.runInNewContext(await fs.readFile(path.join(root, 'assets/masaflow-ui.js'), 'utf8'), sandbox);
-  sandbox.window.MasaFlowUI.printDailySummary();
-  return { html: printed, engine };
-}
 async function actualFunction(name) {
   const html = await fs.readFile(path.join(root, 'apps/html/history.html'), 'utf8');
   const match = html.match(new RegExp(`  function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n  \\}`));
   assert.ok(match, `Cannot find ${name} in the ledger screen`);
   return match[0];
 }
-
-test('daily print uses verified receipts, keeps USD and MXN apart, and formats the legacy drawer in USD', async () => {
-  const { html, engine } = await printedSummary(await mixedCurrencyState());
-  const verified = engine.verifiedReceipts();
-  assert.equal(verified.receipts.length, 2); assert.equal(verified.excluded, 1);
-  assert.match(html, /<h2>MXN<\/h2>[\s\S]*?<span>Cash receipts<\/span><b>\$85\.00<\/b>/);
-  assert.match(html, /<h2>USD<\/h2>[\s\S]*?<span>Cash receipts<\/span><b>USD\s?85\.00<\/b>/);
-  assert.match(html, /<span>Expected in drawer<\/span><b>USD\s?185\.00<\/b>/);
-  assert.match(html, /<span>Inconsistent cash receipts excluded \(all dates\)<\/span><b>1<\/b>/);
-  assert.ok(!html.includes('255.00'), 'Invalid receipts or mixed-currency totals reached the printout');
-});
-
-test('an empty daily print leaves average ticket absent', async () => {
-  const { html } = await printedSummary(createEngine().getState());
-  assert.match(html, /<span>Average ticket<\/span><b>—<\/b>/);
-  assert.match(html, /<span>Paid orders<\/span><b>0<\/b>/);
-});
 
 test('ledger rows use the same exclusions as analytics for bad currencies, duplicate IDs and null records', async () => {
   const source = await actualFunction('ledgerRows');

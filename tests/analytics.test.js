@@ -104,7 +104,7 @@ test('strict completion timestamps exclude impossible calendar days and timezone
   assert.equal(dateParts('2026-10-01T06:10:00', 'America/Mexico_City'), null);
 });
 
-test('malformed and null audit/hardware records are excluded while valid frozen currency audits remain intact', async () => {
+test('malformed audit records are excluded while legacy hardware metadata stays out of analytics', async () => {
   const state = await fixture(['2026-09-30T12:00:00.000Z']);
   state.shifts.push(null);
   const validAudit = { id: 'valid-audit', currency: 'USD', openedAt: '2026-09-30T12:00:00.000Z', closedAt: '2026-09-30T20:00:00.000Z', floatCents: 1000, expectedCentsAtClose: 3500, actualCents: 3450, varianceCents: -50 };
@@ -125,7 +125,7 @@ test('malformed and null audit/hardware records are excluded while valid frozen 
   assert.equal(dto.operations.latestAudit.expectedCents, 3500); assert.equal(dto.operations.latestAudit.varianceCents, -50);
   assert.equal(dto.operations.latestAudit.currency, 'USD'); assert.equal(dto.operations.currentShift.currency, 'MXN');
   assert.equal(dto.metricDefinitions.find(metric => metric.id === 'drawer_variance').unit, 'USD');
-  assert.ok(dto.operations.drawerExceptions.some(exception => exception.key === 'manual:test'));
+  assert.equal('drawerExceptions' in dto.operations, false);
   assert.equal(dto.sales.receiptsCents, 9500); assert.deepEqual(state, snapshot);
 });
 

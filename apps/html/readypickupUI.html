@@ -130,9 +130,6 @@
   </p>
 
   <!-- Menu link. The padding (cancelled by -mb-4) makes the small text a 44px+ tap target. -->
-  <button type="button" id="tracking-print" data-testid="tracking-print" hidden class="mt-6 text-white/80 hover:text-white transition-colors font-semibold text-xs flex items-center gap-2 min-h-[44px]">
-    <i class="fa-solid fa-print" aria-hidden="true"></i> Print receipt
-  </button>
   <div data-mf-language-host class="mt-2 flex justify-center"></div>
   <a id="menu-link" data-testid="menu-link" hidden href="MenuUI.html" class="mt-auto pt-8 pb-4 -mb-4 text-white/60 hover:text-white transition-colors font-semibold text-xs flex items-center gap-2 focus-visible:outline-white">
     <i class="fa-solid fa-utensils" aria-hidden="true"></i> <span id="menu-link-label">Order something else</span>
@@ -333,7 +330,7 @@ window.addEventListener('DOMContentLoaded', () => {
     text($('pickup-at'), order.orderType === 'dine_in' && order.tableNumber ? `Table ${order.tableNumber}` : 'Counter');
 
     show($('order-body'), true); show($('order-footer'), true); show($('missing-footer'), false);
-    show($('keep-open'), view.waiting); show($('menu-link'), true); show($('tracking-print'), order.status !== 'cancelled');
+    show($('keep-open'), view.waiting); show($('menu-link'), true);
     document.title = `MasaFlow — Order #${order.number}`;
     syncReadyOverlay(order);
   }
@@ -347,7 +344,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     showStatus(loaded ? MISSING : connected ? LOADING : OFFLINE);
     show($('order-body'), false); show($('order-footer'), false); show($('missing-footer'), loaded);
-    show($('keep-open'), false); show($('menu-link'), false); show($('tracking-print'), false);
+    show($('keep-open'), false); show($('menu-link'), false);
     syncReadyOverlay(null);
   }
 
@@ -386,7 +383,6 @@ window.addEventListener('DOMContentLoaded', () => {
   if (orderId === null) setUpBoard();
 
   $('ready-dismiss').addEventListener('click', closeReady);
-  $('tracking-print').addEventListener('click', () => { if (orderId) UI.printReceipt(orderId); });
   $('menu-link').addEventListener('click', () => { try { localStorage.removeItem('activeMasaFlowOrder'); } catch (_) {} });
   document.addEventListener('keydown', event => {
     if (!overlayOpen) return;

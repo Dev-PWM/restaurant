@@ -18,7 +18,7 @@ function customerState(state, query = new URLSearchParams()) {
   return {
     version: state.version, revision: state.revision, settings: state.settings, menu: state.menu, orders,
     payments: payment ? [pick(payment, ['id', 'orderId', 'currency', 'subtotalCents', 'taxCents', 'totalCents', 'tenderedCents', 'changeCents', 'paidAt'])] : [],
-    shifts: [], cashDrops: [], audit: [], hardwareJobs: []
+    shifts: [], cashDrops: [], audit: []
   };
 }
 module.exports = { customerState, customerOrder, UUID };

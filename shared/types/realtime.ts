@@ -1,6 +1,6 @@
 /** All money is a safe integer in MXN centavos. Display formatting never enters ledger math. */
 export type OrderStatus =
-  "draft" | "unpaid" | "cooking" | "ready" | "completed" | "no_show";
+  "draft" | "review" | "cooking" | "ready" | "completed" | "no_show";
 export interface Modifier {
   id: string;
   name: string;
@@ -59,6 +59,7 @@ export interface Order {
   items: OrderLine[];
   totalCents: number;
   createdAt: string;
+  acceptedAt: string | null;
   paidAt: string | null;
   readyAt: string | null;
   completedAt: string | null;
@@ -117,7 +118,7 @@ export interface Snapshot {
 export interface Commands {
   submit_client_order: OrderInput;
   pos_order_paid: { orderId: string; tenderedCents: number; tipCents?: number };
-  pos_update_status: { orderId: string; status: "ready" | "completed" };
+  pos_update_status: { orderId: string; status: "cooking" | "ready" };
   pos_mark_noshow: { orderId: string };
   admin_toggle_stock: {
     id: string;

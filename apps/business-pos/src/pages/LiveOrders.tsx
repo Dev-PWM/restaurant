@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Boxes,
@@ -10,7 +10,6 @@ import {
   LayoutGrid,
   Pause,
   Play,
-  Printer,
   Search,
   SlidersHorizontal,
   Table,
@@ -27,7 +26,6 @@ import {
   mxn,
   OrderLines,
   orderLabel,
-  printThermalTicket,
   SoundButton,
   StaffHeader,
   time,
@@ -64,7 +62,7 @@ export function CashTender({
   }
   return (
     <Modal
-      title={`Cobrar ${orderLabel(order)} · ${order.customerName}`}
+      title={`Cobrar al entregar ${orderLabel(order)} · ${order.customerName}`}
       onClose={onClose}
     >
       <OrderLines order={order} />
@@ -144,7 +142,7 @@ export function CashTender({
         disabled={!connected || busy || !valid || change < 0}
         onClick={() => void pay(cents, tipCents)}
       >
-        Confirmar pago
+        Confirmar pago y entregar
         <ArrowRight size={18} />
       </button>
       <button
@@ -152,7 +150,7 @@ export function CashTender({
         disabled={!connected || busy}
         onClick={() => void pay(order.totalCents)}
       >
-        Efectivo Exacto · Cobrar {mxn(order.totalCents)}
+        Efectivo exacto · Cobrar y entregar {mxn(order.totalCents)}
       </button>
       <p className="mt-4 text-center text-xs text-stone-500">
         Confirma solo después de recibir el efectivo.
@@ -174,9 +172,9 @@ export function TicketCard({
     [busy, setBusy] = useState(false);
   const startTime = Date.parse(
     order.status === "ready"
-      ? order.readyAt || order.paidAt || order.createdAt
+      ? order.readyAt || order.createdAt
       : order.status === "cooking"
-        ? order.paidAt || order.createdAt
+        ? order.acceptedAt || order.createdAt
         : order.createdAt,
   );
   const elapsedSeconds = Math.max(0, Math.floor((now - startTime) / 1000));
@@ -187,7 +185,7 @@ export function TicketCard({
   const isCooking = order.status === "cooking";
   const aging = isCooking && minutes >= 10;
   const isWarning =
-    (isCooking && minutes >= 5) || (order.status === "unpaid" && minutes >= 8);
+    (isCooking && minutes >= 5) || (order.status === "review" && minutes >= 8);
   const progressPercent = Math.min(
     100,
     Math.max(4, Math.round((elapsedSeconds / 600) * 100)),
@@ -196,18 +194,19 @@ export function TicketCard({
     setBusy(true);
     await command("pos_update_status", {
       orderId: order.id,
-      status: order.status === "cooking" ? "ready" : "completed",
+      status: order.status === "review" ? "cooking" : "ready",
     });
     setBusy(false);
   }
   return (
     <article
+      data-order-id={order.id}
       className={`overflow-hidden rounded-xl border-2 bg-white shadow-xs transition-colors ${
         aging
           ? "animate-pulse border-red-500 bg-red-50/40"
           : order.status === "cooking" && minutes >= 5
             ? "border-amber-400 bg-amber-50"
-            : order.status === "unpaid" && minutes >= 8
+            : order.status === "review" && minutes >= 8
               ? "border-amber-300"
               : "border-stone-200"
       }`}
@@ -222,7 +221,7 @@ export function TicketCard({
         aria-label={`Tiempo de espera: ${minutes} minutos`}
       >
         <div
-          className={`h-full transition-all duration-1000 ease-linear ${
+          className={`h-full transition-all duration-220 ease-linear ${
             aging
               ? "bg-red-500 animate-pulse"
               : isWarning
@@ -277,11 +276,11 @@ export function TicketCard({
                 ? "Demorado"
                 : isWarning
                   ? "Atención"
-                  : order.status === "unpaid"
-                    ? "Por pagar"
+                  : order.status === "review"
+                      ? "En revisión"
                     : order.status === "cooking"
                       ? "Cocinando"
-                      : "Para entrega"}
+                        : "Lista para recoger"}
             </span>
           </div>
         </div>
@@ -289,25 +288,26 @@ export function TicketCard({
         <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
           <div className="flex items-center gap-2">
             <span className="text-stone-500">{time(order.createdAt)}</span>
-            <button
-              className="p-1 text-stone-400 hover:text-stone-700 transition-colors"
-              title="Imprimir comanda térmica"
-              aria-label={`Imprimir comanda ${orderLabel(order)}`}
-              onClick={() => printThermalTicket(order)}
-            >
-              <Printer size={15} />
-            </button>
           </div>
           <strong>{mxn(order.totalCents)}</strong>
         </div>
-        {order.status === "unpaid" ? (
+        {order.status === "review" ? (
+          <button
+            className="btn btn-primary mt-4 w-full"
+            disabled={!connected || busy}
+            onClick={() => void advance()}
+          >
+            <Check size={17} />
+            Aceptar y empezar a cocinar
+          </button>
+        ) : order.status === "ready" ? (
           <>
             <button
-              className="btn btn-primary mt-4 w-full"
+              className="btn mt-4 w-full border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900"
               disabled={!connected || busy}
               onClick={onPay}
             >
-              Cobrar en efectivo
+              Cobrar al entregar
               <ArrowRight size={16} />
             </button>
             <button
@@ -315,24 +315,24 @@ export function TicketCard({
               disabled={!connected || busy}
               onClick={() => setNoShow(true)}
             >
-              No-Show
+              Cancelar / No-Show
             </button>
           </>
         ) : (
           <button
-            className={`btn mt-4 w-full ${order.status === "ready" ? "border-emerald-800 bg-emerald-800 text-white hover:bg-emerald-900" : "btn-primary"}`}
+            className="btn btn-primary mt-4 w-full"
             disabled={!connected || busy}
             onClick={() => void advance()}
           >
             <Check size={17} />
-            {order.status === "cooking" ? "Marcar lista" : "Entregado"}
+            Marcar lista para recoger
           </button>
         )}
         {noShow && (
           <Modal title="¿Marcar como No-Show?" onClose={() => setNoShow(false)}>
             <p className="mb-5">
               Se quitará {orderLabel(order)} de la fila. El historial conservará
-              el pedido como No-Show, sin ingreso de efectivo.
+              el pedido como cancelado / No-Show, sin ingreso de efectivo.
             </p>
             <div className="flex gap-3">
               <button className="btn flex-1" onClick={() => setNoShow(false)}>
@@ -350,13 +350,31 @@ export function TicketCard({
                   if (reply.ok) setNoShow(false);
                 }}
               >
-                Confirmar No-Show
+                Confirmar cancelación
               </button>
             </div>
           </Modal>
         )}
       </div>
     </article>
+  );
+}
+
+function TicketSkeleton() {
+  return (
+    <div
+      className="panel animate-pulse space-y-4"
+      aria-hidden="true"
+    >
+      <div className="flex justify-between gap-3">
+        <div className="h-6 w-20 rounded bg-stone-200" />
+        <div className="h-6 w-14 rounded bg-stone-200" />
+      </div>
+      <div className="h-4 w-2/3 rounded bg-stone-200" />
+      <div className="h-3 w-full rounded bg-stone-200" />
+      <div className="h-3 w-4/5 rounded bg-stone-200" />
+      <div className="h-10 w-full rounded-xl bg-stone-200" />
+    </div>
   );
 }
 
@@ -519,7 +537,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                 <th className="px-4 py-3.5 text-right">Total Cobrado</th>
                 <th className="px-4 py-3.5">Detalle Efectivo</th>
                 <th className="px-4 py-3.5 text-center">Estado</th>
-                <th className="px-4 py-3.5 text-center">Ticket</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100 font-medium">
@@ -589,15 +606,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                         {isNoShow ? "No-Show" : "Entregado"}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <button
-                        className="rounded p-1 text-stone-400 transition-colors hover:bg-stone-100 hover:text-stone-700"
-                        title="Reimprimir comanda térmica"
-                        onClick={() => printThermalTicket(order)}
-                      >
-                        <Printer size={15} />
-                      </button>
-                    </td>
                   </tr>
                 );
               })}
@@ -642,14 +650,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                         {isNoShow ? "No-Show" : "Entregado"}
                       </span>
                     </div>
-                    <button
-                      className="p-1.5 text-stone-400 transition-colors hover:text-stone-700"
-                      title="Reimprimir comanda térmica"
-                      aria-label={`Reimprimir comanda ${orderLabel(order)}`}
-                      onClick={() => printThermalTicket(order)}
-                    >
-                      <Printer size={16} />
-                    </button>
                   </div>
 
                   <div className="mt-3 flex items-center justify-between text-xs">
@@ -734,12 +734,19 @@ export function LiveOrders() {
     [activeTab, setActiveTab] = useState<
       "queue" | "batching" | "completed"
     >("queue"),
-    [activeLane, setActiveLane] = useState<"unpaid" | "cooking" | "ready">(
-      "unpaid",
+    [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
+      "review",
     );
   const previousActive = useRef<Set<string> | null>(null);
   const previousCooking = useRef<Set<string> | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const previousTicketPositions = useRef(
+    new Map<string, { left: number; top: number }>(),
+  );
   const now = useTicketTimer();
+  const layoutKey =
+    snapshot?.activeOrders.map((order) => `${order.id}:${order.status}`).join("|") ??
+    "";
 
   useEffect(() => {
     const unlock = () => {
@@ -809,37 +816,98 @@ export function LiveOrders() {
       totalPieces,
     };
   }, [cookingOrders]);
-  if (!snapshot) return null;
+  useLayoutEffect(() => {
+    const board = boardRef.current;
+    if (!board) return;
+    const reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    const positions = new Map<string, { left: number; top: number }>();
+    for (const card of board.querySelectorAll<HTMLElement>("[data-order-id]")) {
+      if (!card.getClientRects().length) continue;
+      const id = card.dataset.orderId;
+      if (!id) continue;
+      const rect = card.getBoundingClientRect();
+      const next = { left: rect.left, top: rect.top };
+      const previous = previousTicketPositions.current.get(id);
+      if (!reducedMotion && typeof card.animate === "function") {
+        if (previous) {
+          const x = previous.left - next.left;
+          const y = previous.top - next.top;
+          if (x || y) {
+            card.animate(
+              [
+                { transform: `translate(${x}px, ${y}px)` },
+                { transform: "translate(0, 0)" },
+              ],
+              { duration: 220, easing: "ease-out" },
+            );
+          }
+        } else {
+          card.animate(
+            [
+              { opacity: 0.7, transform: "translateY(8px)" },
+              { opacity: 1, transform: "translateY(0)" },
+            ],
+            { duration: 220, easing: "ease-out" },
+          );
+        }
+      }
+      positions.set(id, next);
+    }
+    previousTicketPositions.current = positions;
+  }, [layoutKey]);
+  if (!snapshot) {
+    return (
+      <main
+        className="mx-auto max-w-[1600px] px-5 py-8"
+        role="status"
+        aria-label="Conectando con la cocina"
+        aria-busy="true"
+      >
+        <h1 className="display mb-6 text-3xl">Conectando con la cocina…</h1>
+        <div className="grid gap-5 md:grid-cols-3">
+          {["En revisión", "Cocinando", "Lista para recoger"].map((lane) => (
+            <section key={lane} className="space-y-3 rounded-2xl bg-stone-100 p-3">
+              <h2 className="px-2 py-2 font-bold text-stone-700">{lane}</h2>
+              <TicketSkeleton />
+              <TicketSkeleton />
+            </section>
+          ))}
+        </div>
+      </main>
+    );
+  }
   const payOrder = snapshot.activeOrders.find(
-    (o) => o.id === payId && o.status === "unpaid",
+    (o) => o.id === payId && o.status === "ready",
   );
 
   const lanes = [
     {
-      status: "unpaid",
-      title: "Por Pagar",
-      note: "Recibe el efectivo para empezar.",
+      status: "review",
+      title: "En revisión",
+      note: "Acepta el pedido para empezar a cocinar.",
       color: "bg-stone-500",
     },
     {
       status: "cooking",
       title: "Cocinando",
-      note: "Pagados. Manos a la masa.",
+      note: "Pedidos aceptados. Manos a la masa.",
       color: "bg-clay-600",
     },
     {
       status: "ready",
-      title: "Lista",
-      note: "Todo listo para entregar.",
+      title: "Lista para recoger",
+      note: "Cobra al entregar o marca No-Show.",
       color: "bg-emerald-700",
     },
   ] as const;
 
   const visibleLanes = kitchenOnly
-    ? lanes.filter((lane) => lane.status !== "unpaid")
+    ? lanes.filter((lane) => lane.status !== "review")
     : lanes;
   const laneCounts = {
-    unpaid: snapshot.activeOrders.filter((order) => order.status === "unpaid")
+    review: snapshot.activeOrders.filter((order) => order.status === "review")
       .length,
     cooking: cookingOrders.length,
     ready: snapshot.activeOrders.filter((order) => order.status === "ready")
@@ -921,7 +989,7 @@ export function LiveOrders() {
                 onClick={() => {
                   const next = !kitchenOnly;
                   setKitchenOnly(next);
-                  if (next && activeLane === "unpaid") setActiveLane("cooking");
+                  if (next && activeLane === "review") setActiveLane("cooking");
                 }}
                 title="Ocultar o mostrar fila de caja"
               >
@@ -1081,6 +1149,7 @@ export function LiveOrders() {
               </div>
             )}
             <div
+              ref={boardRef}
               className={`grid items-start gap-5 ${
                 kitchenOnly ? "md:grid-cols-2" : "md:grid-cols-3"
               }`}
@@ -1118,7 +1187,8 @@ export function LiveOrders() {
                           onPay={() => setPayId(order.id)}
                         />
                       ))}
-                      {!orders.length && (
+                      {!connected && <TicketSkeleton />}
+                      {!orders.length && connected && (
                         <EmptyState>
                           Sin pedidos {lane.title.toLowerCase()}
                         </EmptyState>

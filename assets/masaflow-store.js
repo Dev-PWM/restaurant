@@ -246,7 +246,7 @@
         cents(tenderedCents, 'Cash tendered', false);
         if (tenderedCents < order.totalCents) throw new Error(`Insufficient cash. ${money(order.totalCents - tenderedCents, order.currency)} still due.`);
         available(s, order);
-        const paidAt = now(); const payment = { id: uid(), orderId: id, shiftId: shift.id, currency: order.currency, method: 'cash', subtotalCents: order.subtotalCents, taxCents: order.taxCents, totalCents: order.totalCents, tenderedCents, changeCents: tenderedCents - order.totalCents, paidAt, cashierId: cleanText(cashierId, 80) || shift.cashierId, drawerKickStatus: 'pending' };
+        const paidAt = now(); const payment = { id: uid(), orderId: id, shiftId: shift.id, currency: order.currency, method: 'cash', subtotalCents: order.subtotalCents, taxCents: order.taxCents, totalCents: order.totalCents, tenderedCents, changeCents: tenderedCents - order.totalCents, paidAt, cashierId: cleanText(cashierId, 80) || shift.cashierId };
         s.payments.push(payment);
         Object.assign(order, { status: 'pending', paymentStatus: 'paid', paymentId: payment.id, paidAt, updatedAt: paidAt });
         audit(s, 'cash_payment', `${order.number} (${order.currency}): received ${money(tenderedCents, order.currency)}, returned ${money(payment.changeCents, order.currency)}; sale ${money(order.totalCents, order.currency)}. Dispatched to kitchen.`);
@@ -301,20 +301,6 @@
         if ('available' in patch) { if (typeof patch.available !== 'boolean') throw new Error('Invalid availability.'); option.available = patch.available; }
         audit(s, 'modifier_edit', `${item.name} · ${option.name}: ${option.currency} ${money(option.priceCents, option.currency)}, ${option.available ? 'in stock' : 'out of stock'}.`, { menuItemId: item.id, optionId: option.id, name: `${item.name} · ${option.name}`, available: option.available }); return option;
       }); },
-      reserveHardwareJob(key, paymentId = null) { return mutate(s => {
-        const existing = s.hardwareJobs.find(j => j && j.key === key); if (existing) return { job: existing, duplicate: true };
-        if (paymentId && !verifiedReceipts(s).receipts.some(({ payment }) => payment.id === paymentId)) throw new Error('Drawer pulse requires a verified cash payment.');
-        if (!paymentId && !getOpenShift(s)) throw new Error('Open a drawer shift before a manual drawer pulse.');
-        const job = { key, paymentId, status: 'reserved', createdAt: now(), message: '' }; s.hardwareJobs.push(job);
-        audit(s, paymentId ? 'drawer_kick_requested' : 'manual_drawer_kick', paymentId ? 'Drawer pulse requested for verified cash sale.' : 'Cashier requested a manual drawer pulse.');
-        return { job, duplicate: false };
-      }); },
-      finishHardwareJob(key, status, message) { return mutate(s => {
-        const job = s.hardwareJobs.find(j => j && j.key === key); if (!job) throw new Error('Hardware job not found.');
-        job.status = status; job.message = cleanText(message, 300); job.updatedAt = now();
-        const payment = s.payments.find(p => p && p.id === job.paymentId); if (payment) payment.drawerKickStatus = status;
-        audit(s, 'drawer_kick_result', `${status}: ${job.message}`); return job;
-      }); }
     };
     return api;
   }

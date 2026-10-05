@@ -4,7 +4,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const os = require('node:os');
-const net = require('node:net');
 const { createEngine, initialState, verifiedReceipts } = require('../assets/masaflow-store.js');
 const { createBackupManager, validateState, validateBackup, backupEnvelope, acquireLock, identity, saveBackup, listBackups, pruneAutomatic, prepareRestore, restoreBackup } = require('../shared/local-data.js');
 const { createService } = require('../legacy-server.cjs');
@@ -20,7 +19,7 @@ async function directory(t) {
   return target;
 }
 async function service(t, target, options = {}) {
-  const app = await createService({ dataDirectory: target, printerHost: '', summaryOptions: { apiKey: '' }, ...options });
+  const app = await createService({ dataDirectory: target, summaryOptions: { apiKey: '' }, ...options });
   await new Promise((resolve, reject) => { app.server.once('error', reject); app.server.listen(0, '127.0.0.1', resolve); });
   if (cleanup.has(t)) cleanup.get(t).push(() => app.close()); else t.after(() => app.close());
   return { app, url: `http://127.0.0.1:${app.server.address().port}` };
@@ -132,18 +131,20 @@ test('legacy restore preserves USD amounts and closed audits without converting 
   assert.equal(verifiedReceipts(restored).receipts.length, 1);
 });
 
-test('restored pending and reserved drawer jobs never replay at service startup', async t => {
+test('legacy hardware metadata is preserved but stays inert after restore', async t => {
   const target = await directory(t), engine = createEngine(); await engine.openShift(10000);
   for (let i = 0; i < 2; i++) { const order = await engine.createDraft(draft()); await engine.payOrder(order.id, 5000); }
-  const source = engine.getState(); source.hardwareJobs.push({ key: `payment:${source.payments[0].id}`, paymentId: source.payments[0].id, status: 'reserved', createdAt: new Date().toISOString() });
+  const source = engine.getState();
+  source.payments[0].drawerKickStatus = 'pending';
+  source.hardwareJobs.push({ key: `payment:${source.payments[0].id}`, paymentId: source.payments[0].id, status: 'reserved', createdAt: new Date().toISOString() });
+  const originalHardwareJobs = copy(source.hardwareJobs);
   const restored = prepareRestore(backupEnvelope(source, 'manual'), null);
-  assert.ok(restored.payments.every(row => row.drawerKickStatus === 'unknown')); assert.ok(restored.hardwareJobs.every(row => row.status === 'unknown'));
+  assert.equal(restored.payments[0].drawerKickStatus, 'pending');
+  assert.deepEqual(restored.hardwareJobs, originalHardwareJobs);
   await fs.writeFile(path.join(target, 'state.json'), JSON.stringify(restored));
-  let connections = 0;
-  const printer = net.createServer(socket => { connections++; socket.resume(); socket.end(); });
-  await new Promise(resolve => printer.listen(0, '127.0.0.1', resolve)); t.after(() => new Promise(resolve => printer.close(resolve)));
-  const { app } = await service(t, target, { printerHost: '127.0.0.1', printerPort: printer.address().port });
-  assert.equal(connections, 0); assert.ok(app.engine.getState().payments.every(row => row.drawerKickStatus === 'unknown'));
+  const { app } = await service(t, target);
+  assert.equal(app.engine.getState().payments[0].drawerKickStatus, 'pending');
+  assert.deepEqual(app.engine.getState().hardwareJobs, originalHardwareJobs);
 });
 
 test('actual service exposes launcher health identity and manual backups without changing financial revision', async t => {
