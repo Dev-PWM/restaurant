@@ -9,11 +9,6 @@ const { randomUUID, createHash } = require("node:crypto");
 /** @typedef {import('../types/realtime').Commands} Commands */
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const paymentHourFormatter = new Intl.DateTimeFormat("es-MX", {
-  timeZone: "America/Mexico_City",
-  hour: "2-digit",
-  hourCycle: "h23",
-});
 /** @param {unknown} condition @param {string} message @param {string} [code] @returns {asserts condition} */
 function ensure(condition, message, code = "INVALID_INPUT") {
   if (!condition) throw Object.assign(new Error(message), { code });
@@ -31,7 +26,6 @@ function metrics(orders) {
   /** @type {SalesMetrics} */
   const result = {
     revenueCents: 0,
-    tipsCents: 0,
     cashHeldCents: 0,
     voidCount: 0,
     tenderedCents: 0,
@@ -39,14 +33,9 @@ function metrics(orders) {
     paidOrders: 0,
     completedOrders: 0,
     noShows: 0,
-    averageTicketCents: 0,
-    peakHour: null,
     itemPerformance: [],
-    favoriteCombinations: [],
   };
-  const items = new Map(),
-    combinations = new Map(),
-    hours = new Map();
+  const items = new Map();
   for (const order of orders) {
     if (order.status === "no_show") {
       result.noShows++;
@@ -56,13 +45,10 @@ function metrics(orders) {
     const payment = order.transaction;
     if (!payment) continue;
     result.revenueCents += payment.totalCents;
-    result.tipsCents += payment.tipCents;
     result.cashHeldCents += payment.tenderedCents - payment.changeCents;
     result.tenderedCents += payment.tenderedCents;
     result.changeCents += payment.changeCents;
     result.paidOrders++;
-    const hour = paymentHourFormatter.format(new Date(payment.paidAt));
-    hours.set(hour, (hours.get(hour) || 0) + 1);
     // Performance uses fulfilled sales from the history ledger, while cash totals recognize payment immediately.
     if (order.status !== "completed") continue;
     result.completedOrders++;
@@ -76,21 +62,10 @@ function metrics(orders) {
       row.quantity += line.quantity;
       row.revenueCents += line.lineTotalCents;
       items.set(line.menuItemId, row);
-      const combination = `${line.name} · ${
-        line.modifiers
-          .map((m) => m.name)
-          .sort()
-          .join(" + ") || "Sin cambios"
-      }`;
-      combinations.set(
-        combination,
-        (combinations.get(combination) || 0) + line.quantity,
-      );
     }
   }
   for (const amount of [
     result.revenueCents,
-    result.tipsCents,
     result.cashHeldCents,
     result.tenderedCents,
     result.changeCents,
@@ -99,16 +74,9 @@ function metrics(orders) {
       Number.isSafeInteger(amount),
       "El total excede el límite seguro. Cierra el turno.",
     );
-  result.averageTicketCents = result.paidOrders
-    ? Math.round(result.revenueCents / result.paidOrders)
-    : 0;
-  result.peakHour = [...hours].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   result.itemPerformance = [...items.values()].sort(
     (a, b) => b.quantity - a.quantity || a.name.localeCompare(b.name),
   );
-  result.favoriteCombinations = [...combinations]
-    .map(([name, quantity]) => ({ name, quantity }))
-    .sort((a, b) => b.quantity - a.quantity);
   return result;
 }
 /** @returns {State} */
@@ -340,17 +308,15 @@ function validate(s) {
     );
     if (order.transaction) {
       const t = order.transaction;
-      // Additive recovery migration: earlier v3 receipts had no tipping field.
-      if (!Object.hasOwn(t, "tipCents")) t.tipCents = 0;
-      money(t.tipCents);
       money(t.totalCents);
       money(t.tenderedCents);
       money(t.changeCents);
+      const legacyTipCents = t.tipCents === undefined ? 0 : money(t.tipCents);
       ensure(
         t.orderId === order.id &&
           t.currency === "MXN" &&
           t.totalCents === order.totalCents &&
-          t.tenderedCents - t.changeCents === t.totalCents + t.tipCents &&
+          t.tenderedCents - t.changeCents === t.totalCents + legacyTipCents &&
           Number.isFinite(Date.parse(t.paidAt)),
         "Recibo de efectivo inconsistente.",
       );
@@ -581,14 +547,16 @@ function createEngine({ directory, persist = writeAtomic }) {
       const order = [...next.activeOrders, ...next.completedOrders].find(
         (o) => o.id === data.orderId,
       );
-      ensure(order, "Pedido no encontrado.", "ORDER_NOT_FOUND");
+      ensure(order, "Pedido no encontrado.", "ORDER_NOT_FOUND"      );
       if (event === "pos_order_paid") {
+        ensure(
+          !Object.hasOwn(data, "tipCents"),
+          "Las propinas ya no están disponibles.",
+        );
         money(data.tenderedCents);
-        const tipCents = data.tipCents === undefined ? 0 : money(data.tipCents);
         if (order.transaction) {
           ensure(
-            order.transaction.tenderedCents === data.tenderedCents &&
-              order.transaction.tipCents === tipCents,
+            order.transaction.tenderedCents === data.tenderedCents,
             "El pedido ya fue pagado con otro importe.",
             "PAYMENT_CONFLICT",
           );
@@ -596,7 +564,7 @@ function createEngine({ directory, persist = writeAtomic }) {
         }
         ensure(order.status === "ready", "Solo puedes cobrar un pedido listo para entregar.");
         ensure(
-          data.tenderedCents >= order.totalCents + tipCents,
+          data.tenderedCents >= order.totalCents,
           "El efectivo no cubre el total.",
         );
         order.transaction = {
@@ -605,8 +573,7 @@ function createEngine({ directory, persist = writeAtomic }) {
           paidAt: at,
           totalCents: order.totalCents,
           tenderedCents: data.tenderedCents,
-          tipCents,
-          changeCents: data.tenderedCents - order.totalCents - tipCents,
+          changeCents: data.tenderedCents - order.totalCents,
           method: "cash",
           currency: "MXN",
         };

@@ -44,7 +44,8 @@ export interface Transaction {
   totalCents: number;
   tenderedCents: number;
   changeCents: number;
-  tipCents: number;
+  /** Preserved only when reading older persisted receipts. New payments never record tips. */
+  tipCents?: number;
   method: "cash";
   currency: "MXN";
 }
@@ -73,7 +74,6 @@ export interface ItemPerformance {
 }
 export interface SalesMetrics {
   revenueCents: number;
-  tipsCents: number;
   cashHeldCents: number;
   /** Unpaid cancellations (no_show), not paid refunds. */
   voidCount: number;
@@ -82,10 +82,7 @@ export interface SalesMetrics {
   paidOrders: number;
   completedOrders: number;
   noShows: number;
-  averageTicketCents: number;
-  peakHour: string | null;
   itemPerformance: ItemPerformance[];
-  favoriteCombinations: { name: string; quantity: number }[];
 }
 export interface State {
   version: 3;
@@ -117,7 +114,7 @@ export interface Snapshot {
 }
 export interface Commands {
   submit_client_order: OrderInput;
-  pos_order_paid: { orderId: string; tenderedCents: number; tipCents?: number };
+  pos_order_paid: { orderId: string; tenderedCents: number };
   pos_update_status: { orderId: string; status: "cooking" | "ready" };
   pos_mark_noshow: { orderId: string };
   admin_toggle_stock: {

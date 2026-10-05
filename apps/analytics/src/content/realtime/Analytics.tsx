@@ -84,7 +84,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[780px] text-left text-sm">
+        <table className="w-full min-w-[680px] text-left text-sm">
           <thead>
             <tr className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
               {[
@@ -93,12 +93,11 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
                 "Estado",
                 "Venta",
                 "Recibido",
-                "Propina",
                 "Cambio",
               ].map((label) => (
                 <th
                   key={label}
-                  className={`px-3 py-3 ${["Venta", "Recibido", "Propina", "Cambio"].includes(label) ? "text-right" : ""}`}
+                  className={`px-3 py-3 ${["Venta", "Recibido", "Cambio"].includes(label) ? "text-right" : ""}`}
                 >
                   {label}
                 </th>
@@ -140,9 +139,6 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
                 </td>
                 <td className="px-3 py-4 text-right tabular-nums">
                   {o.transaction ? mxn(o.transaction.tenderedCents) : "—"}
-                </td>
-                <td className="px-3 py-4 text-right tabular-nums">
-                  {o.transaction ? mxn(o.transaction.tipCents) : "—"}
                 </td>
                 <td className="px-3 py-4 text-right tabular-nums">
                   {o.transaction ? mxn(o.transaction.changeCents) : "—"}
@@ -193,7 +189,6 @@ function exportLedger(orders: Order[]) {
       "Platillos",
       "Venta MXN",
       "Recibido MXN",
-      "Propina MXN",
       "Cambio MXN",
     ],
   ];
@@ -211,7 +206,6 @@ function exportLedger(orders: Order[]) {
         .join("; "),
       ((o.transaction?.totalCents || 0) / 100).toFixed(2),
       ((o.transaction?.tenderedCents || 0) / 100).toFixed(2),
-      ((o.transaction?.tipCents || 0) / 100).toFixed(2),
       ((o.transaction?.changeCents || 0) / 100).toFixed(2),
     ]);
   const url = URL.createObjectURL(
@@ -339,11 +333,7 @@ export function Analytics() {
       ...snapshot.activeOrders.filter((o) => o.transaction),
       ...snapshot.completedOrders,
     ];
-  const top = [...metrics.itemPerformance].sort(
-      (a, b) => b.revenueCents - a.revenueCents,
-    )[0],
-    favorite = metrics.favoriteCombinations[0],
-    maximum = metrics.itemPerformance[0]?.quantity || 1;
+  const maximum = metrics.itemPerformance[0]?.quantity || 1;
   return (
     <>
       <StaffHeader page="analytics">
@@ -355,7 +345,6 @@ export function Analytics() {
       <main className="mx-auto max-w-[1440px] px-5 py-8 lg:px-8">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="eyebrow mb-2">Cada peso, en su lugar</p>
             <h1 className="display text-4xl md:text-5xl">Caja y ventas.</h1>
             <p className="mt-3 text-sm text-stone-500">
               Turno abierto{" "}
@@ -391,7 +380,7 @@ export function Analytics() {
             Turno archivado: {archive}. La caja está lista para empezar.
           </p>
         )}
-        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
           <section className="rounded-2xl bg-clay-600 p-6 text-white">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <Banknote size={18} />
@@ -416,33 +405,9 @@ export function Analytics() {
                 {mxn(metrics.changeCents)}
               </strong>
             </p>
-            <p className="mt-2 text-xs text-stone-500">
-              Ventas + propinas = efectivo en caja
-            </p>
-          </section>
-          <section className="panel">
-            <p className="eyebrow">Propinas</p>
-            <p className="my-4 text-3xl font-semibold tabular-nums">
-              {mxn(metrics.tipsCents)}
-            </p>
-            <p className="mb-2 text-sm text-stone-500">
-              Ticket promedio:{" "}
-              <strong className="text-stone-900">
-                {mxn(metrics.averageTicketCents)}
-              </strong>
-            </p>
-            <p className="text-sm text-stone-500">
-              Hora de mayor actividad:{" "}
-              <strong className="text-stone-900">
-                {metrics.peakHour ? `${metrics.peakHour}:00 h` : "—"}
-              </strong>
-            </p>
-            <p className="mt-2 text-xs text-stone-500">
-              Solo pagos del turno actual
-            </p>
           </section>
         </div>
-        <div className="mt-6 grid gap-6 md:grid-cols-[1.4fr_1fr]">
+        <div className="mt-6">
           <section className="panel">
             <h2 className="text-xl font-bold">Los más vendidos</h2>
             <p className="mb-6 mt-1 text-sm text-stone-500">
@@ -480,31 +445,9 @@ export function Analytics() {
               </ol>
             ) : (
               <EmptyState>
-                Entrega el primer pedido para ver los favoritos.
+                Entrega el primer pedido para ver los platillos más vendidos.
               </EmptyState>
             )}
-          </section>
-          <section className="rounded-2xl border border-clay-100 bg-clay-50 p-6">
-            <p className="eyebrow text-clay-700">Los favoritos de la casa</p>
-            <h2 className="display mb-3 mt-5 text-3xl">
-              {top?.name || "El próximo favorito está por llegar."}
-            </h2>
-            <p className="text-sm text-stone-600">
-              {top
-                ? `${mxn(top.revenueCents)} MXN · Mayor ingreso de pedidos entregados`
-                : "Descubre qué platillos y combinaciones eligen más tus clientes."}
-            </p>
-            <div className="mt-7 border-t border-clay-100 pt-5">
-              <p className="eyebrow mb-3">Combinación preferida</p>
-              <p className="font-semibold">
-                {favorite?.name || "Sin pedidos entregados aún"}
-              </p>
-              {favorite && (
-                <p className="mt-2 text-sm text-stone-500">
-                  Elegida {favorite.quantity} veces
-                </p>
-              )}
-            </div>
           </section>
         </div>
         <TransactionTable orders={ledger} />
@@ -526,10 +469,6 @@ export function Analytics() {
             <div className="flex justify-between">
               <dt>Ventas cobradas</dt>
               <dd className="font-bold">{mxn(metrics.revenueCents)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Propinas</dt>
-              <dd className="font-bold">{mxn(metrics.tipsCents)}</dd>
             </div>
             <div className="flex justify-between">
               <dt>Efectivo en caja</dt>

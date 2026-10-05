@@ -40,22 +40,18 @@ export function CashTender({
 }) {
   const { command, connected } = useRealtime();
   const [value, setValue] = useState(""),
-    [keepChange, setKeepChange] = useState(false),
     [busy, setBusy] = useState(false);
   const valid = /^\d{1,7}(?:\.\d{0,2})?$/.test(value),
     parts = value.split(".");
   const cents = valid
     ? Number(parts[0]) * 100 + Number((parts[1] || "").padEnd(2, "0"))
     : 0;
-  const surplus = cents - order.totalCents;
-  const tipCents = keepChange && surplus > 0 ? surplus : 0;
-  const change = surplus - tipCents;
-  async function pay(amount: number, tip = 0) {
+  const change = cents - order.totalCents;
+  async function pay(amount: number) {
     setBusy(true);
     const result = await command("pos_order_paid", {
       orderId: order.id,
       tenderedCents: amount,
-      tipCents: tip,
     });
     setBusy(false);
     if (result.ok) onClose();
@@ -81,10 +77,7 @@ export function CashTender({
           value={value}
           placeholder="0.00"
           disabled={busy}
-          onChange={(e) => {
-            setValue(e.target.value);
-            setKeepChange(false);
-          }}
+          onChange={(e) => setValue(e.target.value)}
         />
       </label>
       <div className="my-4 grid grid-cols-2 gap-3">
@@ -93,10 +86,7 @@ export function CashTender({
             className="btn min-h-16 text-xl tabular-nums"
             key={preset}
             disabled={busy}
-            onClick={() => {
-              setValue(String(preset));
-              setKeepChange(false);
-            }}
+            onClick={() => setValue(String(preset))}
           >
             {mxn(preset * 100)}
           </button>
@@ -104,23 +94,11 @@ export function CashTender({
         <button
           className="btn min-h-16 text-lg tabular-nums"
           disabled={busy}
-          onClick={() => {
-            setValue((order.totalCents / 100).toFixed(2));
-            setKeepChange(false);
-          }}
+          onClick={() => setValue((order.totalCents / 100).toFixed(2))}
         >
           Exacto · {mxn(order.totalCents)}
         </button>
       </div>
-      <label className="flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-stone-200 p-3 text-sm font-semibold">
-        <input
-          type="checkbox"
-          checked={keepChange}
-          disabled={busy || !valid || surplus <= 0}
-          onChange={(event) => setKeepChange(event.target.checked)}
-        />
-        El cliente deja el cambio como propina
-      </label>
       <div
         className={`my-5 rounded-xl p-4 ${change >= 0 ? "bg-emerald-50 text-emerald-900" : "bg-stone-100"}`}
       >
@@ -130,17 +108,11 @@ export function CashTender({
             {mxn(Math.abs(change))}
           </strong>
         </div>
-        {tipCents > 0 && (
-          <div className="mt-3 flex justify-between border-t border-emerald-200 pt-3">
-            <span>Propina registrada</span>
-            <strong>{mxn(tipCents)}</strong>
-          </div>
-        )}
       </div>
       <button
         className="btn btn-primary w-full"
         disabled={!connected || busy || !valid || change < 0}
-        onClick={() => void pay(cents, tipCents)}
+        onClick={() => void pay(cents)}
       >
         Confirmar pago y entregar
         <ArrowRight size={18} />
@@ -424,8 +396,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
   const totalRevenueCents = orders
     .filter((o) => o.status === "completed" && o.transaction)
     .reduce((sum, o) => sum + (o.transaction?.totalCents || 0), 0);
-  const averageTicketCents =
-    totalFulfilled > 0 ? Math.round(totalRevenueCents / totalFulfilled) : 0;
 
   return (
     <section aria-label="Historial y auditoría de pedidos completados">
@@ -492,15 +462,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
               </span>
               <strong className="text-xl font-bold text-emerald-800 tabular-nums">
                 {mxn(totalRevenueCents)} MXN
-              </strong>
-            </div>
-            <div className="hidden h-8 w-px bg-stone-200 sm:block" />
-            <div>
-              <span className="block text-xs text-stone-500">
-                Ticket promedio
-              </span>
-              <strong className="text-xl font-bold text-stone-800 tabular-nums">
-                {mxn(averageTicketCents)} MXN
               </strong>
             </div>
           </div>
@@ -727,9 +688,6 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
                     <p className="mt-1 text-xs text-stone-500">
                       Efectivo recibido: {mxn(order.transaction.tenderedCents)} · Cambio:{" "}
                       {mxn(order.transaction.changeCents)}
-                      {order.transaction.tipCents > 0 && (
-                        <> · Propina: {mxn(order.transaction.tipCents)}</>
-                      )}
                     </p>
                   )}
                 </div>

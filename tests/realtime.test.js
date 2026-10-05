@@ -42,12 +42,11 @@ function prepareForPickup(engine, orderId) {
     engine.dispatch("pos_update_status", { orderId, status: "ready" });
   }
 }
-function pay(engine, orderId, tenderedCents = 20000, tipCents = 0) {
+function pay(engine, orderId, tenderedCents = 20000) {
   prepareForPickup(engine, orderId);
   return engine.dispatch("pos_order_paid", {
     orderId,
     tenderedCents,
-    tipCents,
   });
 }
 function complete(engine, orderId) {
@@ -107,10 +106,6 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   assert.deepEqual(engine.getState().salesMetrics.itemPerformance, [
     { id: "huarache", name: "Huarache", quantity: 2, revenueCents: 19000 },
   ]);
-  assert.equal(
-    engine.getState().salesMetrics.favoriteCombinations[0].quantity,
-    2,
-  );
   assert.equal(engine.getState().salesMetrics.revenueCents, 19000);
 });
 test("no-show leaves the queue, remains in history, never contributes to cash or performance", (t) => {
@@ -582,20 +577,25 @@ test("proxy identity trusts only loopback and the last appended, valid client ad
   );
 });
 
-test("keep-the-change tips reconcile separately from revenue, survive restart, and archive then reset", (t) => {
+test("payments record the full order total, calculate change, survive restart, and archive then reset", (t) => {
   const { engine, directory } = fixture(t);
   const { orderId } = submit(engine);
-  const request = { orderId, tenderedCents: 20000, tipCents: 1000 };
-  pay(engine, orderId, request.tenderedCents, request.tipCents);
+  const request = { orderId, tenderedCents: 20000 };
+  pay(engine, orderId, request.tenderedCents);
   engine.dispatch("pos_order_paid", request);
   let s = engine.getState();
-  assert.equal(s.completedOrders[0].transaction.changeCents, 0);
+  assert.equal(s.completedOrders[0].transaction.changeCents, 1000);
+  assert.equal("tipCents" in s.completedOrders[0].transaction, false);
   assert.equal(s.salesMetrics.revenueCents, 19000);
-  assert.equal(s.salesMetrics.tipsCents, 1000);
-  assert.equal(s.salesMetrics.cashHeldCents, 20000);
+  assert.equal(s.salesMetrics.cashHeldCents, 19000);
   assert.throws(
-    () => engine.dispatch("pos_order_paid", { ...request, tipCents: 0 }),
-    (error) => error.code === "PAYMENT_CONFLICT",
+    () =>
+      engine.dispatch("pos_order_paid", {
+        orderId,
+        tenderedCents: 20000,
+        tipCents: 1000,
+      }),
+    /propinas ya no están disponibles/,
   );
   const restarted = createEngine({ directory });
   complete(restarted, orderId);
@@ -604,7 +604,6 @@ test("keep-the-change tips reconcile separately from revenue, survive restart, a
   s = restarted.getState();
   assert.equal(s.salesMetrics.voidCount, 1);
   assert.equal(s.salesMetrics.noShows, 1);
-  assert.equal(s.salesMetrics.averageTicketCents, 19000);
   assert.equal(s.salesMetrics.itemPerformance[0].revenueCents, 19000);
   const closed = restarted.dispatch("pos_close_shift", {
     shiftId: s.shiftId,
@@ -617,60 +616,53 @@ test("keep-the-change tips reconcile separately from revenue, survive restart, a
   const next = restarted.getState();
   for (const field of [
     "revenueCents",
-    "tipsCents",
     "cashHeldCents",
     "voidCount",
   ])
     assert.equal(next.salesMetrics[field], 0);
 });
-test("partial tips and centavos calculate exact residual change; invalid tips never create a receipt", (t) => {
+test("invalid tender amounts and legacy tip commands never create a receipt", (t) => {
   const { engine } = fixture(t);
   const { orderId } = submit(engine);
   prepareForPickup(engine, orderId);
   const before = engine.getState();
-  for (const tipCents of [
-    -1,
-    0.5,
-    "500",
-    null,
-    NaN,
-    1002,
-    Number.MAX_SAFE_INTEGER,
-  ]) {
+  for (const tenderedCents of [18999, 20000.5, "20000", null, NaN]) {
     assert.throws(() =>
       engine.dispatch("pos_order_paid", {
         orderId,
-        tenderedCents: 20001,
-        tipCents,
+        tenderedCents,
       }),
     );
     assert.deepEqual(engine.getState(), before);
   }
-  engine.dispatch("pos_order_paid", {
-    orderId,
-    tenderedCents: 20001,
-    tipCents: 551,
-  });
-  const t1 = engine.getState().completedOrders[0].transaction;
-  assert.equal(t1.changeCents, 450);
-  assert.equal(t1.totalCents + t1.tipCents + t1.changeCents, t1.tenderedCents);
+  assert.throws(
+    () =>
+      engine.dispatch("pos_order_paid", {
+        orderId,
+        tenderedCents: 20000,
+        tipCents: 551,
+      }),
+    /propinas ya no están disponibles/,
+  );
+  assert.deepEqual(engine.getState(), before);
 });
-test("older v3 receipts migrate missing tips to zero and corrupted tip equations fail recovery", (t) => {
+test("historical v3 receipts with tip fields preserve their cash evidence when loaded", (t) => {
   const { engine, directory } = fixture(t);
   const { orderId } = submit(engine);
   pay(engine, orderId);
   const previous = engine.getState();
-  delete previous.completedOrders[0].transaction.tipCents;
+  previous.completedOrders[0].transaction.tipCents = 1000;
+  previous.completedOrders[0].transaction.changeCents = 0;
   writeAtomic(engine.file, previous);
   const restored = createEngine({ directory });
-  assert.equal(restored.getState().completedOrders[0].transaction.tipCents, 0);
-  assert.equal(restored.getState().salesMetrics.cashHeldCents, 19000);
-  const corrupt = restored.getState();
-  corrupt.completedOrders[0].transaction.tipCents = 1;
-  writeAtomic(engine.file, corrupt);
-  assert.throws(() => createEngine({ directory }), /inconsistente/);
+  const receipt = restored.getState().completedOrders[0].transaction;
+  assert.equal(receipt.tipCents, 1000);
+  assert.equal(receipt.changeCents, 0);
+  assert.equal(restored.getState().salesMetrics.revenueCents, 19000);
+  assert.equal(restored.getState().salesMetrics.cashHeldCents, 20000);
+  assert.equal("tipsCents" in restored.getState().salesMetrics, false);
 });
-test("failed tip persistence leaves no cash receipt or kitchen dispatch", (t) => {
+test("failed payment persistence leaves no cash receipt or kitchen dispatch", (t) => {
   let fail = false;
   const { engine } = fixture(t, {
     persist: (file, state) => {
@@ -687,7 +679,6 @@ test("failed tip persistence leaves no cash receipt or kitchen dispatch", (t) =>
       engine.dispatch("pos_order_paid", {
         orderId,
         tenderedCents: 20000,
-        tipCents: 1000,
       }),
     /disk full/,
   );
@@ -725,7 +716,7 @@ test("legacy startup refuses passwordless wildcard network binding", () => {
   assert.match(result.stderr, /Set MASAFLOW_STAFF_PASSWORD/);
 });
 
-test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash or tips", async (t) => {
+test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash", async (t) => {
   const { connect, engine, directory } = await serviceFixture(t);
   const customer = await connect(),
     staff = await connect();
@@ -769,7 +760,6 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash 
         ack(staff.socket, "pos_order_paid", {
           orderId: order.orderId,
           tenderedCents: 10000,
-          tipCents: 500,
         }),
       ),
     ),
@@ -788,9 +778,8 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash 
   assert.equal(s.activeOrders.length, 0);
   assert.equal(s.completedOrders.length, 40);
   assert.equal(s.salesMetrics.revenueCents, 304000);
-  assert.equal(s.salesMetrics.tipsCents, 16000);
-  assert.equal(s.salesMetrics.cashHeldCents, 320000);
-  assert.equal(s.salesMetrics.changeCents, 0);
+  assert.equal(s.salesMetrics.cashHeldCents, 304000);
+  assert.equal(s.salesMetrics.changeCents, 16000);
   assert.equal(s.salesMetrics.paidOrders, 32);
   assert.equal(s.salesMetrics.voidCount, 8);
   assert.deepEqual(
