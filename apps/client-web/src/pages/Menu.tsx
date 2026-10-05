@@ -18,6 +18,7 @@ import {
   uuid,
   writeStorage,
 } from "../../../../shared/ui/RealtimeProvider";
+import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
 import {
   Brand,
   enableAudio,
@@ -110,8 +111,7 @@ export function Menu() {
   const filteredItems = useMemo(() => {
     if (!snapshot) return [];
     return snapshot.menuItems.filter((item) => {
-      const matchesCategory =
-        category === "Todo" || item.category === category;
+      const matchesCategory = category === "Todo" || item.category === category;
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !query ||
@@ -170,7 +170,8 @@ export function Menu() {
           Tu pedido está en el historial.
         </h1>
         <p className="my-4 text-sm leading-relaxed text-stone-600">
-          El turno pudo haber concluido o tu comanda ya fue entregada. Consulta al personal del mostrador si necesitas verificar tu servicio.
+          El turno pudo haber concluido o tu comanda ya fue entregada. Consulta
+          al personal del mostrador si necesitas verificar tu servicio.
         </p>
         <p className="rounded-lg bg-stone-100 p-2 font-mono text-xs text-stone-500 break-all">
           Ref: {activeId}
@@ -194,10 +195,12 @@ export function Menu() {
         <ChefHat className="my-8 text-clay-600 animate-pulse" size={64} />
         <h1 className="display text-4xl">Pedidos por internet pausados.</h1>
         <p className="mt-5 text-xl text-stone-600">
-          Puedes ordenar directamente en el mostrador. Tus pedidos existentes siguen en curso.
+          Puedes ordenar directamente en el mostrador. Tus pedidos existentes
+          siguen en curso.
         </p>
         <p className="mt-8 text-sm text-stone-500">
-          Este menú volverá a estar disponible cuando se reanuden los pedidos web.
+          Este menú volverá a estar disponible cuando se reanuden los pedidos
+          web.
         </p>
       </div>
     );
@@ -205,38 +208,14 @@ export function Menu() {
 
   const customizeItem = snapshot.menuItems.find((m) => m.id === customizeId);
 
-  const price = (line: CartLine) => {
-    const item = snapshot.menuItems.find((m) => m.id === line.menuItemId);
-    const itemBase = item?.priceCents || 0;
-    const mods = line.modifierIds.reduce(
-      (sum, id) =>
-        sum + (snapshot.modifiers.find((m) => m.id === id)?.priceCents || 0),
-      0,
-    );
-    return itemBase + mods;
-  };
-
-  const cartLines = cart.map((line, index) => {
-    const item = snapshot.menuItems.find(
-      (entry) => entry.id === line.menuItemId,
-    );
-    const unitPriceCents = price(line);
-    const quantity = Number(line.quantity);
-    return {
-      key: `${line.menuItemId}-${index}`,
-      quantity,
-      itemName: item?.name ?? "Platillo",
-      lineTotalCents: unitPriceCents * quantity,
-    };
-  });
-  const estimatedTotalCents = cartLines.reduce(
-    (sum, cartLine) => sum + cartLine.lineTotalCents,
-    0,
+  const cartSummary = summarizeCart(
+    cart,
+    snapshot.menuItems,
+    snapshot.modifiers,
   );
-  const cartItemCount = cartLines.reduce(
-    (sum, cartLine) => sum + cartLine.quantity,
-    0,
-  );
+  const estimatedTotalCents = cartSummary.totalCents;
+  const cartItemCount = cartSummary.itemCount;
+  const cartLines = cartSummary.lines;
   const pendingExpired = pending && pending.shiftId !== snapshot.shiftId;
 
   async function submit() {
@@ -252,9 +231,7 @@ export function Menu() {
       customerName: name.trim(),
       items: cart,
     };
-    const quotedTotalCents = pending
-      ? pendingTotalCents
-      : estimatedTotalCents;
+    const quotedTotalCents = pending ? pendingTotalCents : estimatedTotalCents;
 
     if (
       (quotedTotalCents !== null &&
@@ -386,7 +363,8 @@ export function Menu() {
               Servido con cariño.
             </h1>
             <p className="menu-hero__copy mt-3 text-sm sm:text-base max-w-md leading-relaxed">
-              Huaraches, sopes, pambazos y antojitos recién salidos del comal. Envía tu pedido para revisión y paga en efectivo al recogerlo.
+              Huaraches, sopes, pambazos y antojitos recién salidos del comal.
+              Envía tu pedido para revisión y paga en efectivo al recogerlo.
             </p>
           </div>
 
@@ -398,7 +376,8 @@ export function Menu() {
                 <span>Paga al recoger tu pedido</span>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-stone-800 font-medium">
-                El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo. Paga en efectivo en el mostrador al recogerlo.
+                El negocio revisará tu pedido y, si lo acepta, comenzará a
+                prepararlo. Paga en efectivo en el mostrador al recogerlo.
               </p>
             </div>
 
@@ -650,7 +629,8 @@ export function Menu() {
         )}
 
         <p className="mt-10 text-center text-xs text-stone-500">
-          Precios finales en pesos mexicanos (MXN). Disponibilidad actualizada en vivo con la cocina.
+          Precios finales en pesos mexicanos (MXN). Disponibilidad actualizada
+          en vivo con la cocina.
         </p>
       </main>
 

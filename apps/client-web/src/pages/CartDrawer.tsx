@@ -2,6 +2,7 @@ import { ArrowRight, Coins, Minus, Plus, Trash2, Utensils } from "lucide-react";
 import { useState } from "react";
 import type { OrderInput } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
+import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
 import { Modal, mxn } from "../../../../shared/ui/components";
 
 type CartLine = OrderInput["items"][number];
@@ -32,28 +33,21 @@ export function CartDrawer({
   const [shakeKey, setShakeKey] = useState(0);
   if (!snapshot) return null;
 
-  const price = (line: CartLine) => {
-    const item = snapshot.menuItems.find((m) => m.id === line.menuItemId);
-    const itemBase = item?.priceCents || 0;
-    const mods = line.modifierIds.reduce(
-      (sum, id) =>
-        sum + (snapshot.modifiers.find((m) => m.id === id)?.priceCents || 0),
-      0,
-    );
-    return itemBase + mods;
-  };
-
-  const totalCents = cart.reduce(
-    (sum, line) => sum + price(line) * line.quantity,
-    0,
+  const cartSummary = summarizeCart(
+    cart,
+    snapshot.menuItems,
+    snapshot.modifiers,
   );
+  const totalCents = cartSummary.totalCents;
 
   const updateQuantity = (index: number, newQty: number) => {
     if (newQty <= 0) {
       setCart((prev) => prev.filter((_, i) => i !== index));
     } else {
       setCart((prev) =>
-        prev.map((line, i) => (i === index ? { ...line, quantity: newQty } : line)),
+        prev.map((line, i) =>
+          i === index ? { ...line, quantity: newQty } : line,
+        ),
       );
     }
   };
@@ -74,91 +68,92 @@ export function CartDrawer({
   return (
     <Modal title="Tu Comanda de Antojitos" onClose={onClose}>
       <div className="space-y-3.5">
-        {cart.map((line, index) => {
-          const menuItem = snapshot.menuItems.find(
-            (m) => m.id === line.menuItemId,
-          );
-          const lineMods = line.modifierIds
-            .map((id) => snapshot.modifiers.find((m) => m.id === id))
-            .filter(Boolean);
+        {cartSummary.lines.map(
+          ({ line, item: menuItem, key, index, lineTotalCents }) => {
+            const lineMods = line.modifierIds
+              .map((id) => snapshot.modifiers.find((m) => m.id === id))
+              .filter(Boolean);
 
-          const masaMod = lineMods.find((m) => m?.kind === "masa");
-          const otherMods = lineMods.filter((m) => m?.kind !== "masa");
+            const masaMod = lineMods.find((m) => m?.kind === "masa");
+            const otherMods = lineMods.filter((m) => m?.kind !== "masa");
 
-          return (
-            <div
-              key={index}
-              className="rounded-xl border border-stone-200 bg-stone-50/70 p-3.5"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <strong className="text-stone-900 font-bold">
-                      {menuItem?.name || "Platillo"}
-                    </strong>
-                    {masaMod && (
-                      <span className="rounded bg-white px-2 py-0.5 border border-stone-200 text-xs font-semibold text-stone-700">
-                        {masaMod.name}
-                      </span>
+            return (
+              <div
+                key={key}
+                className="rounded-xl border border-stone-200 bg-stone-50/70 p-3.5"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <strong className="text-stone-900 font-bold">
+                        {menuItem?.name || "Platillo"}
+                      </strong>
+                      {masaMod && (
+                        <span className="rounded bg-white px-2 py-0.5 border border-stone-200 text-xs font-semibold text-stone-700">
+                          {masaMod.name}
+                        </span>
+                      )}
+                    </div>
+
+                    {otherMods.length > 0 && (
+                      <p className="mt-1 text-xs text-stone-500">
+                        {otherMods.map((m) => m?.name).join(" · ")}
+                      </p>
                     )}
                   </div>
 
-                  {otherMods.length > 0 && (
-                    <p className="mt-1 text-xs text-stone-500">
-                      {otherMods.map((m) => m?.name).join(" · ")}
-                    </p>
-                  )}
+                  <button
+                    className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-200 hover:text-stone-700"
+                    disabled={busy || Boolean(pending)}
+                    aria-label={`Quitar platillo ${index + 1}`}
+                    onClick={() =>
+                      setCart((prev) => prev.filter((_, i) => i !== index))
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </button>
                 </div>
 
-                <button
-                  className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-200 hover:text-stone-700"
-                  disabled={busy || Boolean(pending)}
-                  aria-label={`Quitar platillo ${index + 1}`}
-                  onClick={() =>
-                    setCart((prev) => prev.filter((_, i) => i !== index))
-                  }
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+                <div className="mt-3 flex items-center justify-between border-t border-stone-200/60 pt-2.5">
+                  <div className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white p-0.5">
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
+                      disabled={busy}
+                      onClick={() => updateQuantity(index, line.quantity - 1)}
+                      aria-label="Disminuir cantidad"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <span className="w-6 text-center text-xs font-bold tabular-nums">
+                      {line.quantity}
+                    </span>
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
+                      disabled={busy}
+                      onClick={() => updateQuantity(index, line.quantity + 1)}
+                      aria-label="Aumentar cantidad"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-stone-200/60 pt-2.5">
-                <div className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white p-0.5">
-                  <button
-                    type="button"
-                    className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
-                    disabled={busy}
-                    onClick={() => updateQuantity(index, line.quantity - 1)}
-                    aria-label="Disminuir cantidad"
-                  >
-                    <Minus size={13} />
-                  </button>
-                  <span className="w-6 text-center text-xs font-bold tabular-nums">
-                    {line.quantity}
+                  <span className="font-bold text-sm text-stone-900 tabular-nums">
+                    {mxn(lineTotalCents)} MXN
                   </span>
-                  <button
-                    type="button"
-                    className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
-                    disabled={busy}
-                    onClick={() => updateQuantity(index, line.quantity + 1)}
-                    aria-label="Aumentar cantidad"
-                  >
-                    <Plus size={13} />
-                  </button>
                 </div>
-
-                <span className="font-bold text-sm text-stone-900 tabular-nums">
-                  {mxn(price(line) * line.quantity)} MXN
-                </span>
               </div>
-            </div>
-          );
-        })}
+            );
+          },
+        )}
       </div>
 
       {/* Subtotal & Total */}
       <div className="my-5 flex items-center justify-between border-t border-stone-200 pt-4">
-        <span className="text-base font-bold text-stone-800">Total a pagar</span>
+        <span className="text-base font-bold text-stone-800">
+          Total a pagar
+        </span>
         <strong className="text-2xl font-bold text-clay-950 tabular-nums">
           {mxn(totalCents)} MXN
         </strong>
@@ -197,8 +192,12 @@ export function CartDrawer({
       )}
 
       {!validCart && (
-        <p role="alert" className="my-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-800">
-          Un producto de tu carrito se encuentra agotado. Por favor ajústalo antes de enviar.
+        <p
+          role="alert"
+          className="my-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-800"
+        >
+          Un producto de tu carrito se encuentra agotado. Por favor ajústalo
+          antes de enviar.
         </p>
       )}
 
@@ -209,15 +208,14 @@ export function CartDrawer({
           <span>Pago 100% en Efectivo al Mostrador</span>
         </div>
         <p className="mt-1 text-stone-700 leading-relaxed">
-          El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo. Paga en efectivo en el mostrador al recogerlo.
+          El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo.
+          Paga en efectivo en el mostrador al recogerlo.
         </p>
       </div>
 
       <button
         className="btn btn-primary w-full py-3.5 text-base font-bold shadow-sm"
-        disabled={
-          !connected || busy || (!pending && !validCart)
-        }
+        disabled={!connected || busy || (!pending && !validCart)}
         onClick={() => {
           if (!pending && !name.trim()) {
             setNameError(true);
