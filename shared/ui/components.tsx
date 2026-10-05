@@ -512,21 +512,62 @@ export function useTicketTimer(intervalMs = 1000) {
   return now;
 }
 let audio: AudioContext | undefined;
-export function enableAudio() {
+export async function enableAudio(): Promise<boolean> {
   try {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") return false;
     const AudioCtx =
       window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext;
-    if (!AudioCtx) return;
+    if (!AudioCtx) return false;
     audio ||= new AudioCtx();
-    if (audio.state === "suspended") {
-      void audio.resume();
-    }
+    if (audio.state === "suspended") await audio.resume();
+    return audio.state === "running";
   } catch {
-    // Ignore restricted audio context gracefully
+    return false;
   }
+}
+export function AudioUnlockButton() {
+  const [ready, setReady] = useState(
+    () => typeof audio !== "undefined" && audio.state === "running",
+  );
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        className={`btn ${ready ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-400 bg-amber-50 font-bold text-amber-950"}`}
+        aria-label={
+          ready
+            ? "Timbre activado en este dispositivo"
+            : "Iniciar turno y activar timbre"
+        }
+        onClick={async () => {
+          setBusy(true);
+          setFailed(false);
+          const unlocked = await enableAudio();
+          setReady(unlocked);
+          setFailed(!unlocked);
+          if (unlocked) chime("new");
+          setBusy(false);
+        }}
+        disabled={busy}
+      >
+        {ready ? <Volume2 size={16} /> : <Volume1 size={16} />}
+        {busy
+          ? "Activando…"
+          : ready
+            ? "Timbre activo"
+            : "Iniciar turno · Activar timbre"}
+      </button>
+      {failed && (
+        <span role="alert" className="text-xs font-semibold text-red-800">
+          No se pudo activar el timbre en este navegador.
+        </span>
+      )}
+    </>
+  );
 }
 let volumeScale = 1.0;
 export function setChimeVolume(vol: number) {
@@ -574,7 +615,7 @@ export function SoundButton() {
     else setMode("normal");
   }, []);
   const cycle = () => {
-    enableAudio();
+    void enableAudio();
     if (mode === "normal") {
       setMode("soft");
       setChimeVolume(0.5);

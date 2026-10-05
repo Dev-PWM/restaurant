@@ -89,10 +89,11 @@ export function OrderStatus({
     }
   }
 
-  const testAudioChime = () => {
-    enableAudio();
-    chime(true);
-    setTestedSound(true);
+  const testAudioChime = async () => {
+    if (await enableAudio()) {
+      chime(true);
+      setTestedSound(true);
+    }
   };
 
   return (

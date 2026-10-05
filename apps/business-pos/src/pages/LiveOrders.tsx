@@ -23,8 +23,8 @@ import {
 } from "../simulator.js";
 import {
   chime,
+  AudioUnlockButton,
   EmptyState,
-  enableAudio,
   InventoryControl,
   Modal,
   mxn,
@@ -853,18 +853,6 @@ export function LiveOrders() {
   }
 
   useEffect(() => {
-    const unlock = () => {
-      enableAudio();
-    };
-    window.addEventListener("click", unlock, { once: true });
-    window.addEventListener("touchstart", unlock, { once: true });
-    return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
-    };
-  }, []);
-
-  useEffect(() => {
     if (!liveSnapshot) return;
     const currentActive = new Set(liveSnapshot.activeOrders.map((o) => o.id));
     const currentCooking = new Set(
@@ -1161,6 +1149,7 @@ export function LiveOrders() {
                 </span>
               </button>
             )}
+            <AudioUnlockButton />
             <SoundButton />
           </div>
         </div>

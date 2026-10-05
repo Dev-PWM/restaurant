@@ -30,6 +30,24 @@ test("realtime apps expose an installable, scoped offline app shell", () => {
   assert.match(worker, /url\.pathname\.startsWith\("\/socket\.io\/"\)/);
 });
 
+test("staff can explicitly unlock chimes and accounting export remains available", () => {
+  const sharedUi = fs.readFileSync(
+    path.join(repo, "shared/ui/components.tsx"),
+    "utf8",
+  );
+  assert.match(sharedUi, /export function AudioUnlockButton/);
+  assert.match(sharedUi, /Iniciar turno · Activar timbre/);
+  assert.match(sharedUi, /await audio\.resume\(\)/);
+  assert.match(sharedUi, /No se pudo activar el timbre/);
+
+  const analytics = fs.readFileSync(
+    path.join(repo, "apps/analytics/src/content/realtime/Analytics.tsx"),
+    "utf8",
+  );
+  assert.match(analytics, /Exportar historial/);
+  assert.match(analytics, /text\/csv;charset=utf-8/);
+});
+
 test("quick UI feedback animations stay brief and honor reduced motion", () => {
   const styles = fs.readFileSync(
     path.join(repo, "shared/ui/styles.css"),

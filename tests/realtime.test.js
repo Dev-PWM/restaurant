@@ -506,6 +506,50 @@ test("reconnect snapshots reconcile missed tickets and menu updates; logout revo
     "UNAUTHORIZED",
   );
 });
+test("sold-out item and modifier updates reach open customer screens and reconnect snapshots", async (t) => {
+  const { connect, engine } = await serviceFixture(t);
+  const customer = await connect();
+  const staff = await connect();
+  assert.equal((await ack(staff.socket, "staff_login", "2468")).ok, true);
+
+  const itemUpdate = new Promise((resolve) =>
+    customer.socket.once("menu_updated", resolve),
+  );
+  assert.equal(
+    (
+      await ack(staff.socket, "admin_toggle_stock", {
+        id: "huarache",
+        kind: "item",
+        available: false,
+      })
+    ).ok,
+    true,
+  );
+  const soldOutItem = await itemUpdate;
+  assert.equal(
+    soldOutItem.menuItems.find((item) => item.id === "huarache").available,
+    false,
+  );
+
+  customer.socket.disconnect();
+  await ack(staff.socket, "admin_toggle_stock", {
+    id: "blue",
+    kind: "modifier",
+    available: false,
+  });
+  const reconnected = await connect(customer.sessionId);
+  assert.equal(
+    reconnected.initial.menuItems.find((item) => item.id === "huarache")
+      .available,
+    false,
+  );
+  assert.equal(
+    reconnected.initial.modifiers.find((modifier) => modifier.id === "blue")
+      .available,
+    false,
+  );
+  assert.equal(engine.getState().revision, soldOutItem.revision + 1);
+});
 test("PIN attempts are bounded across fresh sockets; server refuses missing PIN and concurrent writer", async (t) => {
   await assert.rejects(createService({ pin: "" }), /4 dígitos/);
   const { connect, directory } = await serviceFixture(t);
