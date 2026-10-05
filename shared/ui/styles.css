@@ -81,6 +81,17 @@
     font-family: Georgia, "Times New Roman", serif;
     @apply font-normal tracking-tight;
   }
+  .menu-hero {
+    color: #fff;
+    background-color: #542116;
+    background-image: linear-gradient(135deg, #6b2b1e, #3b170f);
+  }
+  .menu-hero__eyebrow {
+    color: #ffd6a8;
+  }
+  .menu-hero__copy {
+    color: #fff7ed;
+  }
 }
 @layer utilities {
   @keyframes masaflow-bump {

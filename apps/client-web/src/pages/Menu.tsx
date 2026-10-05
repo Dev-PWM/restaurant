@@ -376,16 +376,16 @@ export function Menu() {
       <main className="mx-auto max-w-[90rem] px-4 pb-36 pt-6 sm:px-6 sm:pt-10 lg:pr-[22rem]">
         {/* Hero & Cash Upfront Guidance */}
         <div className="mb-8 grid items-stretch gap-6 md:grid-cols-[1.5fr_1fr]">
-          <div className="flex flex-col justify-center rounded-3xl bg-gradient-to-br from-clay-900 to-clay-950 p-6 sm:p-8 text-white shadow-xs">
-            <span className="inline-block text-xs font-bold uppercase tracking-wider text-orange-300">
+          <div className="menu-hero flex flex-col justify-center rounded-3xl p-6 sm:p-8 shadow-xs">
+            <span className="menu-hero__eyebrow inline-block text-xs font-bold uppercase tracking-wider">
               Masa Criolla Nixtamalizada
             </span>
-            <h1 className="display mt-2 text-4xl sm:text-5xl font-black leading-tight text-white">
+            <h1 className="display mt-2 text-4xl sm:text-5xl font-black leading-tight">
               Hecho con masa.
               <br />
               Servido con cariño.
             </h1>
-            <p className="mt-3 text-sm sm:text-base text-clay-100 max-w-md leading-relaxed">
+            <p className="menu-hero__copy mt-3 text-sm sm:text-base max-w-md leading-relaxed">
               Huaraches, sopes, pambazos y antojitos recién salidos del comal. Envía tu pedido para revisión y paga en efectivo al recogerlo.
             </p>
           </div>
