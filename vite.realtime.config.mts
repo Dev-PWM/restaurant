@@ -52,11 +52,11 @@ export default defineConfig(({ mode, command }) => {
       },
       proxy: {
         "/socket.io": {
-          target: `http://127.0.0.1:${process.env.PORT || 3000}`,
+          target: `http://127.0.0.1:${process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000}`,
           ws: true,
           xfwd: true,
         },
-        "/api": `http://127.0.0.1:${process.env.PORT || 3000}`,
+        "/api": `http://127.0.0.1:${process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000}`,
       },
     },
     build: {

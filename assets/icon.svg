@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="100" fill="#a64930"/>
+  <!-- Comal / masa circle plate -->
+  <circle cx="256" cy="256" r="180" fill="#f8f5ef" stroke="#873822" stroke-width="12"/>
+  <!-- Inner comal texture rings -->
+  <circle cx="256" cy="256" r="140" fill="none" stroke="#f3ded2" stroke-width="6" stroke-dasharray="16 12"/>
+  <!-- Stylized warm taco / masa tortilla shape -->
+  <path d="M160 280 C160 190, 352 190, 352 280 C352 305, 330 325, 300 325 L212 325 C182 325, 160 305, 160 280 Z" fill="#e2a14e"/>
+  <!-- Grill lines / steam marks -->
+  <path d="M210 200 Q220 160 210 130" stroke="#faf0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M256 190 Q266 150 256 120" stroke="#faf0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <path d="M302 200 Q312 160 302 130" stroke="#faf0eb" stroke-width="8" stroke-linecap="round" fill="none"/>
+  <!-- Brand text letter 'M' -->
+  <text x="256" y="295" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="52" fill="#873822" text-anchor="middle">M</text>
+</svg>

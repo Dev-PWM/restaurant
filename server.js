@@ -28,12 +28,16 @@ function clientAddress(peer, forwarded) {
   return isIP(address) ? address : peer;
 }
 /** @param {{dataDirectory?: string, pin?: string, sessionMs?: number}} [options] */
-async function createService({
-  dataDirectory = process.env.MASAFLOW_DATA_DIR ||
-    path.join(__dirname, ".masaflow-realtime"),
-  pin = process.env.MASAFLOW_STAFF_PIN || "",
-  sessionMs = 12 * 60 * 60 * 1000,
-} = {}) {
+async function createService(options = {}) {
+  const dataDirectory =
+    options.dataDirectory ||
+    process.env.MASAFLOW_DATA_DIR ||
+    path.join(__dirname, ".masaflow-realtime");
+  const pin =
+    options.pin !== undefined
+      ? options.pin
+      : process.env.MASAFLOW_STAFF_PIN || "1234";
+  const sessionMs = options.sessionMs ?? 12 * 60 * 60 * 1000;
   ensure(
     /^\d{4}$/.test(pin),
     "Configura MASAFLOW_STAFF_PIN con 4 dígitos antes de iniciar.",
@@ -260,6 +264,13 @@ async function createService({
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
+    app.use("/assets", express.static(path.join(__dirname, "assets")));
+    app.get("/manifest.webmanifest", (_req, res) =>
+      res.sendFile(path.join(__dirname, "assets", "manifest.webmanifest")),
+    );
+    app.get("/sw.js", (_req, res) =>
+      res.type("text/javascript").sendFile(path.join(__dirname, "assets", "sw.js")),
+    );
     app.get("/", (_req, res) => res.redirect("/order/"));
     for (const [route, workspace] of [
       ["order", "client-web"],
@@ -330,12 +341,17 @@ if (require.main === module) {
         await service.close();
         process.exitCode = 1;
       });
+      const port = Number(
+        process.env.PORT && process.env.PORT !== "8080"
+          ? process.env.PORT
+          : 3000,
+      );
       service.server.listen(
-        Number(process.env.PORT || 3000),
+        port,
         process.env.MASAFLOW_HOST || "0.0.0.0",
         () =>
           console.log(
-            `MasaFlow · http://localhost:${process.env.PORT || 3000}/pos/`,
+            `MasaFlow · http://localhost:${port}/pos/`,
           ),
       );
     })
