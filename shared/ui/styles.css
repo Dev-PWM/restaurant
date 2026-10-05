@@ -2,8 +2,15 @@
 @theme {
   --color-clay-50: #faf0eb;
   --color-clay-100: #f3ded2;
+  --color-clay-200: #e8c4b4;
+  --color-clay-300: #d9a58f;
+  --color-clay-400: #c77f66;
+  --color-clay-500: #b45f46;
   --color-clay-600: #a64930;
   --color-clay-700: #873822;
+  --color-clay-800: #6b2b1e;
+  --color-clay-900: #542116;
+  --color-clay-950: #3b170f;
   --color-cream: #f8f5ef;
 }
 @source "./components.tsx";
@@ -13,7 +20,7 @@
 @source "../../apps/analytics/src/content/realtime";
 @layer base {
   body {
-    @apply m-0 bg-stone-50 text-stone-900 antialiased;
+    @apply m-0 bg-cream text-stone-900 antialiased;
     font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   }
   button,
