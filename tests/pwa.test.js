@@ -68,6 +68,14 @@ test("digital order tracking and pickup payment contain no print controls", () =
     const source = fs.readFileSync(path.join(repo, file), "utf8");
     assert.doesNotMatch(source, /printThermalTicket|thermalPrint|window\.print/);
   }
+  const analytics = fs.readFileSync(
+    path.join(repo, "apps/analytics/src/content/realtime/Analytics.tsx"),
+    "utf8",
+  );
+  assert.match(analytics, /Ventas cobradas · MXN/);
+  assert.match(analytics, /Recibido/);
+  assert.match(analytics, /Cambio/);
+  assert.doesNotMatch(analytics, /Efectivo en caja/);
   const engine = fs.readFileSync(
     path.join(repo, "shared/realtime/engine.js"),
     "utf8",

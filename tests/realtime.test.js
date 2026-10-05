@@ -100,6 +100,7 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   assert.equal(m.revenueCents, 19000);
   assert.equal(m.tenderedCents, 20000);
   assert.equal(m.changeCents, 1000);
+  assert.equal(m.revenueCents + m.changeCents, m.tenderedCents);
   assert.equal(m.paidOrders, 1);
   assert.equal(m.itemPerformance.length, 1);
   assert.throws(() => pay(engine, order.orderId, 50000), /otro importe/);
@@ -587,7 +588,6 @@ test("payments record the full order total, calculate change, survive restart, a
   assert.equal(s.completedOrders[0].transaction.changeCents, 1000);
   assert.equal("tipCents" in s.completedOrders[0].transaction, false);
   assert.equal(s.salesMetrics.revenueCents, 19000);
-  assert.equal(s.salesMetrics.cashHeldCents, 19000);
   assert.throws(
     () =>
       engine.dispatch("pos_order_paid", {
@@ -616,7 +616,6 @@ test("payments record the full order total, calculate change, survive restart, a
   const next = restarted.getState();
   for (const field of [
     "revenueCents",
-    "cashHeldCents",
     "voidCount",
   ])
     assert.equal(next.salesMetrics[field], 0);
@@ -659,7 +658,8 @@ test("historical v3 receipts with tip fields preserve their cash evidence when l
   assert.equal(receipt.tipCents, 1000);
   assert.equal(receipt.changeCents, 0);
   assert.equal(restored.getState().salesMetrics.revenueCents, 19000);
-  assert.equal(restored.getState().salesMetrics.cashHeldCents, 20000);
+  assert.equal(restored.getState().salesMetrics.tenderedCents, 20000);
+  assert.equal(restored.getState().salesMetrics.changeCents, 0);
   assert.equal("tipsCents" in restored.getState().salesMetrics, false);
 });
 test("failed payment persistence leaves no cash receipt or kitchen dispatch", (t) => {
@@ -778,8 +778,11 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash"
   assert.equal(s.activeOrders.length, 0);
   assert.equal(s.completedOrders.length, 40);
   assert.equal(s.salesMetrics.revenueCents, 304000);
-  assert.equal(s.salesMetrics.cashHeldCents, 304000);
   assert.equal(s.salesMetrics.changeCents, 16000);
+  assert.equal(
+    s.salesMetrics.revenueCents + s.salesMetrics.changeCents,
+    s.salesMetrics.tenderedCents,
+  );
   assert.equal(s.salesMetrics.paidOrders, 32);
   assert.equal(s.salesMetrics.voidCount, 8);
   assert.deepEqual(

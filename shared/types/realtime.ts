@@ -74,7 +74,6 @@ export interface ItemPerformance {
 }
 export interface SalesMetrics {
   revenueCents: number;
-  cashHeldCents: number;
   /** Unpaid cancellations (no_show), not paid refunds. */
   voidCount: number;
   tenderedCents: number;

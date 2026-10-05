@@ -380,7 +380,7 @@ export function Analytics() {
             Turno archivado: {archive}. La caja está lista para empezar.
           </p>
         )}
-        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+        <div>
           <section className="rounded-2xl bg-clay-600 p-6 text-white">
             <p className="flex items-center gap-2 text-sm font-semibold">
               <Banknote size={18} />
@@ -389,22 +389,26 @@ export function Analytics() {
             <p className="my-4 text-5xl font-semibold tracking-tight tabular-nums">
               {mxn(metrics.revenueCents)}
             </p>
-            <p className="text-sm text-white/90">
-              {metrics.paidOrders} pedidos pagados · {metrics.noShows} No-Show
-              excluidos
-            </p>
-          </section>
-          <section className="panel">
-            <p className="eyebrow">Efectivo en caja · MXN</p>
-            <p className="my-4 text-3xl font-semibold tabular-nums">
-              {mxn(metrics.cashHeldCents)}
-            </p>
-            <p className="text-sm text-stone-500">
-              Recibido: {mxn(metrics.tenderedCents)} · Cambio:{" "}
-              <strong className="text-stone-900">
-                {mxn(metrics.changeCents)}
-              </strong>
-            </p>
+            <div className="flex flex-wrap items-end justify-between gap-5 border-t border-white/25 pt-4">
+              <p className="text-sm text-white/90">
+                {metrics.paidOrders} pedidos pagados · {metrics.noShows} No-Show
+                excluidos
+              </p>
+              <dl className="flex gap-8">
+                <div>
+                  <dt className="text-xs text-white/75">Recibido</dt>
+                  <dd className="mt-1 text-lg font-semibold tabular-nums">
+                    {mxn(metrics.tenderedCents)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-white/75">Cambio</dt>
+                  <dd className="mt-1 text-lg font-semibold tabular-nums">
+                    {mxn(metrics.changeCents)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </section>
         </div>
         <div className="mt-6">
@@ -464,15 +468,11 @@ export function Analytics() {
             Se guardará un archivo permanente con el historial y los totales. El
             nuevo turno empezará en cero.
           </p>
-          <DenominationCounter expectedCents={metrics.cashHeldCents} />
+          <DenominationCounter expectedCents={metrics.revenueCents} />
           <dl className="mb-5 space-y-3 rounded-xl bg-stone-100 p-4">
             <div className="flex justify-between">
               <dt>Ventas cobradas</dt>
               <dd className="font-bold">{mxn(metrics.revenueCents)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Efectivo en caja</dt>
-              <dd className="font-bold">{mxn(metrics.cashHeldCents)}</dd>
             </div>
             <div className="flex justify-between gap-3">
               <dt>No-Show / anulaciones sin cobro</dt>

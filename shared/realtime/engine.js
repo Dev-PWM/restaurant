@@ -26,7 +26,6 @@ function metrics(orders) {
   /** @type {SalesMetrics} */
   const result = {
     revenueCents: 0,
-    cashHeldCents: 0,
     voidCount: 0,
     tenderedCents: 0,
     changeCents: 0,
@@ -45,7 +44,6 @@ function metrics(orders) {
     const payment = order.transaction;
     if (!payment) continue;
     result.revenueCents += payment.totalCents;
-    result.cashHeldCents += payment.tenderedCents - payment.changeCents;
     result.tenderedCents += payment.tenderedCents;
     result.changeCents += payment.changeCents;
     result.paidOrders++;
@@ -66,7 +64,6 @@ function metrics(orders) {
   }
   for (const amount of [
     result.revenueCents,
-    result.cashHeldCents,
     result.tenderedCents,
     result.changeCents,
   ])
