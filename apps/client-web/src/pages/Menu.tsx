@@ -216,8 +216,25 @@ export function Menu() {
     return itemBase + mods;
   };
 
-  const total = cart.reduce(
-    (sum, line) => sum + price(line) * line.quantity,
+  const cartLines = cart.map((line, index) => {
+    const item = snapshot.menuItems.find(
+      (entry) => entry.id === line.menuItemId,
+    );
+    const unitPriceCents = price(line);
+    const quantity = Number(line.quantity);
+    return {
+      key: `${line.menuItemId}-${index}`,
+      quantity,
+      itemName: item?.name ?? "Platillo",
+      lineTotalCents: unitPriceCents * quantity,
+    };
+  });
+  const estimatedTotalCents = cartLines.reduce(
+    (sum, cartLine) => sum + cartLine.lineTotalCents,
+    0,
+  );
+  const cartItemCount = cartLines.reduce(
+    (sum, cartLine) => sum + cartLine.quantity,
     0,
   );
   const pendingExpired = pending && pending.shiftId !== snapshot.shiftId;
@@ -235,7 +252,9 @@ export function Menu() {
       customerName: name.trim(),
       items: cart,
     };
-    const quotedTotalCents = pending ? pendingTotalCents : total;
+    const quotedTotalCents = pending
+      ? pendingTotalCents
+      : estimatedTotalCents;
 
     if (
       (quotedTotalCents !== null &&
@@ -367,22 +386,19 @@ export function Menu() {
               Servido con cariño.
             </h1>
             <p className="mt-3 text-sm sm:text-base text-clay-100 max-w-md leading-relaxed">
-              Huaraches, sopes, pambazos y antojitos recién salidos del comal. Elige tus platillos y paga al llegar al mostrador.
+              Huaraches, sopes, pambazos y antojitos recién salidos del comal. Envía tu pedido para revisión y paga en efectivo al recogerlo.
             </p>
           </div>
 
-          {/* Upfront Cash Trust Card (Strictly satisfies prompt requirements) */}
+          {/* Cash-at-pickup guidance */}
           <div className="flex flex-col justify-between rounded-3xl border border-amber-300 bg-amber-50/80 p-6 shadow-2xs">
             <div>
               <div className="flex items-center gap-2 text-sm font-bold text-amber-950">
                 <Coins size={18} className="text-amber-700" />
-                <span>Aquí cocinamos después de cobrar</span>
+                <span>Paga al recoger tu pedido</span>
               </div>
               <p className="mt-2 text-sm leading-relaxed text-stone-800 font-medium">
-                Sin pagos en línea. Paga en efectivo en el mostrador para empezar a cocinar.
-              </p>
-              <p className="mt-1 text-xs text-stone-600">
-                No online payments. Pay in cash at the counter to start cooking.
+                El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo. Paga en efectivo en el mostrador al recogerlo.
               </p>
             </div>
 
@@ -433,44 +449,50 @@ export function Menu() {
           className="fixed right-6 top-28 z-20 hidden max-h-[calc(100dvh-9rem)] w-80 flex-col overflow-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-lg lg:flex"
           aria-label="Carrito"
         >
-          <h2 className="text-lg font-bold text-stone-900">Tu pedido</h2>
+          <h2 className="flex items-center justify-between text-lg font-bold text-stone-900">
+            Tu pedido
+            <span
+              className="rounded-full bg-stone-100 px-2.5 py-1 text-sm tabular-nums"
+              aria-label={`${cartItemCount} artículos`}
+              data-testid="cart-item-count"
+            >
+              {cartItemCount}
+            </span>
+          </h2>
           {cart.length === 0 ? (
             <p className="py-6 text-sm text-stone-500">
               Agrega un antojito para empezar.
             </p>
           ) : (
             <ul className="my-4 space-y-3">
-              {cart.map((line, index) => {
-                const item = snapshot.menuItems.find(
-                  (entry) => entry.id === line.menuItemId,
-                );
-                return (
-                  <li
-                    className="flex justify-between gap-3 border-b border-stone-100 pb-3 text-sm"
-                    key={`${line.menuItemId}-${index}`}
-                  >
-                    <span>
-                      {line.quantity} × {item?.name ?? "Platillo"}
-                    </span>
-                    <strong className="tabular-nums">
-                      {mxn(price(line) * line.quantity)}
-                    </strong>
-                  </li>
-                );
-              })}
+              {cartLines.map(({ key, quantity, itemName, lineTotalCents }) => (
+                <li
+                  className="flex justify-between gap-3 border-b border-stone-100 pb-3 text-sm"
+                  key={key}
+                >
+                  <span>
+                    {quantity} × {itemName}
+                  </span>
+                  <strong className="tabular-nums">
+                    {mxn(lineTotalCents)}
+                  </strong>
+                </li>
+              ))}
             </ul>
           )}
           <div className="mt-auto border-t border-stone-200 pt-4">
             <div className="flex justify-between text-sm">
               <span>Total estimado</span>
-              <strong className="tabular-nums">{mxn(total)} MXN</strong>
+              <strong className="tabular-nums" data-testid="cart-total">
+                {mxn(estimatedTotalCents)} MXN
+              </strong>
             </div>
             <button
               className="btn btn-primary mt-4 min-h-12 w-full transition-transform duration-200 active:scale-90"
               disabled={cart.length === 0 || Boolean(pending)}
               onClick={() => setCheckout(true)}
             >
-              Ver mi pedido ({totalItemsCount})
+              Ver mi pedido ({cartItemCount})
             </button>
           </div>
         </aside>
@@ -641,7 +663,7 @@ export function Menu() {
                 Total estimado
               </span>
               <strong className="text-xl font-black text-clay-950 tabular-nums">
-                {mxn(total)} MXN
+                {mxn(estimatedTotalCents)} MXN
               </strong>
             </div>
 
@@ -650,7 +672,7 @@ export function Menu() {
               onClick={() => setCheckout(true)}
             >
               <ShoppingBag size={18} />
-              <span>Ver mi pedido ({totalItemsCount})</span>
+              <span>Ver mi pedido ({cartItemCount})</span>
               <ArrowRight size={16} />
             </button>
           </div>

@@ -209,7 +209,7 @@ export function CartDrawer({
           <span>Pago 100% en Efectivo al Mostrador</span>
         </div>
         <p className="mt-1 text-stone-700 leading-relaxed">
-          Paga en efectivo al llegar al mostrador. Tu comanda pasará a la plancha en cuanto la cajera registre tu pago.
+          El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo. Paga en efectivo en el mostrador al recogerlo.
         </p>
       </div>
 

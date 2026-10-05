@@ -170,20 +170,19 @@ export function TicketCard({
   const { command, connected } = useRealtime();
   const [noShow, setNoShow] = useState(false),
     [busy, setBusy] = useState(false);
+  const isCooking = order.status === "cooking";
+  const isReview = order.status === "review";
+  const tracksElapsedTime = isReview || isCooking;
   const startTime = Date.parse(
-    order.status === "ready"
-      ? order.readyAt || order.createdAt
-      : order.status === "cooking"
-        ? order.acceptedAt || order.createdAt
-        : order.createdAt,
+    isCooking ? order.acceptedAt || order.createdAt : order.createdAt,
   );
-  const elapsedSeconds = Math.max(0, Math.floor((now - startTime) / 1000));
+  const elapsedSeconds = tracksElapsedTime
+    ? Math.max(0, Math.floor((now - startTime) / 1000))
+    : 0;
   const minutes = Math.floor(elapsedSeconds / 60);
   const seconds = elapsedSeconds % 60;
   const formattedTimer = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 
-  const isCooking = order.status === "cooking";
-  const isReview = order.status === "review";
   const aging =
     (isReview && elapsedSeconds > 180) ||
     (isCooking && elapsedSeconds > 900);
@@ -216,27 +215,27 @@ export function TicketCard({
       }`}
       aria-label={`Pedido ${orderLabel(order)} de ${order.customerName}`}
     >
-      <div
-        className="h-1.5 w-full bg-stone-100"
-        role="progressbar"
-        aria-valuenow={progressPercent}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Tiempo de espera: ${minutes} minutos`}
-      >
+      {tracksElapsedTime && (
         <div
-          className={`h-full transition-all duration-220 ease-linear ${
-            aging
-              ? "bg-red-500 animate-pulse"
-              : isWarning
-                ? "bg-amber-400"
-                : order.status === "ready"
-                  ? "bg-emerald-500"
+          className="h-1.5 w-full bg-stone-100"
+          role="progressbar"
+          aria-valuenow={progressPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Tiempo de espera: ${minutes} minutos`}
+        >
+          <div
+            className={`h-full transition-all duration-220 ease-linear ${
+              aging
+                ? "bg-red-500 animate-pulse"
+                : isWarning
+                  ? "bg-amber-400"
                   : "bg-clay-600"
-          }`}
-          style={{ width: `${progressPercent}%` }}
-        />
-      </div>
+            }`}
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
       <div className="p-4">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -244,29 +243,31 @@ export function TicketCard({
             <p className="font-semibold text-stone-900">{order.customerName}</p>
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold tabular-nums shadow-xs ${
-                aging
-                  ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-400/40"
-                  : isWarning
-                    ? "border-amber-300 bg-amber-100 text-amber-900"
-                    : "border-stone-200 bg-stone-100 text-stone-700"
-              }`}
-              title={`Tiempo transcurrido: ${minutes} min ${seconds} s`}
-              aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
-            >
-              <Clock3
-                size={13}
-                className={`shrink-0 ${
+            {tracksElapsedTime && (
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold tabular-nums shadow-xs ${
                   aging
-                    ? "text-red-600 animate-bounce"
+                    ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-400/40"
                     : isWarning
-                      ? "text-amber-600"
-                      : "text-stone-500"
+                      ? "border-amber-300 bg-amber-100 text-amber-900"
+                      : "border-stone-200 bg-stone-100 text-stone-700"
                 }`}
-              />
-              {formattedTimer}
-            </span>
+                title={`Tiempo transcurrido: ${minutes} min ${seconds} s`}
+                aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
+              >
+                <Clock3
+                  size={13}
+                  className={`shrink-0 ${
+                    aging
+                      ? "text-red-600 animate-bounce"
+                      : isWarning
+                        ? "text-amber-600"
+                        : "text-stone-500"
+                  }`}
+                />
+                {formattedTimer}
+              </span>
+            )}
             <span
               className={`text-[10px] font-semibold uppercase tracking-wider ${
                 aging
