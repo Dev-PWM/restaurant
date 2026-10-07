@@ -87,6 +87,7 @@ export function AcademyBanner({
             {!rushMode && (
               <button
                 type="button"
+                data-tour-allow="rush"
                 onClick={onStartRush}
                 className="btn btn-sm inline-flex items-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-950/60 text-xs font-bold text-amber-300 hover:bg-amber-900/60"
                 title="Probar reto rápido de 60 segundos"
@@ -98,6 +99,7 @@ export function AcademyBanner({
 
             <button
               type="button"
+              data-tour-allow="reset"
               onClick={onResetModule}
               className="btn btn-sm inline-flex items-center gap-1.5 rounded-xl border border-stone-700 bg-stone-800 text-xs font-bold text-stone-300 hover:bg-stone-700"
               title="Reiniciar este módulo desde el paso 1"
@@ -109,6 +111,7 @@ export function AcademyBanner({
             {canExit ? (
               <button
                 type="button"
+                data-tour-allow="exit"
                 onClick={onExit}
                 className="btn btn-sm inline-flex items-center gap-1.5 rounded-xl border border-red-500/50 bg-red-950/60 text-xs font-bold text-red-200 hover:bg-red-900/80"
                 title="Salir del entrenamiento e ir al POS en vivo"
@@ -138,6 +141,7 @@ export function AcademyBanner({
               <button
                 key={m.id}
                 type="button"
+                data-tour-allow="module"
                 onClick={() => onSelectModule(m.id)}
                 className={`group flex shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
                   isCurrent

@@ -117,7 +117,7 @@ export function CoachmarkSpotlight({
       {targetRect && (
         <>
           <div
-            className={`pointer-events-none fixed z-40 rounded-2xl ring-4 transition-all duration-300 ${
+            className={`pointer-events-none fixed z-[70] rounded-2xl ring-4 transition-all duration-300 ${
               isLocked
                 ? "ring-amber-500 shadow-[0_0_25px_rgba(245,158,11,0.6)]"
                 : "ring-yellow-400 shadow-[0_0_35px_rgba(250,204,21,0.8)] motion-safe:animate-pulse"
@@ -133,7 +133,7 @@ export function CoachmarkSpotlight({
           {/* Explain-Before-Execute Pointer Blocker overlay over the target element during countdown */}
           {isLocked && (
             <div
-              className="fixed z-[55] flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-[1px] cursor-not-allowed select-none"
+              className="fixed z-[70] flex items-center justify-center rounded-xl bg-black/30 backdrop-blur-[1px] cursor-not-allowed select-none"
               style={{
                 top: targetRect.top - 4,
                 left: targetRect.left - 4,
@@ -157,7 +157,7 @@ export function CoachmarkSpotlight({
 
       {/* Bouncing cognitive coachmark card */}
       <aside
-        className="fixed z-[60] rounded-3xl border-2 border-yellow-400 bg-stone-900/95 p-5 text-white shadow-2xl backdrop-blur-md transition-all duration-300"
+        className="fixed z-[70] rounded-3xl border-2 border-yellow-400 bg-stone-900/95 p-5 text-white shadow-2xl backdrop-blur-md transition-all duration-300"
         style={coachStyle}
         role="status"
         aria-live="polite"

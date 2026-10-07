@@ -1047,6 +1047,7 @@ export function LiveOrders() {
   const commandRef = useRef(command);
   const resumeRef = useRef(resumeRealtime);
   const simulatorRef = useRef(false);
+  const autoBootedRef = useRef(false);
   useEffect(() => {
     commandRef.current = command;
     resumeRef.current = resumeRealtime;
@@ -1126,7 +1127,8 @@ export function LiveOrders() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     const trained = localStorage.getItem("masaflow_trained") === "true";
-    if (!trained && liveSnapshot && !simulatorRef.current) {
+    if (!trained && liveSnapshot && !simulatorRef.current && !autoBootedRef.current) {
+      autoBootedRef.current = true;
       startSimulator();
     }
   }, [liveSnapshot]);
@@ -1143,7 +1145,9 @@ export function LiveOrders() {
     setGhostBlindDropOpen(false);
 
     if (modId === "module1_golden_path") {
-      setDemoOrders([createDemoOrder()]);
+      const goldenOrder = createDemoOrder();
+      setDemoOrders([goldenOrder]);
+      setRestrictionAcknowledgedIds(new Set([goldenOrder.id]));
       setDemoCompletedOrders([]);
       setActiveTab("queue");
       setActiveLane("review");
@@ -1164,9 +1168,16 @@ export function LiveOrders() {
       setGhostWebOrdersPaused(false);
       setActiveTab("queue");
     } else if (modId === "module5_revenue_closeout") {
-      const order1 = payDemoOrder(createDemoOrder(), 20000);
-      const order2 = payDemoOrder(createPickyEaterDemoOrder(), 20000);
-      const order3 = payDemoOrder(createDemoOrder(), 50000);
+      const order1 = payDemoOrder({ ...createDemoOrder(), status: "ready" }, 20000);
+      const order2 = payDemoOrder({ ...createPickyEaterDemoOrder(), status: "ready" }, 20000);
+      const order3 = payDemoOrder(
+        {
+          ...createDemoOrder(undefined, { id: "demo-order-003", number: 1 }),
+          number: 3,
+          status: "ready",
+        },
+        50000,
+      );
       const noShow = markDemoNoShow(createNoShowDemoOrder());
       setDemoCompletedOrders([order1, order2, order3, noShow]);
       setDemoOrders([]);
@@ -2086,6 +2097,11 @@ export function LiveOrders() {
                                 coachTarget={guidedTarget ?? undefined}
                                 onSimulatorAdvance={advanceSimulatorOrder}
                                 onSimulatorNoShow={markSimulatorNoShow}
+                                onSimulatorNoShowOpen={() => {
+                                  if (simulator && currentStep?.action === "noshow-open") {
+                                    advanceStep();
+                                  }
+                                }}
                                 restrictionAcknowledged={restrictionAcknowledgedIds.has(
                                   order.id,
                                 )}
@@ -2200,6 +2216,7 @@ export function LiveOrders() {
               {rushPassed ? (
                 <button
                   className="btn btn-primary bg-emerald-700 border-emerald-700 flex-1 text-white font-bold"
+                  data-tour-allow="graduate"
                   onClick={() => {
                     setRushFinished(false);
                     setIsGraduated(true);
@@ -2276,6 +2293,11 @@ export function LiveOrders() {
               }
             }}
             isBlindDropOpen={ghostBlindDropOpen}
+            onBlindDropMatched={() => {
+              if (currentModule === "module5_revenue_closeout" && currentStepIndex === 3) {
+                advanceStep();
+              }
+            }}
             onBlindDropConfirmed={() => {
               setGhostBlindDropOpen(false);
               setGhostLedgerOpen(false);

@@ -433,7 +433,7 @@ export const CURRICULUM_STEPS: AcademyStep[] = [
     target: "card-revenue-display",
     action: "inspect-revenue",
     title: "2. Verificar Ingresos Cobrados",
-    instruction: "Aquí ves tus ganancias reales. El sistema ya sumó las órdenes de práctica. Toca 'Cerrar Turno' para hacer el corte de caja seguro.",
+    instruction: "Aquí ves tus ganancias reales: el sistema ya sumó las órdenes de práctica. Toca la tarjeta de «Ingresos del Día» para verificar tus ingresos acumulados.",
     backendConsequence: "Verifica que las 3 ventas de $185 suman $555.00, con $1,200.00 recibidos, $645.00 en cambio y 1 No-Show.",
     valueWhy: "Educación financiera: transparencia total del corte de caja sin fórmulas confusas.",
   },

@@ -22,6 +22,7 @@ interface AcademyLedgerModalProps {
   onOpenCloseShift: () => void;
   isBlindDropOpen: boolean;
   onBlindDropConfirmed: () => void;
+  onBlindDropMatched?: () => void;
   onCardClickAllowed: boolean;
 }
 
@@ -34,6 +35,7 @@ export function AcademyLedgerModal({
   onOpenCloseShift,
   isBlindDropOpen,
   onBlindDropConfirmed,
+  onBlindDropMatched,
   onCardClickAllowed,
 }: AcademyLedgerModalProps) {
   const [declaredCash, setDeclaredCash] = useState("");
@@ -80,6 +82,7 @@ export function AcademyLedgerModal({
           <button
             type="button"
             onClick={onClose}
+            data-tour-allow="ledger-close"
             data-tour-action="ledger-close"
             className="rounded-full p-2 text-stone-400 hover:bg-stone-800 hover:text-white"
           >
@@ -207,8 +210,13 @@ export function AcademyLedgerModal({
                     data-tour-action="blind-drop-input"
                     value={declaredCash}
                     onChange={(e) => {
-                      setDeclaredCash(e.target.value);
+                      const val = e.target.value;
+                      setDeclaredCash(val);
                       setShowDiscrepancyError(false);
+                      const entered = parseFloat(val);
+                      if (!isNaN(entered) && Math.round(entered * 100) === expectedCashCents) {
+                        onBlindDropMatched?.();
+                      }
                     }}
                     placeholder="Ej. 555"
                     className="field flex-1 text-xl font-black tabular-nums bg-stone-900 border-yellow-400 text-yellow-400"
@@ -216,9 +224,12 @@ export function AcademyLedgerModal({
                   />
                   <button
                     type="button"
+                    data-tour-target="input-blind-drop"
+                    data-tour-action="blind-drop-input"
                     onClick={() => {
                       setDeclaredCash("555");
                       setShowDiscrepancyError(false);
+                      onBlindDropMatched?.();
                     }}
                     className="btn btn-secondary text-xs px-3 font-bold"
                   >

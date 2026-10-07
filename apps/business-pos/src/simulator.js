@@ -143,9 +143,10 @@ export function markDemoNoShow(order) {
  */
 export function createPickyEaterDemoOrder(now = new Date()) {
   const order = createDemoOrder(now, {
-    number: 2,
+    number: 1,
     id: "demo-order-picky-002",
   });
+  order.number = 2;
   order.customerName = "Carlos (Sin Queso)";
   return order;
 }

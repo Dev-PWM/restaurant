@@ -123,6 +123,7 @@ export function GraduationModal({
           <div className="pt-4 flex flex-col sm:flex-row gap-3">
             <button
               type="button"
+              data-tour-allow="graduate"
               onClick={onGraduateAndGoLive}
               className="btn btn-primary flex-1 py-4 text-base font-black shadow-xl flex items-center justify-center gap-2 group"
             >
@@ -131,6 +132,7 @@ export function GraduationModal({
             </button>
             <button
               type="button"
+              data-tour-allow="repeat"
               onClick={onRepeatTraining}
               className="btn btn-secondary py-4 text-sm font-bold flex items-center justify-center gap-1.5 text-stone-300"
             >
