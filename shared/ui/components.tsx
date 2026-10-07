@@ -280,11 +280,12 @@ export function InventoryControl({ onClose }: { onClose: () => void }) {
   );
 }
 export function PinGate({ children }: { children: ReactNode }) {
-  const { snapshot, login, connected, error } = useRealtime();
+  const { snapshot, login, connected, error, suspended } = useRealtime();
   const [pin, setPin] = useState(""),
     [busy, setBusy] = useState(false),
     [shakeKey, setShakeKey] = useState(0);
-  if (snapshot?.staff) return <>{children}</>;
+  // The training simulator suspends realtime (snapshot becomes null) while staff stay signed in.
+  if (snapshot?.staff || suspended) return <>{children}</>;
   const enter = async () => {
     setBusy(true);
     const authenticated = await login(pin);
@@ -423,9 +424,12 @@ export function FullscreenButton() {
 export function StaffHeader({
   page,
   children,
+  lockDisabled = false,
 }: {
   page: "pos" | "analytics";
   children?: ReactNode;
+  /** Locking drops the session, so it is blocked while a confirmed payment is still unsent. */
+  lockDisabled?: boolean;
 }) {
   const { snapshot, connected, suspended, logout } = useRealtime();
   return (
@@ -470,9 +474,21 @@ export function StaffHeader({
           <PWAInstallButton />
           <FullscreenButton />
           {children}
-          <button className="btn" onClick={logout} aria-label="Bloquear sesión">
-            <LockKeyhole size={16} />
-          </button>
+          {!suspended && (
+            <button
+              className="btn"
+              onClick={logout}
+              disabled={lockDisabled}
+              title={
+                lockDisabled
+                  ? "Espera a que se registre el pago en curso"
+                  : undefined
+              }
+              aria-label="Bloquear sesión"
+            >
+              <LockKeyhole size={16} />
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -544,6 +560,7 @@ export function AudioUnlockButton() {
     <>
       <button
         type="button"
+        data-tour-allow="audio"
         className={`btn ${ready ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-400 bg-amber-50 font-bold text-amber-950"}`}
         aria-label={
           ready
@@ -583,23 +600,28 @@ export function setChimeVolume(vol: number) {
 export function getChimeVolume() {
   return volumeScale;
 }
-export function chime(type: "new" | "kitchen" | "ready" | boolean = "new") {
+export function chime(
+  type: "new" | "kitchen" | "ready" | "alarm" | boolean = "new",
+) {
   try {
     if (volumeScale <= 0) return;
     enableAudio();
     if (!audio || audio.state !== "running") return;
     const isKitchen = type === "kitchen" || type === true;
     const isReady = type === "ready";
-    const notes = isReady
-      ? [659.25, 783.99, 1046.5]
-      : isKitchen
-        ? [587.33, 880]
-        : [523.25, 659.25];
+    const isAlarm = type === "alarm";
+    const notes = isAlarm
+      ? [880, 440, 880, 440]
+      : isReady
+        ? [659.25, 783.99, 1046.5]
+        : isKitchen
+          ? [587.33, 880]
+          : [523.25, 659.25];
     notes.forEach((frequency, index) => {
       const oscillator = audio!.createOscillator();
       const gain = audio!.createGain();
       const at = audio!.currentTime + index * 0.15;
-      oscillator.type = "sine";
+      oscillator.type = isAlarm ? "square" : "sine";
       oscillator.frequency.setValueAtTime(frequency, at);
       gain.gain.setValueAtTime(0.0001, at);
       gain.gain.exponentialRampToValueAtTime(0.08 * volumeScale, at + 0.02);
@@ -638,6 +660,7 @@ export function SoundButton() {
   };
   return (
     <button
+      data-tour-allow="audio"
       className={`btn transition-colors ${
         mode === "mute"
           ? "border-stone-300 text-stone-400 line-through"

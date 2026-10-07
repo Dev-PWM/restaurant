@@ -64,6 +64,8 @@ interface ContextValue {
   logout: () => void;
   suspendRealtime: () => void;
   resumeRealtime: () => void;
+  /** Ask the server for a fresh snapshot without dropping the connection. */
+  resync: () => void;
 }
 const Context = createContext<ContextValue | null>(null);
 export function RealtimeProvider({
@@ -235,14 +237,19 @@ export function RealtimeProvider({
     setSnapshot(null);
     setConnected(false);
   }
+  // The last snapshot is kept while suspended (the simulator never reads it) so
+  // the PIN gate and board do not flash empty when training starts or ends;
+  // reconnecting replaces it with a fresh init_data.
   function suspendRealtime() {
     setSuspended(true);
-    setSnapshot(null);
     setConnected(false);
   }
   function resumeRealtime() {
-    setSnapshot(null);
     setSuspended(false);
+  }
+  function resync() {
+    const socket = socketRef.current;
+    if (socket?.connected) socket.emit("request_init");
   }
   return (
     <Context.Provider
@@ -256,6 +263,7 @@ export function RealtimeProvider({
         logout,
         suspendRealtime,
         resumeRealtime,
+        resync,
         error,
         clearError: () => setError(""),
       }}

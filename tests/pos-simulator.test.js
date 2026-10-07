@@ -68,3 +68,30 @@ test("demo no-shows remain local and are allowed only before cooking", async () 
     /Cannot mark demo order cooking/,
   );
 });
+
+test("rush grading requires every ticket paid inside the time limit", async () => {
+  const { evaluateRush, RUSH_LIMIT_SECONDS, RUSH_TICKET_COUNT } =
+    await simulator;
+  assert.equal(RUSH_TICKET_COUNT, 5);
+  assert.equal(RUSH_LIMIT_SECONDS, 60);
+  assert.equal(evaluateRush({ paid: 5, noShows: 0, elapsedSeconds: 42 }), true);
+  assert.equal(
+    evaluateRush({ paid: 5, noShows: 0, elapsedSeconds: 60 }),
+    true,
+    "the time limit is inclusive",
+  );
+  assert.equal(
+    evaluateRush({ paid: 4, noShows: 1, elapsedSeconds: 30 }),
+    false,
+  );
+  assert.equal(
+    evaluateRush({ paid: 5, noShows: 0, elapsedSeconds: 61 }),
+    false,
+  );
+});
+
+test("the undo window and hesitation timing match the training spec", async () => {
+  const { UNDO_WINDOW_SECONDS, HESITATION_MS } = await simulator;
+  assert.equal(UNDO_WINDOW_SECONDS, 5);
+  assert.equal(HESITATION_MS, 5000);
+});

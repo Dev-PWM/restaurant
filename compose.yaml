@@ -11,6 +11,7 @@ services:
       MASAFLOW_HOST: 0.0.0.0
       PORT: 4173
       MASAFLOW_DATA_DIR: /data/realtime
+      MASAFLOW_LOG_DIR: /data/logs
       MASAFLOW_STAFF_PIN: ${MASAFLOW_STAFF_PIN:?Set MASAFLOW_STAFF_PIN in .env}
     ports:
       - "${MASAFLOW_BIND_IP:-127.0.0.1}:4173:4173"

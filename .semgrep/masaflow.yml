@@ -1,0 +1,109 @@
+# Static analysis rules for MasaFlow. Run with: npm run scan:sast (needs the semgrep CLI)
+# ERROR rules gate the build; WARNING rules are findings to review.
+rules:
+  - id: masaflow-redos-nested-quantifier
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Nested quantifier inside a regular expression (catastrophic backtracking). A long
+      customer-controlled string can freeze the single-threaded server mid-rush. Rewrite
+      without the nested repetition. `npm run scan:regex` probes this dynamically.
+    pattern-regex: '\/[^\/\n]*\((?:[^()\\\n\/]|\\.)*[+*](?:[^()\\\n\/]|\\.)*\)(?:[+*]|\{\d+,\d*\})[^\/\n]*\/[dgimsuy]*'
+    paths:
+      exclude: ["tests/", "node_modules/", "scripts/scan-regex.cjs"]
+
+  - id: masaflow-dynamic-regexp
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      RegExp built from a non-literal. If any part comes from a customer name, modifier or
+      order note, escape it and bound its length first (the engine already caps names at 60).
+    patterns:
+      - pattern-either:
+          - pattern: new RegExp($X)
+          - pattern: new RegExp($X, $FLAGS)
+      - pattern-not: new RegExp("...")
+      - pattern-not: new RegExp("...", $FLAGS)
+    paths:
+      exclude: ["tests/", "node_modules/"]
+
+  - id: masaflow-no-eval
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: eval and new Function execute strings as code; nothing in MasaFlow needs them.
+    pattern-either:
+      - pattern: eval(...)
+      - pattern: new Function(...)
+    paths:
+      exclude: ["node_modules/"]
+
+  - id: masaflow-raw-html-sink
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      Raw HTML sink. Customer names and modifiers are untrusted; render them as React
+      text instead.
+    pattern-either:
+      - pattern: <$EL dangerouslySetInnerHTML={...} />
+      - pattern: $E.innerHTML = $X
+      - pattern: $E.outerHTML = $X
+      - pattern: document.write(...)
+    paths:
+      exclude: ["node_modules/", "tests/"]
+
+  - id: masaflow-shell-injection
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Shell command assembled from a non-literal. Use execFile/spawn with an argument array.
+    patterns:
+      - pattern-either:
+          - pattern: $CP.exec($CMD, ...)
+          - pattern: $CP.execSync($CMD, ...)
+      - pattern-not: $CP.exec("...", ...)
+      - pattern-not: $CP.execSync("...", ...)
+    paths:
+      exclude: ["node_modules/", "tests/"]
+
+  - id: masaflow-staff-pin-in-client-code
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >-
+      The staff PIN must never reach a browser bundle. It is verified on the server only
+      (shared SHA-256 compare in server.js).
+    pattern-either:
+      - pattern: process.env.MASAFLOW_STAFF_PIN
+      - pattern: import.meta.env.$ANY_PIN
+    paths:
+      include: ["apps/*/src/", "shared/ui/", "shared/pwa/"]
+
+  - id: masaflow-literal-pin-in-client-code
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: A four-digit PIN literal is assigned in client code.
+    pattern-regex: '(?i)\bpin\b\s*[:=]\s*["''`]\d{4}["''`]'
+    paths:
+      include: ["apps/*/src/", "shared/ui/"]
+      exclude: ["tests/"]
+
+  - id: masaflow-staff-pin-default
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      A default staff PIN is baked into the code. Anyone who knows the project (it is
+      public in .env.example) can log in when MASAFLOW_STAFF_PIN is unset. Prefer refusing
+      to start without an explicit PIN.
+    pattern-either:
+      - pattern: process.env.MASAFLOW_STAFF_PIN || "..."
+      - pattern: process.env.MASAFLOW_STAFF_PIN = "..."
+    paths:
+      exclude: ["tests/", "node_modules/"]
+
+  - id: masaflow-socket-cors-wildcard
+    languages: [javascript, typescript]
+    severity: WARNING
+    message: >-
+      Socket.io accepts connections from any origin. Customer sessions are UUID-scoped and
+      rate-limited per address, but a same-origin policy would shrink the attack surface.
+    pattern: "{..., origin: \"*\", ...}"
+    paths:
+      exclude: ["tests/", "node_modules/"]

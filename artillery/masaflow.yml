@@ -1,0 +1,30 @@
+# MasaFlow lunch-rush load test (Socket.io).
+#
+# 50 phones place orders while one POS cashier accepts, readies and pays them.
+# Run it with `npm run loadtest`, which starts a disposable server (temp data
+# directory, random PIN) so fake orders can never reach the real ledger.
+# To aim it elsewhere: LOADTEST_TARGET=http://host:port MASAFLOW_STAFF_PIN=xxxx \
+#   npx artillery@2.0.34 run artillery/masaflow.yml   (only against a throwaway server!)
+config:
+  plugins:
+    ensure: {}
+  target: "{{ $processEnvironment.LOADTEST_TARGET }}"
+  processor: "./processor.cjs"
+  phases:
+    # 51 arrivals: the first becomes the POS cashier, the other 50 are phones.
+    - name: "50 phones arrive over 10 seconds"
+      duration: 10
+      arrivalCount: 51
+  ensure:
+    thresholds:
+      - masaflow.submit_ack_ms.p99: 500
+      - masaflow.pos_ack_ms.p99: 500
+      - masaflow.state_update_ms.p99: 1000
+    conditions:
+      - expression: "masaflow.rejected == 0"
+      - expression: "masaflow.ack_timeout == 0"
+      - expression: "masaflow.vu_error == 0"
+scenarios:
+  - name: "phones and POS"
+    flow:
+      - function: "virtualUser"

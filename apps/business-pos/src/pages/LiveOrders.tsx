@@ -19,6 +19,7 @@ import {
   Search,
   SlidersHorizontal,
   Table,
+  Trophy,
 } from "lucide-react";
 import type { Order, Snapshot } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
@@ -26,11 +27,19 @@ import {
   advanceDemoOrder,
   createRushOrders,
   createDemoOrder,
+  evaluateRush,
+  HESITATION_MS,
   markDemoNoShow,
   payDemoOrder,
+  RUSH_LIMIT_SECONDS,
+  RUSH_TICKET_COUNT,
+  UNDO_WINDOW_SECONDS,
 } from "../simulator.js";
+import { burstConfetti } from "../confetti";
+import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import {
   chime,
+  enableAudio,
   AudioUnlockButton,
   EmptyState,
   InventoryControl,
@@ -46,47 +55,32 @@ import {
 export function CashTender({
   order,
   onClose,
+  onConfirm,
   simulator = false,
-  onSimulatorPayment,
+  guidedTarget = null,
   onSimulatorTenderSelected,
   onExitSimulator,
-  mistakeCountdown = 0,
-  onSimulatorUndo,
   trainingMessage,
 }: {
   order: Order;
   onClose: () => void;
+  /** Queues the payment. Live mode starts the undo window; the simulator grades it. */
+  onConfirm: (orderId: string, tenderedCents: number) => void;
   simulator?: boolean;
-  onSimulatorPayment?: (orderId: string, tenderedCents: number) => void;
+  guidedTarget?: string | null;
   onSimulatorTenderSelected?: (tenderedCents: number) => void;
   onExitSimulator?: () => void;
-  mistakeCountdown?: number;
-  onSimulatorUndo?: () => void;
   trainingMessage?: string;
 }) {
-  const { command, connected } = useRealtime();
-  const [value, setValue] = useState(""),
-    [busy, setBusy] = useState(false);
+  const { connected } = useRealtime();
+  const [value, setValue] = useState("");
   const valid = /^\d{1,7}(?:\.\d{0,2})?$/.test(value),
     parts = value.split(".");
   const cents = valid
     ? Number(parts[0]) * 100 + Number((parts[1] || "").padEnd(2, "0"))
     : 0;
   const change = cents - order.totalCents;
-  async function pay(amount: number) {
-    setBusy(true);
-    if (simulator) {
-      onSimulatorPayment?.(order.id, amount);
-      setBusy(false);
-      return;
-    }
-    const result = await command("pos_order_paid", {
-      orderId: order.id,
-      tenderedCents: amount,
-    });
-    setBusy(false);
-    if (result.ok) onClose();
-  }
+  const spotlight = "relative z-50 ring-4 ring-yellow-400";
   return (
     <Modal
       title={`Cobrar al entregar ${orderLabel(order)} · ${order.customerName}`}
@@ -95,21 +89,11 @@ export function CashTender({
       <OrderLines order={order} />
       {simulator && trainingMessage && (
         <p
-          className={`my-4 rounded-xl border-2 p-4 font-semibold text-stone-900 ${mistakeCountdown ? "border-red-600 bg-red-50" : "border-yellow-500 bg-yellow-50"}`}
+          className="my-4 rounded-xl border-2 border-yellow-500 bg-yellow-50 p-4 font-semibold text-stone-900"
           role="status"
         >
           {trainingMessage}
         </p>
-      )}
-      {simulator && mistakeCountdown > 0 && onSimulatorUndo && (
-        <button
-          className="btn btn-danger relative z-50 mb-4 w-full motion-safe:animate-bounce"
-          data-tour-target="undo-demo-payment"
-          data-tour-action="undo"
-          onClick={onSimulatorUndo}
-        >
-          Deshacer pago de práctica · {mistakeCountdown}s
-        </button>
       )}
       <div className="my-6 flex items-end justify-between border-t border-stone-200 pt-5">
         <span>Total a cobrar</span>
@@ -126,41 +110,39 @@ export function CashTender({
           value={value}
           placeholder="0.00"
           readOnly={simulator}
-          disabled={busy}
           onChange={(e) => setValue(e.target.value)}
         />
       </label>
       <div className="my-4 grid grid-cols-2 gap-3">
-        {[100, 200, 500].map((preset) => (
-          <button
-            className={`btn min-h-16 text-xl tabular-nums ${simulator && preset === 200 && trainingMessage?.includes("El cliente entrega $200") ? "relative z-50 ring-4 ring-yellow-400 motion-safe:animate-bounce" : ""} ${simulator && preset === 500 && trainingMessage?.includes("Selecciona ese billete") && mistakeCountdown === 0 ? "relative z-50 ring-4 ring-yellow-400 motion-safe:animate-bounce" : ""}`}
-            key={preset}
-            data-tour-action={simulator ? "cash-preset" : undefined}
-            data-tour-cents={simulator ? preset * 100 : undefined}
-            data-tour-target={
-              simulator &&
-              mistakeCountdown === 0 &&
-              ((preset === 200 &&
-                trainingMessage?.includes("El cliente entrega $200")) ||
-                (preset === 500 &&
-                  trainingMessage?.includes("Selecciona ese billete")))
-                ? preset === 200
-                  ? "tender-200"
-                  : "tender-500"
-                : undefined
-            }
-            disabled={(!simulator && !connected) || busy}
-            onClick={() => {
-              setValue(String(preset));
-              if (simulator) onSimulatorTenderSelected?.(preset * 100);
-            }}
-          >
-            {mxn(preset * 100)}
-          </button>
-        ))}
+        {[100, 200, 500].map((preset) => {
+          const target =
+            preset === 200
+              ? "tender-200"
+              : preset === 500
+                ? "tender-500"
+                : undefined;
+          const lit =
+            simulator && target !== undefined && guidedTarget === target;
+          return (
+            <button
+              className={`btn min-h-16 text-xl tabular-nums ${lit ? spotlight : ""}`}
+              key={preset}
+              data-tour-action={simulator ? "cash-preset" : undefined}
+              data-tour-cents={simulator ? preset * 100 : undefined}
+              data-tour-target={lit ? target : undefined}
+              disabled={!simulator && !connected}
+              onClick={() => {
+                setValue(String(preset));
+                if (simulator) onSimulatorTenderSelected?.(preset * 100);
+              }}
+            >
+              {mxn(preset * 100)}
+            </button>
+          );
+        })}
         <button
           className="btn min-h-16 text-lg tabular-nums"
-          disabled={busy || simulator}
+          disabled={simulator && guidedTarget !== null}
           onClick={() => setValue((order.totalCents / 100).toFixed(2))}
         >
           Exacto · {mxn(order.totalCents)}
@@ -177,28 +159,38 @@ export function CashTender({
         </div>
       </div>
       <button
-        className={`btn btn-primary w-full ${simulator && trainingMessage?.toLowerCase().includes("confirma") ? "relative z-50 ring-4 ring-yellow-400 motion-safe:animate-bounce" : ""}`}
+        className={`btn btn-primary w-full ${simulator && guidedTarget === "confirm-demo-payment" ? spotlight : ""}`}
         data-tour-action={simulator ? "confirm" : undefined}
-        data-tour-target={simulator ? "confirm-demo-payment" : undefined}
-        disabled={(!simulator && !connected) || busy || !valid || change < 0}
-        onClick={() => void pay(cents)}
+        data-tour-target={
+          simulator && guidedTarget === "confirm-demo-payment"
+            ? "confirm-demo-payment"
+            : undefined
+        }
+        disabled={(!simulator && !connected) || !valid || change < 0}
+        onClick={() => onConfirm(order.id, cents)}
       >
         Confirmar pago y entregar
         <ArrowRight size={18} />
       </button>
       <button
         className="btn mt-3 w-full"
-        disabled={simulator || !connected || busy}
-        data-tour-action={simulator ? "confirm" : undefined}
-        onClick={() => void pay(order.totalCents)}
+        // Guided steps stay on the scripted bills; the exam may pay exact change
+        // (a $555 ticket cannot be covered by the $500 preset).
+        disabled={simulator ? guidedTarget !== null : !connected}
+        onClick={() => onConfirm(order.id, order.totalCents)}
       >
         Efectivo exacto · Cobrar y entregar {mxn(order.totalCents)}
       </button>
       <p className="mt-4 text-center text-xs text-stone-500">
-        Confirma solo después de recibir el efectivo.
+        Confirma solo después de recibir el efectivo. Tendrás{" "}
+        {UNDO_WINDOW_SECONDS} segundos para deshacer.
       </p>
       {simulator && onExitSimulator && (
-        <button className="btn mt-3 w-full" onClick={onExitSimulator}>
+        <button
+          className="btn mt-3 w-full"
+          data-tour-allow="exit"
+          onClick={onExitSimulator}
+        >
           Salir del simulador
         </button>
       )}
@@ -217,10 +209,17 @@ export function TicketCard({
   restrictionAcknowledged = false,
   errorShake = false,
   coachTarget,
+  pendingSeconds,
+  pendingCents = 0,
+  onUndoPayment,
 }: {
   order: Order;
   now: number;
   onPay: () => void;
+  /** Set while a confirmed payment can still be undone; the ticket is grayed out. */
+  pendingSeconds?: number;
+  pendingCents?: number;
+  onUndoPayment?: () => void;
   simulator?: boolean;
   highlighted?: boolean;
   onSimulatorAdvance?: (order: Order) => void;
@@ -235,6 +234,7 @@ export function TicketCard({
     [busy, setBusy] = useState(false);
   const isCooking = order.status === "cooking";
   const isReview = order.status === "review";
+  const paymentPending = pendingSeconds !== undefined;
   const tracksElapsedTime = isReview || isCooking;
   const startTime = Date.parse(
     isCooking ? order.acceptedAt || order.createdAt : order.createdAt,
@@ -270,7 +270,8 @@ export function TicketCard({
   return (
     <article
       data-order-id={order.id}
-      className={`relative overflow-hidden rounded-xl border-2 bg-white shadow-xs transition-colors ${errorShake ? "animate-shake" : ""} ${
+      aria-busy={paymentPending}
+      className={`relative overflow-hidden rounded-xl border-2 shadow-xs transition-colors ${paymentPending ? "bg-stone-100" : "bg-white"} ${errorShake ? "animate-shake" : ""} ${
         highlighted ? "z-40 ring-4 ring-yellow-400" : ""
       } ${
         aging
@@ -305,87 +306,91 @@ export function TicketCard({
         </div>
       )}
       <div className="p-4">
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <strong className="text-xl tracking-tight">
-              {orderLabel(order)}
-            </strong>
-            <p className="font-semibold text-stone-900">{order.customerName}</p>
-          </div>
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            {tracksElapsedTime && (
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold tabular-nums shadow-xs ${
-                  aging
-                    ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-400/40"
-                    : isWarning
-                      ? "border-amber-300 bg-amber-100 text-amber-900"
-                      : "border-stone-200 bg-stone-100 text-stone-700"
-                }`}
-                title={`Tiempo transcurrido: ${minutes} min ${seconds} s`}
-                aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
-              >
-                <Clock3
-                  size={13}
-                  className={`shrink-0 ${
+        <div className={paymentPending ? "opacity-60 grayscale" : undefined}>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <strong className="text-xl tracking-tight">
+                {orderLabel(order)}
+              </strong>
+              <p className="font-semibold text-stone-900">
+                {order.customerName}
+              </p>
+            </div>
+            <div className="flex flex-col items-end gap-1 shrink-0">
+              {tracksElapsedTime && (
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold tabular-nums shadow-xs ${
                     aging
-                      ? "text-red-600 animate-bounce"
+                      ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-400/40"
                       : isWarning
-                        ? "text-amber-600"
-                        : "text-stone-500"
+                        ? "border-amber-300 bg-amber-100 text-amber-900"
+                        : "border-stone-200 bg-stone-100 text-stone-700"
                   }`}
-                />
-                {formattedTimer}
-              </span>
-            )}
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-wider ${
-                aging
-                  ? "font-bold text-red-700"
+                  title={`Tiempo transcurrido: ${minutes} min ${seconds} s`}
+                  aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
+                >
+                  <Clock3
+                    size={13}
+                    className={`shrink-0 ${
+                      aging
+                        ? "text-red-600 animate-bounce"
+                        : isWarning
+                          ? "text-amber-600"
+                          : "text-stone-500"
+                    }`}
+                  />
+                  {formattedTimer}
+                </span>
+              )}
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wider ${
+                  aging
+                    ? "font-bold text-red-700"
+                    : isWarning
+                      ? "font-bold text-amber-800"
+                      : "text-stone-400"
+                }`}
+              >
+                {aging
+                  ? "Demorado"
                   : isWarning
-                    ? "font-bold text-amber-800"
-                    : "text-stone-400"
-              }`}
-            >
-              {aging
-                ? "Demorado"
-                : isWarning
-                  ? "Atención"
-                  : order.status === "review"
-                    ? "En revisión"
-                    : order.status === "cooking"
-                      ? "Cocinando"
-                      : "Lista para recoger"}
-            </span>
+                    ? "Atención"
+                    : order.status === "review"
+                      ? "En revisión"
+                      : order.status === "cooking"
+                        ? "Cocinando"
+                        : "Lista para recoger"}
+              </span>
+            </div>
           </div>
-        </div>
-        <OrderLines order={order} />
-        {simulator &&
-          order.status === "cooking" &&
-          order.items.some((item) =>
-            item.modifiers.some((modifier) => modifier.name === "Sin queso"),
-          ) && (
-            <button
-              className={`btn mt-3 w-full border-red-700 bg-red-700 font-black text-white hover:bg-red-800 ${coachTarget === "acknowledge-restriction" ? "relative z-50 ring-4 ring-yellow-400 motion-safe:animate-bounce" : ""}`}
-              data-tour-target={
-                coachTarget === "acknowledge-restriction"
-                  ? "acknowledge-restriction"
-                  : undefined
-              }
-              data-tour-action="acknowledge"
-              aria-pressed={restrictionAcknowledged}
-              onClick={onAcknowledgeRestriction}
-            >
-              {restrictionAcknowledged
-                ? "✓ Restricción revisada: Sin queso"
-                : "Tocar para reconocer: SIN QUESO"}
-            </button>
-          )}
-        <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-stone-500">{time(order.createdAt)}</span>
+          <OrderLines order={order} />
+          {simulator &&
+            order.status === "cooking" &&
+            order.items.some((item) =>
+              item.modifiers.some((modifier) => modifier.name === "Sin queso"),
+            ) && (
+              <button
+                className={`btn mt-3 w-full border-red-700 bg-red-700 font-black text-white hover:bg-red-800 ${coachTarget === "acknowledge-restriction" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
+                data-tour-target={
+                  coachTarget === "acknowledge-restriction"
+                    ? "acknowledge-restriction"
+                    : undefined
+                }
+                data-tour-action="acknowledge"
+                aria-pressed={restrictionAcknowledged}
+                onClick={onAcknowledgeRestriction}
+              >
+                {restrictionAcknowledged
+                  ? "✓ Restricción revisada: Sin queso"
+                  : "Tocar para reconocer: SIN QUESO"}
+              </button>
+            )}
+          <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-stone-500">{time(order.createdAt)}</span>
+            </div>
+            <strong>{mxn(order.totalCents)}</strong>
           </div>
-          <strong>{mxn(order.totalCents)}</strong>
         </div>
         {order.status === "review" ? (
           <>
@@ -412,6 +417,47 @@ export function TicketCard({
               Anular pedido / No-Show
             </button>
           </>
+        ) : order.status === "ready" && paymentPending ? (
+          <div
+            className="mt-4 rounded-xl border-2 border-red-600 bg-red-50 p-3"
+            role="group"
+            aria-label="Pago por registrar"
+          >
+            <p className="text-sm font-bold text-red-900" aria-live="polite">
+              {pendingSeconds === 0
+                ? `Registrando pago de ${mxn(pendingCents)}…`
+                : `Pago de ${mxn(pendingCents)} recibido · se registra en ${pendingSeconds}s`}
+            </p>
+            <div
+              className="mt-2 h-2 overflow-hidden rounded-full bg-red-100"
+              role="progressbar"
+              aria-valuenow={pendingSeconds}
+              aria-valuemin={0}
+              aria-valuemax={UNDO_WINDOW_SECONDS}
+              aria-label="Tiempo para deshacer"
+            >
+              <div
+                className="h-full rounded-full bg-red-600 transition-[width] duration-1000 ease-linear"
+                style={{
+                  width: `${((pendingSeconds ?? 0) / UNDO_WINDOW_SECONDS) * 100}%`,
+                }}
+              />
+            </div>
+            {pendingSeconds !== 0 && (
+              <button
+                className={`btn btn-danger mt-3 w-full ${coachTarget === "undo-demo-payment" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
+                data-tour-action="undo"
+                data-tour-target={
+                  coachTarget === "undo-demo-payment"
+                    ? "undo-demo-payment"
+                    : undefined
+                }
+                onClick={onUndoPayment}
+              >
+                Deshacer
+              </button>
+            )}
+          </div>
         ) : order.status === "ready" ? (
           <>
             <button
@@ -848,6 +894,57 @@ export function CompletedOrdersSection({ orders }: { orders: Order[] }) {
   );
 }
 
+/** What the spotlighted control must be tagged with (data-tour-action) to be clickable. */
+const TOUR_ACTIONS: Record<string, string> = {
+  "accept-demo-order": "accept",
+  "acknowledge-restriction": "acknowledge",
+  "mark-demo-ready": "ready",
+  "pay-demo-order": "pay",
+  "undo-demo-payment": "undo",
+  "tender-200": "cash-preset",
+  "tender-500": "cash-preset",
+  "confirm-demo-payment": "confirm",
+};
+const INTERACTIVE =
+  "button, a[href], input, select, textarea, summary, [role='tab'], [role='switch']";
+
+interface PendingPayment {
+  tenderedCents: number;
+  deadline: number;
+  settling: boolean;
+}
+
+function DataErrorFallback({
+  title,
+  retry,
+}: {
+  title: string;
+  retry: () => void;
+}) {
+  const { resync } = useRealtime();
+  return (
+    <div
+      role="alert"
+      className="rounded-xl border-2 border-red-600 bg-red-50 p-4 text-red-950"
+    >
+      <strong className="block">{title}</strong>
+      <p className="mt-1 text-sm">
+        No pudimos mostrar esto. El resto del tablero sigue funcionando.
+      </p>
+      <button
+        className="btn mt-3 w-full"
+        data-tour-allow="recover"
+        onClick={() => {
+          resync();
+          retry();
+        }}
+      >
+        Volver a sincronizar
+      </button>
+    </div>
+  );
+}
+
 export function LiveOrders() {
   const {
     snapshot: liveSnapshot,
@@ -871,26 +968,47 @@ export function LiveOrders() {
     >(() => new Set()),
     [coachPosition, setCoachPosition] = useState({ left: 16, top: 96 }),
     [mistakeCountdown, setMistakeCountdown] = useState(0),
+    [mistakeOrderId, setMistakeOrderId] = useState<string | null>(null),
+    [mistakeExpired, setMistakeExpired] = useState(false),
     [mistakeSeen, setMistakeSeen] = useState(false),
+    [alarmFlash, setAlarmFlash] = useState(false),
+    [hesitating, setHesitating] = useState(false),
     [selectedTenderCents, setSelectedTenderCents] = useState<number | null>(
       null,
     ),
     [rushMode, setRushMode] = useState(false),
-    [rushRemaining, setRushRemaining] = useState(60),
+    [rushRemaining, setRushRemaining] = useState(RUSH_LIMIT_SECONDS),
     [rushCompleted, setRushCompleted] = useState(0),
     [rushResolved, setRushResolved] = useState(0),
     [rushNoShows, setRushNoShows] = useState(0),
-    [rushSpawned, setRushSpawned] = useState(0),
     [rushFinished, setRushFinished] = useState(false),
     [wrongOrderId, setWrongOrderId] = useState<string | null>(null),
+    [pendingPayments, setPendingPayments] = useState<
+      Record<string, PendingPayment>
+    >({}),
+    [paymentNotice, setPaymentNotice] = useState(""),
     [activeTab, setActiveTab] = useState<"queue" | "completed">("queue"),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
-  const rushDeck = useRef<Order[]>([]);
   const wrongActionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  // Real payments wait out the undo window here; the timers must outlive renders.
+  const pendingTimers = useRef(
+    new Map<
+      string,
+      { timer: ReturnType<typeof setTimeout>; tenderedCents: number }
+    >(),
+  );
+  const commandRef = useRef(command);
+  const resumeRef = useRef(resumeRealtime);
+  const simulatorRef = useRef(false);
+  useEffect(() => {
+    commandRef.current = command;
+    resumeRef.current = resumeRealtime;
+    simulatorRef.current = simulator;
+  });
   const sourceSnapshot = simulator
     ? (savedLiveSnapshot ?? liveSnapshot)
     : liveSnapshot;
@@ -913,9 +1031,44 @@ export function LiveOrders() {
     snapshot?.activeOrders
       .map((order) => `${order.id}:${order.status}`)
       .join("|") ?? "";
+  const hasPendingPayment = Object.keys(pendingPayments).length > 0;
+
+  // The control the spotlight is on right now. Everything else is locked out.
+  const guidedTarget =
+    !simulator || rushMode
+      ? null
+      : tourStep === 1
+        ? "accept-demo-order"
+        : tourStep === 2
+          ? "acknowledge-restriction"
+          : tourStep === 3
+            ? "mark-demo-ready"
+            : tourStep === 4
+              ? mistakeCountdown > 0
+                ? "undo-demo-payment"
+                : !payId
+                  ? "pay-demo-order"
+                  : selectedTenderCents === null
+                    ? mistakeSeen
+                      ? "tender-500"
+                      : "tender-200"
+                    : "confirm-demo-payment"
+              : null;
+  const guided = simulator && !rushMode && tourStep >= 1 && tourStep <= 5;
+  const progressStep = Math.min(tourStep, 5);
+  const rushElapsed = RUSH_LIMIT_SECONDS - rushRemaining;
+  const rushPassed =
+    rushFinished &&
+    evaluateRush({
+      paid: rushCompleted,
+      noShows: rushNoShows,
+      elapsedSeconds: rushElapsed,
+    });
 
   function startSimulator() {
-    if (!liveSnapshot) return;
+    if (!liveSnapshot || hasPendingPayment) return;
+    // Starting from a tap is the user gesture that lets the alarm sound play.
+    void enableAudio();
     setSavedLiveSnapshot(liveSnapshot);
     suspendRealtime();
     setSimulator(true);
@@ -925,6 +1078,8 @@ export function LiveOrders() {
     setTourStep(1);
     setRestrictionAcknowledgedIds(new Set());
     setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setMistakeExpired(false);
     setMistakeSeen(false);
     setSelectedTenderCents(null);
     setRushMode(false);
@@ -935,19 +1090,24 @@ export function LiveOrders() {
 
   function exitSimulator() {
     if (wrongActionTimer.current) clearTimeout(wrongActionTimer.current);
-    rushDeck.current = [];
     setSimulator(false);
+    setSavedLiveSnapshot(null);
     setDemoOrders([]);
     setDemoCompletedOrders([]);
     setPayId(null);
     setTourStep(0);
     setRestrictionAcknowledgedIds(new Set());
     setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setMistakeExpired(false);
     setMistakeSeen(false);
+    setAlarmFlash(false);
+    setHesitating(false);
     setSelectedTenderCents(null);
     setRushMode(false);
     setRushFinished(false);
     setWrongOrderId(null);
+    // Drop the ghost data first, then reconnect: init_data brings back the live queue.
     resumeRealtime();
   }
 
@@ -985,6 +1145,8 @@ export function LiveOrders() {
 
   function undoDemoMistake() {
     setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setMistakeExpired(false);
     setMistakeSeen(true);
     setSelectedTenderCents(null);
     setTourStep(4);
@@ -993,22 +1155,21 @@ export function LiveOrders() {
   function completeSimulatorPayment(orderId: string, tenderedCents: number) {
     const order = demoOrders.find((candidate) => candidate.id === orderId);
     if (!order) return;
-    if (
-      !rushMode &&
-      tourStep === 4 &&
-      !mistakeSeen &&
-      tenderedCents === 20000
-    ) {
-      setMistakeCountdown(5);
-      setSelectedTenderCents(null);
-      return;
+    if (!rushMode && tourStep === 4) {
+      if (!mistakeSeen && tenderedCents === 20000) {
+        // The trap: the customer actually handed over $500. Flash, sound the
+        // alarm and open the undo window on the ticket, exactly like a live till.
+        setPayId(null);
+        setSelectedTenderCents(null);
+        setMistakeOrderId(orderId);
+        setMistakeExpired(false);
+        setMistakeCountdown(UNDO_WINDOW_SECONDS);
+        setAlarmFlash(true);
+        chime("alarm");
+        return;
+      }
+      if (!mistakeSeen || tenderedCents !== 50000) return;
     }
-    if (
-      !rushMode &&
-      tourStep === 4 &&
-      (!mistakeSeen || tenderedCents !== 50000)
-    )
-      return;
     const completed = payDemoOrder(order, tenderedCents);
     setDemoOrders((orders) =>
       orders.filter((candidate) => candidate.id !== orderId),
@@ -1026,70 +1187,147 @@ export function LiveOrders() {
   }
 
   function startRushChallenge() {
-    const orders = createRushOrders();
-    rushDeck.current = orders.slice(1);
-    setDemoOrders([orders[0]]);
+    setDemoOrders(createRushOrders());
     setDemoCompletedOrders([]);
     setPayId(null);
     setRushCompleted(0);
     setRushResolved(0);
     setRushNoShows(0);
-    setRushSpawned(1);
-    setRushRemaining(60);
+    setRushRemaining(RUSH_LIMIT_SECONDS);
     setRushFinished(false);
     setRushMode(true);
     setRestrictionAcknowledgedIds(new Set());
+    setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setSelectedTenderCents(null);
     setActiveTab("queue");
     setActiveLane("review");
     setTourStep(7);
   }
 
+  /** Live cash: hold the emission for the undo window, then send pos_order_paid once. */
+  function queueLivePayment(orderId: string, tenderedCents: number) {
+    if (pendingTimers.current.has(orderId)) return;
+    const timer = setTimeout(
+      () => void settleLivePayment(orderId, tenderedCents),
+      UNDO_WINDOW_SECONDS * 1000,
+    );
+    pendingTimers.current.set(orderId, { timer, tenderedCents });
+    setPendingPayments((current) => ({
+      ...current,
+      [orderId]: {
+        tenderedCents,
+        deadline: Date.now() + UNDO_WINDOW_SECONDS * 1000,
+        settling: false,
+      },
+    }));
+    setPayId(null);
+  }
+
+  async function settleLivePayment(orderId: string, tenderedCents: number) {
+    pendingTimers.current.delete(orderId);
+    setPendingPayments((current) =>
+      current[orderId]
+        ? { ...current, [orderId]: { ...current[orderId], settling: true } }
+        : current,
+    );
+    try {
+      // The server broadcasts state before it acks, so by now the ticket has already left the lane.
+      const reply = await commandRef.current("pos_order_paid", {
+        orderId,
+        tenderedCents,
+      });
+      if (!reply.ok)
+        setPaymentNotice(
+          `No se registró el pago de ${mxn(tenderedCents)}: ${reply.error} El pedido sigue por cobrar; vuelve a cobrarlo cuando haya conexión.`,
+        );
+    } finally {
+      setPendingPayments(({ [orderId]: _settled, ...rest }) => rest);
+    }
+  }
+
+  function undoLivePayment(orderId: string) {
+    const entry = pendingTimers.current.get(orderId);
+    if (!entry) return; // Already sent: too late to cancel.
+    clearTimeout(entry.timer);
+    pendingTimers.current.delete(orderId);
+    setPendingPayments(({ [orderId]: _undone, ...rest }) => rest);
+  }
+
+  function pendingPaymentFor(orderId: string) {
+    if (simulator)
+      return mistakeCountdown > 0 && mistakeOrderId === orderId
+        ? { seconds: mistakeCountdown, cents: 20000 }
+        : null;
+    const entry = pendingPayments[orderId];
+    if (!entry) return null;
+    return {
+      seconds: entry.settling
+        ? 0
+        : Math.max(1, Math.ceil((entry.deadline - now) / 1000)),
+      cents: entry.tenderedCents,
+    };
+  }
+
+  /** Strict lockout: during the guided steps only the spotlighted control (and Exit/Sound) responds. */
   function handleGuidedClick(event: ReactMouseEvent<HTMLDivElement>) {
-    if (!simulator || rushMode) return;
+    if (!guided) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
+    const interactive = target.closest<HTMLElement>(INTERACTIVE);
+    if (!interactive || interactive.closest("[data-tour-allow]")) return;
     const actionElement = target.closest<HTMLElement>("[data-tour-action]");
-    if (!actionElement) return;
-    const action = actionElement.dataset.tourAction;
-    const expectedAction =
-      tourStep === 1
-        ? "accept"
-        : tourStep === 2
-          ? "acknowledge"
-          : tourStep === 3
-            ? "ready"
-            : tourStep === 4 && !payId
-              ? "pay"
-              : tourStep === 4 && mistakeCountdown > 0
-                ? "undo"
-                : tourStep === 4 && selectedTenderCents === null
-                  ? "cash-preset"
-                  : tourStep === 4 && selectedTenderCents !== null
-                    ? "confirm"
-                    : null;
-    const tenderCents = Number(actionElement.dataset.tourCents);
     const wrongTender =
-      action === "cash-preset" &&
-      tourStep === 4 &&
-      tenderCents !== (mistakeSeen ? 50000 : 20000);
-    if (action === expectedAction && !wrongTender) return;
+      actionElement?.dataset.tourAction === "cash-preset" &&
+      Number(actionElement.dataset.tourCents) !== (mistakeSeen ? 50000 : 20000);
+    if (
+      actionElement &&
+      !wrongTender &&
+      guidedTarget &&
+      actionElement.dataset.tourAction === TOUR_ACTIONS[guidedTarget]
+    )
+      return;
     event.preventDefault();
     event.stopPropagation();
-    const card = actionElement.closest<HTMLElement>("[data-order-id]");
+    const card = interactive.closest<HTMLElement>("[data-order-id]");
     if (card?.dataset.orderId) setWrongOrderId(card.dataset.orderId);
     if ("vibrate" in navigator) navigator.vibrate(35);
     if (wrongActionTimer.current) clearTimeout(wrongActionTimer.current);
     wrongActionTimer.current = setTimeout(() => setWrongOrderId(null), 300);
   }
 
+  // Mistake window: if «Deshacer» is not tapped in time the payment would have
+  // been recorded on a real till, so the step fails and starts over.
   useEffect(() => {
     if (!simulator || mistakeCountdown <= 0) return;
     const timer = setTimeout(() => {
-      if (mistakeCountdown === 1) undoDemoMistake();
-      else setMistakeCountdown((seconds) => seconds - 1);
+      if (mistakeCountdown > 1) {
+        setMistakeCountdown(mistakeCountdown - 1);
+        return;
+      }
+      setMistakeCountdown(0);
+      setMistakeOrderId(null);
+      setMistakeExpired(true);
+      setSelectedTenderCents(null);
+      setAlarmFlash(true);
+      chime("alarm");
     }, 1000);
     return () => clearTimeout(timer);
   }, [simulator, mistakeCountdown]);
+
+  useEffect(() => {
+    if (!alarmFlash) return;
+    const timer = setTimeout(() => setAlarmFlash(false), 700);
+    return () => clearTimeout(timer);
+  }, [alarmFlash]);
+
+  // Hesitation: still on the same spotlight after 5 s → pulse it.
+  useEffect(() => {
+    setHesitating(false);
+    if (!guidedTarget) return;
+    const timer = setTimeout(() => setHesitating(true), HESITATION_MS);
+    return () => clearTimeout(timer);
+  }, [guidedTarget]);
 
   useEffect(() => {
     if (!rushMode || rushRemaining <= 0) return;
@@ -1101,60 +1339,47 @@ export function LiveOrders() {
   }, [rushMode, rushRemaining]);
 
   useEffect(() => {
-    if (!rushMode) return;
-    const timer = setInterval(() => {
-      const next = rushDeck.current.shift();
-      if (!next) {
-        clearInterval(timer);
-        return;
-      }
-      setDemoOrders((orders) => [...orders, next]);
-      setRushSpawned((count) => count + 1);
-    }, 2000);
-    return () => clearInterval(timer);
-  }, [rushMode]);
-
-  useEffect(() => {
-    if (rushMode && rushRemaining === 0) {
+    if (
+      rushMode &&
+      (rushRemaining === 0 || rushResolved >= RUSH_TICKET_COUNT)
+    ) {
       setRushMode(false);
       setRushFinished(true);
     }
-  }, [rushMode, rushRemaining]);
+  }, [rushMode, rushRemaining, rushResolved]);
 
   useEffect(() => {
-    if (rushMode && rushResolved >= 5) {
-      setRushMode(false);
-      setRushFinished(true);
-    }
-  }, [rushMode, rushResolved]);
+    if (!rushPassed) return;
+    chime("ready");
+    return burstConfetti();
+  }, [rushPassed]);
 
-  useEffect(
-    () => () => {
+  // A confirmed real payment must not vanish silently if the tab is closed mid-window.
+  useEffect(() => {
+    if (!hasPendingPayment) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasPendingPayment]);
+
+  useEffect(() => {
+    const timers = pendingTimers.current;
+    return () => {
       if (wrongActionTimer.current) clearTimeout(wrongActionTimer.current);
-      rushDeck.current = [];
-    },
-    [],
-  );
+      // Leaving the page flushes confirmed payments instead of dropping them.
+      for (const [orderId, entry] of timers) {
+        clearTimeout(entry.timer);
+        void commandRef.current("pos_order_paid", {
+          orderId,
+          tenderedCents: entry.tenderedCents,
+        });
+      }
+      timers.clear();
+      // Never leave realtime suspended behind an unmounted simulator.
+      if (simulatorRef.current) resumeRef.current();
+    };
+  }, []);
 
-  const guidedTarget =
-    tourStep === 1
-      ? "accept-demo-order"
-      : tourStep === 2
-        ? "acknowledge-restriction"
-        : tourStep === 3
-          ? "mark-demo-ready"
-          : tourStep === 4 && !payId
-            ? "pay-demo-order"
-            : tourStep === 4 && mistakeCountdown > 0
-              ? "undo-demo-payment"
-              : tourStep === 4 && selectedTenderCents === null
-                ? mistakeSeen
-                  ? "tender-500"
-                  : "tender-200"
-                : tourStep === 4 && selectedTenderCents !== null
-                  ? "confirm-demo-payment"
-                  : null;
-  const progressStep = Math.min(tourStep, 5);
   const trainingMessage =
     tourStep === 1
       ? "¡Nuevo pedido! Toca «Aceptar» para avisar que empezamos a cocinar."
@@ -1162,23 +1387,29 @@ export function LiveOrders() {
         ? "Lee el modificador rojo y toca «SIN QUESO» para confirmar que viste la restricción."
         : tourStep === 3
           ? "Restricción revisada. Cuando termines de cocinar, marca el pedido como listo."
-          : tourStep === 4 && mistakeCountdown > 0
-            ? `¡Espera! El cliente te dio $500, no $200. Deshaz el pago simulado en ${mistakeCountdown} segundos; si no, se cancela solo.`
-            : tourStep === 4 && selectedTenderCents !== null
-              ? mistakeSeen
-                ? "Corrección lista. El cliente entregó $500. Confirma el efectivo de práctica."
-                : "Ahora confirma el pago de práctica. Enseguida corregiremos el error simulado."
-              : tourStep === 4 && mistakeSeen
-                ? "Corrección lista. El cliente entregó $500. Selecciona ese billete."
-                : tourStep === 4
-                  ? "El cliente entrega $200. Selecciona ese billete para practicar la corrección segura."
-                  : tourStep === 5
-                    ? "¡Excelente, estás listo! La práctica terminó sin tocar la caja real."
-                    : rushMode
-                      ? `Reto almuerzo · ${rushSpawned}/5 comandas · ${rushResolved}/5 resueltas · ${rushRemaining}s restantes.`
-                      : "";
+          : tourStep === 4
+            ? guidedTarget === "undo-demo-payment"
+              ? "¡Espera! El cliente te dio $500, no $200. Toca «Deshacer» antes de que termine la cuenta."
+              : guidedTarget === "pay-demo-order"
+                ? mistakeExpired
+                  ? "Se acabó el tiempo: en la caja real ese pago ya se habría registrado con el monto equivocado. Inténtalo de nuevo: toca «Cobrar al entregar»."
+                  : mistakeSeen
+                    ? "Corrección lista. El cliente entregó $500: toca «Cobrar al entregar» y cóbrale con ese billete."
+                    : "El cliente paga con un billete de $200. Toca «Cobrar al entregar»."
+                : guidedTarget === "confirm-demo-payment"
+                  ? mistakeSeen
+                    ? "El cliente entregó $500. Confirma el efectivo de práctica."
+                    : "Confirma el pago de práctica."
+                  : mistakeSeen
+                    ? "El cliente entregó $500. Selecciona ese billete."
+                    : "El cliente entrega $200. Selecciona ese billete."
+            : tourStep === 5
+              ? "¡Excelente, estás listo! La práctica terminó sin tocar la caja real."
+              : rushMode
+                ? `Reto almuerzo · ${rushResolved}/${RUSH_TICKET_COUNT} resueltas · ${rushRemaining}s restantes.`
+                : "";
   useLayoutEffect(() => {
-    if (!simulator || rushMode || !guidedTarget) return;
+    if (!guidedTarget) return;
     let frame = 0;
     const position = () => {
       cancelAnimationFrame(frame);
@@ -1207,7 +1438,7 @@ export function LiveOrders() {
       window.removeEventListener("resize", position);
       window.removeEventListener("scroll", position, true);
     };
-  }, [simulator, rushMode, guidedTarget, tourStep, payId, mistakeCountdown]);
+  }, [guidedTarget, tourStep, payId, mistakeCountdown]);
 
   useEffect(() => {
     if (!liveSnapshot) return;
@@ -1367,7 +1598,7 @@ export function LiveOrders() {
   };
   return (
     <div
-      className={`min-h-screen ${simulator ? "border-8 border-dashed border-yellow-400" : ""}`}
+      className={`min-h-screen ${simulator ? "border-8 border-dashed border-yellow-400" : ""} ${hesitating ? "tour-hesitating" : ""}`}
       onClickCapture={handleGuidedClick}
       style={
         simulator
@@ -1386,11 +1617,11 @@ export function LiveOrders() {
           />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <span>
-              MODO DE ENTRENAMIENTO — Las ventas no se registran ni se envían
-              pedidos.
+              MODO DE PRUEBA — Las ventas no se registran ni se envían pedidos.
             </span>
             <button
               className="btn border-stone-950 bg-stone-950 text-white hover:bg-stone-800"
+              data-tour-allow="exit"
               onClick={exitSimulator}
             >
               Salir del simulador
@@ -1400,19 +1631,20 @@ export function LiveOrders() {
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <span>
                 {rushFinished
-                  ? `¡Reto terminado! ${rushResolved}/5 resueltos · ${rushCompleted} cobrados · ${rushNoShows} No-Show · ${60 - rushRemaining}s.`
+                  ? `Reto terminado · ${rushResolved}/${RUSH_TICKET_COUNT} resueltos · ${rushCompleted} cobrados · ${rushNoShows} No-Show · ${rushElapsed}s.`
                   : trainingMessage}
               </span>
               {!rushMode && (
                 <button
                   className="btn min-h-10 border-stone-950 bg-white px-3 py-2 text-sm text-stone-950"
+                  data-tour-allow="rush"
                   onClick={startRushChallenge}
                 >
-                  Repetir reto de 60 segundos
+                  Repetir reto de {RUSH_LIMIT_SECONDS} segundos
                 </button>
               )}
             </div>
-          ) : tourStep > 0 ? (
+          ) : guided ? (
             <div>
               <div className="mb-1 flex justify-between text-xs">
                 <span>Paso {progressStep} de 5 · Guía interactiva</span>
@@ -1435,7 +1667,7 @@ export function LiveOrders() {
           ) : null}
         </div>
       )}
-      <StaffHeader page="pos">
+      <StaffHeader page="pos" lockDisabled={hasPendingPayment}>
         {!simulator && (
           <>
             <button className="btn" onClick={() => setInventory(true)}>
@@ -1493,6 +1725,21 @@ export function LiveOrders() {
         </nav>
       )}
       <main className="mx-auto max-w-[1600px] px-5 py-8 lg:px-8">
+        {paymentNotice && (
+          <div
+            role="alert"
+            className="mb-5 flex items-start justify-between gap-3 rounded-xl border-2 border-red-700 bg-red-50 p-4 font-semibold text-red-900"
+          >
+            <span>{paymentNotice}</span>
+            <button
+              className="btn shrink-0"
+              data-tour-allow="notice"
+              onClick={() => setPaymentNotice("")}
+            >
+              Entendido
+            </button>
+          </div>
+        )}
         <div className="mb-6 flex flex-wrap items-end justify-between gap-5">
           <div>
             <p className="eyebrow mb-2">Un buen turno empieza aquí</p>
@@ -1510,7 +1757,12 @@ export function LiveOrders() {
               <button
                 className="btn border-yellow-600 bg-yellow-50 font-bold text-stone-900 hover:bg-yellow-100"
                 onClick={startSimulator}
-                title="Practica el flujo de cocina y caja sin cambiar los datos reales"
+                disabled={hasPendingPayment}
+                title={
+                  hasPendingPayment
+                    ? "Espera a que se registre el pago en curso"
+                    : "Practica el flujo de cocina y caja sin cambiar los datos reales"
+                }
               >
                 <GraduationCap size={16} />
                 Guía interactiva
@@ -1539,9 +1791,10 @@ export function LiveOrders() {
             {simulator && !rushMode && tourStep === 5 && (
               <button
                 className="btn border-clay-700 bg-clay-50 font-bold text-clay-950 hover:bg-clay-100"
+                data-tour-allow="rush"
                 onClick={startRushChallenge}
               >
-                Reto almuerzo · 60 segundos
+                Reto almuerzo · {RUSH_LIMIT_SECONDS} segundos
               </button>
             )}
             <AudioUnlockButton />
@@ -1691,42 +1944,75 @@ export function LiveOrders() {
                       </div>
                       <p className="mt-2 text-xs text-stone-500">{lane.note}</p>
                     </header>
-                    <div className="space-y-3">
-                      {orders.map((order) => (
-                        <TicketCard
-                          key={order.id}
-                          order={order}
-                          now={now}
-                          simulator={simulator}
-                          highlighted={
-                            simulator &&
-                            ((tourStep === 1 && order.status === "review") ||
-                              (tourStep === 2 && order.status === "cooking") ||
-                              (tourStep === 3 && order.status === "ready"))
-                          }
-                          errorShake={wrongOrderId === order.id}
-                          coachTarget={guidedTarget ?? undefined}
-                          onSimulatorAdvance={advanceSimulatorOrder}
-                          onSimulatorNoShow={markSimulatorNoShow}
-                          restrictionAcknowledged={restrictionAcknowledgedIds.has(
-                            order.id,
-                          )}
-                          onAcknowledgeRestriction={() =>
-                            acknowledgeDemoRestriction(order.id)
-                          }
-                          onPay={() => {
-                            setPayId(order.id);
-                            if (simulator) setTourStep(4);
-                          }}
+                    <ErrorBoundary
+                      resetKeys={[snapshot.revision]}
+                      fallback={({ retry }) => (
+                        <DataErrorFallback
+                          title={`Error de datos en «${lane.title}»`}
+                          retry={retry}
                         />
-                      ))}
-                      {!simulator && !connected && <TicketSkeleton />}
-                      {!orders.length && (simulator || connected) && (
-                        <EmptyState>
-                          Sin pedidos {lane.title.toLowerCase()}
-                        </EmptyState>
                       )}
-                    </div>
+                    >
+                      <div className="space-y-3">
+                        {orders.map((order) => {
+                          const pendingPayment = pendingPaymentFor(order.id);
+                          return (
+                            <ErrorBoundary
+                              key={order.id}
+                              resetKeys={[snapshot.revision]}
+                              fallback={({ retry }) => (
+                                <DataErrorFallback
+                                  title="Error de datos"
+                                  retry={retry}
+                                />
+                              )}
+                            >
+                              <TicketCard
+                                order={order}
+                                now={now}
+                                simulator={simulator}
+                                highlighted={
+                                  simulator &&
+                                  ((tourStep === 1 &&
+                                    order.status === "review") ||
+                                    (tourStep === 2 &&
+                                      order.status === "cooking") ||
+                                    (tourStep === 3 &&
+                                      order.status === "ready"))
+                                }
+                                errorShake={wrongOrderId === order.id}
+                                coachTarget={guidedTarget ?? undefined}
+                                onSimulatorAdvance={advanceSimulatorOrder}
+                                onSimulatorNoShow={markSimulatorNoShow}
+                                restrictionAcknowledged={restrictionAcknowledgedIds.has(
+                                  order.id,
+                                )}
+                                onAcknowledgeRestriction={() =>
+                                  acknowledgeDemoRestriction(order.id)
+                                }
+                                pendingSeconds={pendingPayment?.seconds}
+                                pendingCents={pendingPayment?.cents}
+                                onUndoPayment={() =>
+                                  simulator
+                                    ? undoDemoMistake()
+                                    : undoLivePayment(order.id)
+                                }
+                                onPay={() => {
+                                  setPayId(order.id);
+                                  if (simulator) setTourStep(4);
+                                }}
+                              />
+                            </ErrorBoundary>
+                          );
+                        })}
+                        {!simulator && !connected && <TicketSkeleton />}
+                        {!orders.length && (simulator || connected) && (
+                          <EmptyState>
+                            Sin pedidos {lane.title.toLowerCase()}
+                          </EmptyState>
+                        )}
+                      </div>
+                    </ErrorBoundary>
                   </section>
                 );
               })}
@@ -1754,15 +2040,67 @@ export function LiveOrders() {
             }
           }}
           simulator={simulator}
+          guidedTarget={guidedTarget}
           onExitSimulator={exitSimulator}
           trainingMessage={simulator ? trainingMessage : undefined}
-          mistakeCountdown={mistakeCountdown}
-          onSimulatorUndo={undoDemoMistake}
           onSimulatorTenderSelected={setSelectedTenderCents}
-          onSimulatorPayment={completeSimulatorPayment}
+          onConfirm={simulator ? completeSimulatorPayment : queueLivePayment}
         />
       )}
-      {simulator && tourStep > 0 && (
+      {alarmFlash && (
+        <div
+          className="animate-alarm-flash pointer-events-none fixed inset-0 z-[90] bg-red-600/60 motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      )}
+      {simulator && rushFinished && (
+        <>
+          <div
+            className="fixed inset-0 z-[75] bg-black/50 backdrop-blur-sm"
+            aria-hidden="true"
+          />
+          <section
+            className="fixed inset-x-4 top-1/2 z-[80] mx-auto max-w-md -translate-y-1/2 rounded-3xl border-4 border-yellow-400 bg-white p-6 text-center text-stone-950 shadow-2xl"
+            role="alertdialog"
+            aria-labelledby="rush-result-title"
+            aria-describedby="rush-result-detail"
+          >
+            <Trophy
+              className={`mx-auto ${rushPassed ? "text-emerald-700" : "text-clay-700"}`}
+              size={48}
+              aria-hidden="true"
+            />
+            <h2
+              id="rush-result-title"
+              className={`display mt-3 text-3xl ${rushPassed ? "text-emerald-800" : "text-clay-800"}`}
+            >
+              {rushPassed ? "¡Velocidad de Taquero Experto!" : "Casi lo logras"}
+            </h2>
+            <p id="rush-result-detail" className="mt-2 font-semibold">
+              {rushPassed
+                ? `Cobraste las ${RUSH_TICKET_COUNT} comandas en ${rushElapsed} segundos.`
+                : `${rushCompleted} de ${RUSH_TICKET_COUNT} comandas cobradas en ${rushElapsed} segundos. Inténtalo otra vez: cada ronda te sale más rápido.`}
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <button
+                className="btn btn-primary flex-1"
+                data-tour-allow="rush"
+                onClick={startRushChallenge}
+              >
+                {rushPassed ? "Repetir reto" : "Intentar de nuevo"}
+              </button>
+              <button
+                className="btn flex-1"
+                data-tour-allow="exit"
+                onClick={exitSimulator}
+              >
+                Volver al turno real
+              </button>
+            </div>
+          </section>
+        </>
+      )}
+      {guided && (
         <>
           <div
             className="pointer-events-none fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
@@ -1770,7 +2108,7 @@ export function LiveOrders() {
           />
           {!payId && guidedTarget && (
             <aside
-              className="pointer-events-none fixed z-[60] max-w-sm rounded-2xl border-2 border-yellow-400 bg-white p-5 text-stone-950 shadow-2xl"
+              className="pointer-events-none fixed z-[60] max-w-sm rounded-2xl border-2 border-yellow-400 bg-white p-5 text-stone-950 shadow-2xl motion-safe:animate-bounce"
               style={coachPosition}
               role="status"
               aria-live="polite"
@@ -1797,6 +2135,7 @@ export function LiveOrders() {
               </p>
               <button
                 className="btn btn-primary pointer-events-auto mt-4 w-full"
+                data-tour-allow="exit"
                 onClick={exitSimulator}
               >
                 Finalizar guía y volver al turno real

@@ -10,3 +10,5 @@ apps/*/dist-realtime/
 .masaflow-realtime/
 playwright-report/
 test-results/
+
+logs/

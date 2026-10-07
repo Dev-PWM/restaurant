@@ -1,0 +1,31 @@
+# Secret scanning for MasaFlow. Run with: npm run scan:secrets (needs the gitleaks CLI).
+title = "MasaFlow"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "masaflow-staff-pin"
+description = "A real staff PIN assigned in a tracked file"
+regex = '''(?i)MASAFLOW_STAFF_PIN\s*[=:]\s*["']?\d{4}["']?'''
+tags = ["masaflow", "pin"]
+[rules.allowlist]
+description = "The example file, docs and tests intentionally show a sample value"
+paths = ['''^\.env\.example$''', '''^docs/''', '''^README\.md$''', '''^tests/''']
+
+[[rules]]
+id = "masaflow-admin-password-hash"
+description = "Admin UI password hash committed to the repository"
+regex = '''MASAFLOW_ADMIN_PASSWORD_HASH\s*=\s*["']?\$2[abxy]\$\d{2}\$[./A-Za-z0-9]{53}'''
+tags = ["masaflow", "bcrypt"]
+[rules.allowlist]
+paths = ['''^docs/''', '''^tests/''']
+
+[allowlist]
+description = "Generated files and lockfiles"
+paths = [
+  '''package-lock\.json$''',
+  '''bun\.lock$''',
+  '''(^|/)node_modules/''',
+  '''(^|/)dist(-realtime)?/''',
+]

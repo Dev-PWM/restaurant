@@ -122,6 +122,29 @@
       background-position: 34px 0;
     }
   }
+  @keyframes masaflow-tour-pulse {
+    50% {
+      transform: scale(1.04);
+      box-shadow: 0 0 0 10px rgb(250 204 21 / 0.55);
+    }
+  }
+  @keyframes masaflow-alarm-flash {
+    0%,
+    100% {
+      opacity: 0;
+    }
+    30%,
+    70% {
+      opacity: 1;
+    }
+  }
+  /* Only the currently spotlighted control carries data-tour-target. */
+  .tour-hesitating [data-tour-target] {
+    animation: masaflow-tour-pulse 900ms ease-in-out infinite;
+  }
+  .animate-alarm-flash {
+    animation: masaflow-alarm-flash 700ms ease-in-out 1;
+  }
   .animate-bump {
     animation: masaflow-bump 200ms ease-out;
   }
@@ -141,7 +164,8 @@
     animation: masaflow-hazard-stripes 700ms linear infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .simulator-hazard-stripes {
+    .simulator-hazard-stripes,
+    .tour-hesitating [data-tour-target] {
       animation: none;
     }
   }

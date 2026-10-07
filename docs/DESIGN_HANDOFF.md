@@ -339,7 +339,7 @@ Hooks listed here are relied on by tests and other screens; keep them.
 | Menu font `{{font}}` | Outfit, with sans headings | Unfilled template variable in the export |
 | Customizer without a masa choice, notes or quantity | Adds Choose Your Masa (required), Special Instructions, quantity | The order engine requires a masa, and the kitchen needs notes |
 | Chart ellipsis menus | Removed | Nothing behind them |
-| Simulated incoming orders / status changes | Removed; real updates arrive over Server-Sent Events | No simulation code |
+| Simulated incoming orders / status changes | Live updates arrive over Socket.io. The only simulated data is the opt-in «Guía interactiva» training mode in `apps/business-pos/src/simulator.js`, which suspends the realtime connection, works on local ghost orders and never emits a command | No simulation code reaches the live queue or ledger |
 | Emoji in labels ("💾", "↩️", "🔴") | Icons or plain text | Consistent tone; screen readers |
 
 ## 10. Working on it

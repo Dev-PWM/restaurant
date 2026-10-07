@@ -6,6 +6,8 @@ const path = require("node:path");
 const crypto = require("node:crypto");
 const { isIP } = require("node:net");
 const { Server } = require("socket.io");
+const { instrument } = require("@socket.io/admin-ui");
+const { createLogger, createSilentLogger } = require("./shared/logger.js");
 const realtime = require("./shared/realtime/engine.js");
 const { createEngine, UUID } = realtime;
 /** @type {typeof import("./shared/realtime/engine.js").ensure} */
@@ -27,8 +29,20 @@ function clientAddress(peer, forwarded) {
   const address = forwarded.split(",").at(-1)?.trim() || "";
   return isIP(address) ? address : peer;
 }
-/** @param {{dataDirectory?: string, pin?: string, sessionMs?: number}} [options] */
+const LOOPBACK = ["127.0.0.1", "::1", "::ffff:127.0.0.1"];
+/** Logging is observability only; it must never change the outcome of a command already applied. */
+const quietly = (/** @type {() => void} */ write) => {
+  try {
+    write();
+  } catch {
+    // The log stream reports its own failures on stderr.
+  }
+};
+/** @param {{dataDirectory?: string, pin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string}} [options] */
 async function createService(options = {}) {
+  const log = (options.logger ?? createSilentLogger()).child({
+    component: "server",
+  });
   const dataDirectory =
     options.dataDirectory ||
     process.env.MASAFLOW_DATA_DIR ||
@@ -46,8 +60,9 @@ async function createService(options = {}) {
   try {
     const engine = createEngine({ directory: dataDirectory });
     if (engine.menuBackup)
-      console.log(
-        `Menú actualizado a Los Huaraches de Zapata. Copia del libro anterior: ${engine.menuBackup}`,
+      log.info(
+        { backup: engine.menuBackup },
+        "Menú actualizado a Los Huaraches de Zapata",
       );
     const app = express();
     app.disable("x-powered-by");
@@ -117,7 +132,6 @@ async function createService(options = {}) {
       for (const socket of io.sockets.sockets.values()) {
         socket.emit("state_updated", snapshot(socket, s));
         if (staff(socket)) socket.emit("metrics_updated", s.salesMetrics);
-
       }
       if (event === "admin_toggle_stock")
         io.emit("menu_updated", {
@@ -144,10 +158,24 @@ async function createService(options = {}) {
         };
         next();
       } catch (error) {
+        log.warn(
+          {
+            address: clientAddress(
+              socket.handshake.address,
+              socket.handshake.headers["x-forwarded-for"],
+            ),
+            reason: error instanceof Error ? error.message : "unknown",
+          },
+          "socket rejected",
+        );
         next(error instanceof Error ? error : new Error("Sesión inválida."));
       }
     });
     io.on("connection", (socket) => {
+      log.debug({ socket: socket.id }, "socket connected");
+      socket.on("disconnect", (reason) =>
+        log.debug({ socket: socket.id, reason }, "socket disconnected"),
+      );
       socket.emit("init_data", snapshot(socket));
       socket.on("request_init", (ack) => {
         try {
@@ -177,6 +205,7 @@ async function createService(options = {}) {
             );
           if (!correct) {
             limit(key, 8, 15 * 60000);
+            log.warn({ socket: socket.id, key }, "staff login failed");
             ensure(false, "PIN incorrecto.", "INVALID_PIN");
           }
           limits.delete(key);
@@ -187,6 +216,7 @@ async function createService(options = {}) {
           socket.data.token = crypto.randomBytes(32).toString("base64url");
           sessions.set(socket.data.token, Date.now() + sessionMs);
           socket.emit("init_data", snapshot(socket));
+          log.info({ socket: socket.id }, "staff login");
           ack({ ok: true, token: socket.data.token });
         } catch (error) {
           ack(failure(error));
@@ -249,14 +279,49 @@ async function createService(options = {}) {
               }
               const result = engine.dispatch(event, input);
               broadcast(event);
+              // Reply first: nothing about logging may change what the cashier sees.
               ack(result);
+              quietly(() =>
+                log.info(
+                  {
+                    event,
+                    socket: socket.id,
+                    orderId:
+                      result.ok && result.orderId
+                        ? result.orderId
+                        : input && "orderId" in input
+                          ? input.orderId
+                          : undefined,
+                    bytes: Buffer.byteLength(JSON.stringify(input) ?? ""),
+                  },
+                  "command applied",
+                ),
+              );
             } catch (error) {
-              ack(failure(error));
+              const reply = failure(error);
+              ack(reply);
+              if (!reply.ok)
+                quietly(() => {
+                  const persistence = reply.code === "PERSISTENCE_FAILED";
+                  log[persistence ? "error" : "warn"](
+                    {
+                      event,
+                      socket: socket.id,
+                      code: reply.code,
+                      reason: reply.error,
+                      err: persistence ? error : undefined,
+                    },
+                    "command rejected",
+                  );
+                });
             }
           },
         );
     });
     const expiry = setInterval(() => {
+      const at = Date.now();
+      for (const [token, until] of sessions)
+        if (until <= at) sessions.delete(token);
       for (const socket of io.sockets.sockets.values())
         if (socket.data.token && !staff(socket)) {
           socket.data.token = "";
@@ -265,6 +330,67 @@ async function createService(options = {}) {
         }
     }, 10000);
     expiry.unref();
+    const adminHash =
+      options.adminPasswordHash ??
+      process.env.MASAFLOW_ADMIN_PASSWORD_HASH ??
+      "";
+    if (adminHash) {
+      ensure(
+        /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminHash),
+        "MASAFLOW_ADMIN_PASSWORD_HASH debe ser un hash bcrypt. Genera uno con npm run admin:hash.",
+      );
+      /** @param {string} peer @param {string | string[] | undefined} forwarded */
+      const local = (peer, forwarded) =>
+        LOOPBACK.includes(clientAddress(peer, forwarded));
+      // Registered before instrument(), so this runs ahead of the Admin UI's own password check
+      // (a bcrypt compare on the main thread), and caps how often anyone can trigger it.
+      io.of("/admin").use((socket, next) => {
+        const forwarded = socket.handshake.headers["x-forwarded-for"];
+        if (!local(socket.handshake.address, forwarded))
+          return next(new Error("Solo disponible desde este equipo."));
+        try {
+          limit(
+            `admin:${clientAddress(socket.handshake.address, forwarded)}`,
+            20,
+            60000,
+          );
+          next();
+        } catch (error) {
+          next(
+            error instanceof Error ? error : new Error("Intenta más tarde."),
+          );
+        }
+      });
+      instrument(io, {
+        auth: { type: "basic", username: "admin", password: adminHash },
+        namespaceName: "/admin",
+        readonly: true,
+        // "development" would stream every socket's data (including the staff token)
+        // and the arguments of every event (including the PIN in staff_login) to the
+        // dashboard. Production mode shows connections, transports and aggregated
+        // event counts only; per-command payload sizes are in the log instead.
+        mode: "production",
+        serverId: "masaflow",
+      });
+      app.use(
+        "/admin-ui",
+        (req, res, next) =>
+          local(req.socket.remoteAddress ?? "", req.headers["x-forwarded-for"])
+            ? next()
+            : res.status(403).send("Solo disponible desde este equipo."),
+        express.static(
+          path.join(
+            path.dirname(require.resolve("@socket.io/admin-ui")),
+            "..",
+            "ui",
+            "dist",
+          ),
+        ),
+      );
+      log.warn(
+        "Socket.io Admin UI habilitada en /admin-ui/ (solo este equipo, solo lectura)",
+      );
+    }
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
@@ -273,7 +399,9 @@ async function createService(options = {}) {
       res.sendFile(path.join(__dirname, "assets", "manifest.webmanifest")),
     );
     app.get("/sw.js", (_req, res) =>
-      res.type("text/javascript").sendFile(path.join(__dirname, "assets", "sw.js")),
+      res
+        .type("text/javascript")
+        .sendFile(path.join(__dirname, "assets", "sw.js")),
     );
     app.get("/", (_req, res) => res.redirect("/order/"));
     for (const [route, workspace] of [
@@ -300,6 +428,7 @@ async function createService(options = {}) {
       close: () => {
         if (!closing)
           closing = new Promise((resolve, reject) => {
+            log.info("shutting down");
             clearInterval(expiry);
             io.close(() => {
               release().then(() => resolve(undefined), reject);
@@ -332,7 +461,15 @@ if (require.main === module) {
     if (/** @type {NodeJS.ErrnoException} */ (error).code !== "ENOENT")
       throw error;
   }
-  createService()
+  const logger = createLogger({
+    directory: process.env.MASAFLOW_LOG_DIR || path.join(__dirname, "logs"),
+  });
+  // A crash leaves its last words in logs/server_YYYY-MM-DD.log for the post-mortem.
+  process.on("uncaughtException", (error) => {
+    logger.fatal({ err: error }, "uncaughtException");
+    process.exit(1);
+  });
+  createService({ logger })
     .then((service) => {
       const stop = () => {
         void service.close();
@@ -341,7 +478,7 @@ if (require.main === module) {
       process.once("SIGTERM", stop);
       process.once("SIGHUP", stop);
       service.server.once("error", async (error) => {
-        console.error(error.message);
+        logger.error({ err: error }, "server error");
         await service.close();
         process.exitCode = 1;
       });
@@ -350,17 +487,15 @@ if (require.main === module) {
           ? process.env.PORT
           : 3000,
       );
-      service.server.listen(
-        port,
-        process.env.MASAFLOW_HOST || "0.0.0.0",
-        () =>
-          console.log(
-            `MasaFlow · http://localhost:${port}/pos/`,
-          ),
+      service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () =>
+        logger.info(
+          { port, url: `http://localhost:${port}/pos/` },
+          "MasaFlow listo",
+        ),
       );
     })
     .catch((error) => {
-      console.error(error.message);
+      logger.fatal({ err: error }, "no se pudo iniciar MasaFlow");
       process.exitCode = 1;
     });
 }

@@ -77,6 +77,9 @@ Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before r
 | Ledger and durable mutations | `shared/realtime/engine.js` |
 | Menu catalog (the printed "Los Huaraches de Zapata" menu) | `shared/realtime/catalog.js` |
 | Express, Socket.io, staff authorization | `server.js` |
+| Structured logging (pino, daily files) | `shared/logger.js` |
+| Training simulator and exam grading | `apps/business-pos/src/simulator.js` |
+| Load tests, ReDoS scan, Semgrep and Gitleaks config | `scripts/loadtest.cjs`, `artillery/`, `scripts/scan-regex.cjs`, `.semgrep/`, `.gitleaks.toml` |
 | Connection context and shared UI | `shared/ui/` |
 | Customer React app | `apps/client-web/src/` |
 | POS React app | `apps/business-pos/src/` |
@@ -91,5 +94,7 @@ npm test
 npm run test:realtime
 npm run build
 ```
+
+Logs, the Admin UI, load tests and security scans are covered in [docs/OPERATIONS_AND_SECURITY.md](docs/OPERATIONS_AND_SECURITY.md).
 
 See [docs/REALTIME_ARCHITECTURE.md](docs/REALTIME_ARCHITECTURE.md) for lifecycle, cash recognition, security, persistence, chart semantics, performance limits and test boundaries.

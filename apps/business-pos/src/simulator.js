@@ -4,6 +4,13 @@
  * @typedef {import("../../../shared/types/realtime").Order} Order
  */
 
+/** Seconds a cashier can still tap «Deshacer» after confirming a payment. */
+export const UNDO_WINDOW_SECONDS = 5;
+/** Idle time on a spotlighted control before it starts pulsing. */
+export const HESITATION_MS = 5000;
+export const RUSH_TICKET_COUNT = 5;
+export const RUSH_LIMIT_SECONDS = 60;
+
 /**
  * @param {Date} [now]
  * @param {{number?: number, id?: string}} [options]
@@ -115,7 +122,7 @@ export function payDemoOrder(order, tenderedCents, now = new Date()) {
  * @returns {Order[]}
  */
 export function createRushOrders(now = new Date()) {
-  return Array.from({ length: 5 }, (_, index) =>
+  return Array.from({ length: RUSH_TICKET_COUNT }, (_, index) =>
     createDemoOrder(now, {
       number: index + 1,
       id: `rush-order-${String(index + 1).padStart(3, "0")}`,
@@ -128,4 +135,20 @@ export function markDemoNoShow(order) {
   if (order.status !== "review" && order.status !== "ready")
     throw new Error(`Cannot mark demo order ${order.status} as a no-show.`);
   return { ...order, status: "no_show" };
+}
+
+/**
+ * Decides whether a Lunch Rush attempt earns the «Velocidad de Taquero Experto» badge.
+ *
+ * Grading policy (decided with the owner): every ticket must be *paid*, so the exam
+ * proves the full Aceptar → Lista → Cobrar workflow, inside the time limit. A No-Show
+ * ends the rush early but never counts toward passing, and finishing at exactly the
+ * time limit still passes.
+ *
+ * @param {{paid: number, noShows: number, elapsedSeconds: number}} result
+ * @returns {boolean}
+ */
+export function evaluateRush({ paid, noShows, elapsedSeconds }) {
+  void noShows;
+  return paid >= RUSH_TICKET_COUNT && elapsedSeconds <= RUSH_LIMIT_SECONDS;
 }
