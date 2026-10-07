@@ -20,9 +20,9 @@ const input = (engine, extra = {}) => ({
   customerName: "Ana",
   items: [
     {
-      menuItemId: "huarache",
+      menuItemId: "huarache-bistec",
       quantity: 2,
-      modifierIds: ["blue", "cheese", "no-onion"],
+      modifierIds: ["quesillo-10"],
     },
   ],
   ...extra,
@@ -42,7 +42,7 @@ function prepareForPickup(engine, orderId) {
     engine.dispatch("pos_update_status", { orderId, status: "ready" });
   }
 }
-function pay(engine, orderId, tenderedCents = 20000) {
+function pay(engine, orderId, tenderedCents = 25000) {
   prepareForPickup(engine, orderId);
   return engine.dispatch("pos_order_paid", {
     orderId,
@@ -60,7 +60,7 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   const order = submit(engine, { totalCents: 1 });
   assert.equal(engine.getState().activeOrders[0].status, "review");
   assert.equal(engine.getState().salesMetrics.revenueCents, 0);
-  assert.equal(engine.getState().activeOrders[0].totalCents, 19000);
+  assert.equal(engine.getState().activeOrders[0].totalCents, 20000);
   assert.throws(
     () =>
       engine.dispatch("pos_order_paid", {
@@ -87,7 +87,7 @@ test("cash is recognized only on payment, exactly once, with server prices and i
     status: "ready",
   });
   assert.equal(engine.getState().salesMetrics.revenueCents, 0);
-  assert.throws(() => pay(engine, order.orderId, 18999), /no cubre/);
+  assert.throws(() => pay(engine, order.orderId, 19999), /no cubre/);
   assert.throws(() => pay(engine, order.orderId, 20000.5), /centavos/);
   assert.throws(() => pay(engine, order.orderId, "20000"), /centavos/);
   pay(engine, order.orderId);
@@ -97,17 +97,22 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   assert.equal(engine.getState().activeOrders.length, 0);
   assert.equal(engine.getState().completedOrders[0].status, "completed");
   const m = engine.getState().salesMetrics;
-  assert.equal(m.revenueCents, 19000);
-  assert.equal(m.tenderedCents, 20000);
-  assert.equal(m.changeCents, 1000);
+  assert.equal(m.revenueCents, 20000);
+  assert.equal(m.tenderedCents, 25000);
+  assert.equal(m.changeCents, 5000);
   assert.equal(m.revenueCents + m.changeCents, m.tenderedCents);
   assert.equal(m.paidOrders, 1);
   assert.equal(m.itemPerformance.length, 1);
   assert.throws(() => pay(engine, order.orderId, 50000), /otro importe/);
   assert.deepEqual(engine.getState().salesMetrics.itemPerformance, [
-    { id: "huarache", name: "Huarache", quantity: 2, revenueCents: 19000 },
+    {
+      id: "huarache-bistec",
+      name: "Huarache de Bistec",
+      quantity: 2,
+      revenueCents: 20000,
+    },
   ]);
-  assert.equal(engine.getState().salesMetrics.revenueCents, 19000);
+  assert.equal(engine.getState().salesMetrics.revenueCents, 20000);
 });
 test("no-show leaves the queue, remains in history, never contributes to cash or performance", (t) => {
   const { engine } = fixture(t);
@@ -181,13 +186,13 @@ test("pausing web orders blocks new customer orders without stopping existing ki
 
   assert.equal(engine.getState().activeOrders.length, 0);
   assert.equal(engine.getState().completedOrders[0].status, "completed");
-  assert.equal(engine.getState().salesMetrics.revenueCents, 19000);
+  assert.equal(engine.getState().salesMetrics.revenueCents, 20000);
 });
 test("order idempotency survives restart, stock changes, and pause; conflicts reject", (t) => {
   const { engine, directory } = fixture(t);
   const order = submit(engine);
   engine.dispatch("admin_toggle_stock", {
-    id: "blue",
+    id: "quesillo-10",
     kind: "modifier",
     available: false,
   });
@@ -223,29 +228,32 @@ test("order idempotency survives restart, stock changes, and pause; conflicts re
     (error) => error.code === "ORDERS_PAUSED",
   );
 });
-test("sold-out modifiers, missing required masa and malformed carts fail at the server boundary", (t) => {
+test("sold-out modifiers, misplaced add-ons and malformed carts fail at the server boundary", (t) => {
   const { engine } = fixture(t);
   engine.dispatch("admin_toggle_stock", {
-    id: "blue",
+    id: "quesillo-10",
     kind: "modifier",
     available: false,
   });
   assert.throws(() => submit(engine), /agotado/);
   engine.dispatch("admin_toggle_stock", {
-    id: "blue",
+    id: "quesillo-10",
     kind: "modifier",
     available: true,
   });
   for (const items of [
     [],
-    [{ menuItemId: "huarache", quantity: 1, modifierIds: [] }],
-    [{ menuItemId: "huarache", quantity: -1, modifierIds: ["white"] }],
-    [{ menuItemId: "huarache", quantity: 1, modifierIds: ["white", "blue"] }],
-    [{ menuItemId: "huarache", quantity: 1, modifierIds: ["white", "hacked"] }],
+    [{ menuItemId: "huarache-bistec", quantity: -1, modifierIds: [] }],
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-10", "quesillo-10"] }],
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["hacked"] }],
+    // The $5 quesillo belongs to sopes, quesadillas and pambazos, never huaraches.
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-5"] }],
+    [{ menuItemId: "sope-bistec", quantity: 1, modifierIds: ["quesillo-10"] }],
+    [{ menuItemId: "not-on-the-menu", quantity: 1, modifierIds: [] }],
   ])
     assert.throws(() => submit(engine, { items }));
   engine.dispatch("admin_toggle_stock", {
-    id: "huarache",
+    id: "huarache-bistec",
     kind: "item",
     available: false,
   });
@@ -277,7 +285,7 @@ test("close shift archives exact paid/no-show totals, resets, preserves menu, an
   engine.dispatch("pos_mark_noshow", { orderId: absent.orderId });
   engine.dispatch("admin_toggle_stock", {
     kind: "modifier",
-    id: "blue",
+    id: "quesillo-10",
     available: false,
   });
   const before = engine.getState(),
@@ -293,7 +301,7 @@ test("close shift archives exact paid/no-show totals, resets, preserves menu, an
   assert.equal(next.completedOrders.length, 0);
   assert.equal(next.activeOrders.length, 0);
   assert.notEqual(next.shiftId, before.shiftId);
-  assert.equal(next.modifiers.find((m) => m.id === "blue").available, false);
+  assert.equal(next.modifiers.find((m) => m.id === "quesillo-10").available, false);
   const restart = createEngine({ directory });
   const reply = restart.dispatch("pos_close_shift", request);
   assert.equal(reply.archive, result.archive);
@@ -477,7 +485,7 @@ test("reconnect snapshots reconcile missed tickets and menu updates; logout revo
   customer.socket.disconnect();
   await ack(staff.socket, "admin_toggle_stock", {
     kind: "modifier",
-    id: "blue",
+    id: "quesillo-10",
     available: false,
   });
   await ack(staff.socket, "pos_update_status", {
@@ -487,7 +495,7 @@ test("reconnect snapshots reconcile missed tickets and menu updates; logout revo
   const reconnect = await connect(customer.sessionId);
   assert.equal(reconnect.initial.activeOrders[0].status, "cooking");
   assert.equal(
-    reconnect.initial.modifiers.find((m) => m.id === "blue").available,
+    reconnect.initial.modifiers.find((m) => m.id === "quesillo-10").available,
     false,
   );
   await ack(staff.socket, "pos_update_status", {
@@ -518,7 +526,7 @@ test("sold-out item and modifier updates reach open customer screens and reconne
   assert.equal(
     (
       await ack(staff.socket, "admin_toggle_stock", {
-        id: "huarache",
+        id: "huarache-bistec",
         kind: "item",
         available: false,
       })
@@ -527,24 +535,24 @@ test("sold-out item and modifier updates reach open customer screens and reconne
   );
   const soldOutItem = await itemUpdate;
   assert.equal(
-    soldOutItem.menuItems.find((item) => item.id === "huarache").available,
+    soldOutItem.menuItems.find((item) => item.id === "huarache-bistec").available,
     false,
   );
 
   customer.socket.disconnect();
   await ack(staff.socket, "admin_toggle_stock", {
-    id: "blue",
+    id: "quesillo-10",
     kind: "modifier",
     available: false,
   });
   const reconnected = await connect(customer.sessionId);
   assert.equal(
-    reconnected.initial.menuItems.find((item) => item.id === "huarache")
+    reconnected.initial.menuItems.find((item) => item.id === "huarache-bistec")
       .available,
     false,
   );
   assert.equal(
-    reconnected.initial.modifiers.find((modifier) => modifier.id === "blue")
+    reconnected.initial.modifiers.find((modifier) => modifier.id === "quesillo-10")
       .available,
     false,
   );
@@ -573,16 +581,16 @@ test("PIN attempts are bounded across fresh sockets; server refuses missing PIN 
 test("fractional peso prices and modifiers retain every centavo through payment and archive", (t) => {
   const { engine, directory } = fixture(t);
   const seed = engine.getState();
-  seed.menuItems[0].priceCents = 8501;
-  seed.modifiers.find((m) => m.id === "cheese").priceCents = 1007;
+  seed.menuItems[0].priceCents = 9001;
+  seed.modifiers.find((m) => m.id === "quesillo-10").priceCents = 1007;
   writeAtomic(path.join(directory, "data.json"), seed);
   const store = createEngine({ directory });
   const order = submit(store);
-  pay(store, order.orderId, 20001);
+  pay(store, order.orderId, 25001);
   complete(store, order.orderId);
   const state = store.getState();
-  assert.equal(state.salesMetrics.revenueCents, 19016);
-  assert.equal(state.salesMetrics.changeCents, 985);
+  assert.equal(state.salesMetrics.revenueCents, 20016);
+  assert.equal(state.salesMetrics.changeCents, 4985);
   const result = store.dispatch("pos_close_shift", {
     shiftId: state.shiftId,
     expectedRevision: state.revision,
@@ -625,13 +633,13 @@ test("proxy identity trusts only loopback and the last appended, valid client ad
 test("payments record the full order total, calculate change, survive restart, and archive then reset", (t) => {
   const { engine, directory } = fixture(t);
   const { orderId } = submit(engine);
-  const request = { orderId, tenderedCents: 20000 };
+  const request = { orderId, tenderedCents: 25000 };
   pay(engine, orderId, request.tenderedCents);
   engine.dispatch("pos_order_paid", request);
   let s = engine.getState();
-  assert.equal(s.completedOrders[0].transaction.changeCents, 1000);
+  assert.equal(s.completedOrders[0].transaction.changeCents, 5000);
   assert.equal("tipCents" in s.completedOrders[0].transaction, false);
-  assert.equal(s.salesMetrics.revenueCents, 19000);
+  assert.equal(s.salesMetrics.revenueCents, 20000);
   assert.throws(
     () =>
       engine.dispatch("pos_order_paid", {
@@ -648,7 +656,7 @@ test("payments record the full order total, calculate change, survive restart, a
   s = restarted.getState();
   assert.equal(s.salesMetrics.voidCount, 1);
   assert.equal(s.salesMetrics.noShows, 1);
-  assert.equal(s.salesMetrics.itemPerformance[0].revenueCents, 19000);
+  assert.equal(s.salesMetrics.itemPerformance[0].revenueCents, 20000);
   const closed = restarted.dispatch("pos_close_shift", {
     shiftId: s.shiftId,
     expectedRevision: s.revision,
@@ -669,7 +677,7 @@ test("invalid tender amounts and legacy tip commands never create a receipt", (t
   const { orderId } = submit(engine);
   prepareForPickup(engine, orderId);
   const before = engine.getState();
-  for (const tenderedCents of [18999, 20000.5, "20000", null, NaN]) {
+  for (const tenderedCents of [19999, 20000.5, "20000", null, NaN]) {
     assert.throws(() =>
       engine.dispatch("pos_order_paid", {
         orderId,
@@ -692,7 +700,7 @@ test("invalid tender amounts and legacy tip commands never create a receipt", (t
 test("historical v3 receipts with tip fields preserve their cash evidence when loaded", (t) => {
   const { engine, directory } = fixture(t);
   const { orderId } = submit(engine);
-  pay(engine, orderId);
+  pay(engine, orderId, 21000);
   const previous = engine.getState();
   previous.completedOrders[0].transaction.tipCents = 1000;
   previous.completedOrders[0].transaction.changeCents = 0;
@@ -701,8 +709,8 @@ test("historical v3 receipts with tip fields preserve their cash evidence when l
   const receipt = restored.getState().completedOrders[0].transaction;
   assert.equal(receipt.tipCents, 1000);
   assert.equal(receipt.changeCents, 0);
-  assert.equal(restored.getState().salesMetrics.revenueCents, 19000);
-  assert.equal(restored.getState().salesMetrics.tenderedCents, 20000);
+  assert.equal(restored.getState().salesMetrics.revenueCents, 20000);
+  assert.equal(restored.getState().salesMetrics.tenderedCents, 21000);
   assert.equal(restored.getState().salesMetrics.changeCents, 0);
   assert.equal("tipsCents" in restored.getState().salesMetrics, false);
 });
@@ -771,9 +779,9 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash"
       customerName: `Rush ${i + 1}`,
       items: [
         {
-          menuItemId: "huarache",
+          menuItemId: "huarache-longaniza",
           quantity: 1,
-          modifierIds: ["blue", "cheese"],
+          modifierIds: ["quesillo-10"],
         },
       ],
     }),
@@ -821,8 +829,8 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash"
   const s = engine.getState();
   assert.equal(s.activeOrders.length, 0);
   assert.equal(s.completedOrders.length, 40);
-  assert.equal(s.salesMetrics.revenueCents, 304000);
-  assert.equal(s.salesMetrics.changeCents, 16000);
+  assert.equal(s.salesMetrics.revenueCents, 240000);
+  assert.equal(s.salesMetrics.changeCents, 80000);
   assert.equal(
     s.salesMetrics.revenueCents + s.salesMetrics.changeCents,
     s.salesMetrics.tenderedCents,
@@ -847,7 +855,7 @@ test("uncertain directory flush blocks mutations and restart recovers the paymen
   prepareForPickup(engine, orderId);
   fail = true;
   assert.throws(() => pay(engine, orderId), { code: "PERSISTENCE_UNCERTAIN" });
-  assert.equal(engine.getState().salesMetrics.revenueCents, 19000);
+  assert.equal(engine.getState().salesMetrics.revenueCents, 20000);
   assert.throws(() => pay(engine, orderId), { code: "PERSISTENCE_UNCERTAIN" });
   assert.throws(() => submit(engine), { code: "PERSISTENCE_UNCERTAIN" });
   const recovered = createEngine({ directory });

@@ -45,6 +45,10 @@ async function createService(options = {}) {
   const release = await acquireLock(dataDirectory);
   try {
     const engine = createEngine({ directory: dataDirectory });
+    if (engine.menuBackup)
+      console.log(
+        `Menú actualizado a Los Huaraches de Zapata. Copia del libro anterior: ${engine.menuBackup}`,
+      );
     const app = express();
     app.disable("x-powered-by");
     app.use((_req, res, next) => {

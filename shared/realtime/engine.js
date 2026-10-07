@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID, createHash } = require("node:crypto");
+const { MENU_ITEMS, MODIFIERS, hasLegacyPlaceholderMenu } = require("./catalog");
 /** @typedef {import('../types/realtime').State} State */
 /** @typedef {import('../types/realtime').Order} Order */
 /** @typedef {import('../types/realtime').SalesMetrics} SalesMetrics */
@@ -85,104 +86,8 @@ function initialState() {
     revision: 0,
     nextOrderNumber: 1,
     acceptingOrders: true,
-    menuItems: [
-      {
-        id: "huarache",
-        name: "Huarache",
-        description:
-          "Masa recién hecha, frijol, salsa de la casa y queso fresco.",
-        category: "Huaraches",
-        priceCents: 8500,
-        available: true,
-        modifierIds: [
-          "white",
-          "blue",
-          "cheese",
-          "avocado",
-          "no-onion",
-          "no-cilantro",
-        ],
-      },
-      {
-        id: "sope",
-        name: "Sope",
-        description: "Un clásico de comal con frijoles, crema y queso fresco.",
-        category: "Sopes",
-        priceCents: 3500,
-        available: true,
-        modifierIds: [
-          "white",
-          "blue",
-          "cheese",
-          "avocado",
-          "no-onion",
-          "no-cilantro",
-        ],
-      },
-      {
-        id: "pambazo",
-        name: "Pambazo",
-        description:
-          "Pan bañado en guajillo, papa con chorizo, lechuga y crema.",
-        category: "Pambazos",
-        priceCents: 5000,
-        available: true,
-        modifierIds: ["cheese", "avocado", "no-onion"],
-      },
-      {
-        id: "agua",
-        name: "Agua de jamaica",
-        description: "Jamaica de la casa. Fresca, ligera y hecha hoy.",
-        category: "Bebidas",
-        priceCents: 3000,
-        available: true,
-        modifierIds: [],
-      },
-    ],
-    modifiers: [
-      {
-        id: "white",
-        name: "Masa Blanca",
-        priceCents: 0,
-        available: true,
-        kind: "masa",
-      },
-      {
-        id: "blue",
-        name: "Masa Azul",
-        priceCents: 0,
-        available: true,
-        kind: "masa",
-      },
-      {
-        id: "cheese",
-        name: "Extra Queso",
-        priceCents: 1000,
-        available: true,
-        kind: "extra",
-      },
-      {
-        id: "avocado",
-        name: "Extra Aguacate",
-        priceCents: 1500,
-        available: true,
-        kind: "extra",
-      },
-      {
-        id: "no-onion",
-        name: "Sin Cebolla",
-        priceCents: 0,
-        available: true,
-        kind: "omit",
-      },
-      {
-        id: "no-cilantro",
-        name: "Sin Cilantro",
-        priceCents: 0,
-        available: true,
-        kind: "omit",
-      },
-    ],
+    menuItems: structuredClone(MENU_ITEMS),
+    modifiers: structuredClone(MODIFIERS),
     activeOrders: [],
     completedOrders: [],
     salesMetrics: metrics([]),
@@ -345,6 +250,24 @@ function createEngine({ directory, persist = writeAtomic }) {
       }
       throw error;
     }
+  }
+  /** Installs made before the real menu still hold the four-dish placeholder; swap it once, keeping the old ledger beside it. */
+  /** @type {string | null} */
+  let menuBackup = null;
+  if (hasLegacyPlaceholderMenu(state)) {
+    // Named by revision: a retry after a failed swap rewrites the same bytes, and a different ledger never overwrites it.
+    menuBackup = path.join(
+      directory,
+      `data.before-zapata-menu-r${state.revision}.json`,
+    );
+    fs.copyFileSync(file, menuBackup);
+    fs.chmodSync(menuBackup, 0o600);
+    const migrated = structuredClone(state);
+    migrated.menuItems = structuredClone(MENU_ITEMS);
+    migrated.modifiers = structuredClone(MODIFIERS);
+    migrated.revision++;
+    save(file, validate(migrated));
+    state = migrated;
   }
   /** @param {Order} order @param {State} next */
   function finish(order, next) {
@@ -608,7 +531,7 @@ function createEngine({ directory, persist = writeAtomic }) {
     state = next;
     return reply;
   }
-  return { getState: () => structuredClone(state), dispatch, file };
+  return { getState: () => structuredClone(state), dispatch, file, menuBackup };
 }
 module.exports = {
   createEngine,

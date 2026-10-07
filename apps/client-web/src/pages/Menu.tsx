@@ -122,6 +122,17 @@ export function Menu() {
     });
   }, [snapshot, category, searchQuery]);
 
+  // Sections follow the printed menu: first appearance in the catalog decides the order.
+  const groups = useMemo(() => {
+    const byCategory = new Map<string, MenuItem[]>();
+    for (const item of filteredItems)
+      byCategory.set(item.category, [
+        ...(byCategory.get(item.category) ?? []),
+        item,
+      ]);
+    return [...byCategory];
+  }, [filteredItems]);
+
   if (!snapshot) {
     return (
       <div className="flex min-h-[90dvh] flex-col items-center justify-center p-8 text-center">
@@ -355,16 +366,17 @@ export function Menu() {
         <div className="mb-8 grid items-stretch gap-6 md:grid-cols-[1.5fr_1fr]">
           <div className="menu-hero flex flex-col justify-center rounded-3xl p-6 sm:p-8 shadow-xs">
             <span className="menu-hero__eyebrow inline-block text-xs font-bold uppercase tracking-wider">
-              Masa Criolla Nixtamalizada
+              Los Huaraches de Zapata
             </span>
             <h1 className="display mt-2 text-4xl sm:text-5xl font-black leading-tight">
-              Hecho con masa.
+              Sabor por
               <br />
-              Servido con cariño.
+              tradición.
             </h1>
             <p className="menu-hero__copy mt-3 text-sm sm:text-base max-w-md leading-relaxed">
-              Huaraches, sopes, pambazos y antojitos recién salidos del comal.
-              Envía tu pedido para revisión y paga en efectivo al recogerlo.
+              Huaraches, sopes, quesadillas, gorditas y pambazos recién salidos
+              del comal. Envía tu pedido para revisión y paga en efectivo al
+              recogerlo.
             </p>
           </div>
 
@@ -561,76 +573,86 @@ export function Menu() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {filteredItems.map((item, index) => {
-              const available = itemAvailable(item, snapshot.modifiers);
-              const hasMasa = item.modifierIds.some(
-                (id) =>
-                  snapshot.modifiers.find((m) => m.id === id)?.kind === "masa",
-              );
+          <div className="space-y-10">
+            {groups.map(([groupName, groupItems]) => (
+              <section key={groupName} aria-label={groupName}>
+                <h2 className="display mb-4 border-b border-stone-200 pb-2 text-2xl font-bold text-stone-900">
+                  {groupName}
+                </h2>
+                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                  {groupItems.map((item) => {
+                    const available = itemAvailable(item, snapshot.modifiers);
+                    const hasMasa = item.modifierIds.some(
+                      (id) =>
+                        snapshot.modifiers.find((m) => m.id === id)?.kind ===
+                        "masa",
+                    );
 
-              return (
-                <article
-                  key={item.id}
-                  className={`panel flex flex-col justify-between border-stone-200 bg-white transition-all hover:border-stone-300 hover:shadow-xs ${
-                    !available ? "bg-stone-100/70 opacity-60" : ""
-                  }`}
-                >
-                  <div>
-                    <div className="mb-3 flex items-center justify-between">
-                      <span className="text-xs font-bold uppercase tracking-wider text-clay-700">
-                        {item.category}
-                      </span>
-                      {hasMasa && (
-                        <span className="rounded bg-clay-50 px-2 py-0.5 text-[11px] font-semibold text-clay-800 border border-clay-100">
-                          Masa Azul / Blanca
-                        </span>
-                      )}
-                    </div>
+                    return (
+                      <article
+                        key={item.id}
+                        className={`panel flex flex-col justify-between border-stone-200 bg-white transition-all hover:border-stone-300 hover:shadow-xs ${
+                          !available ? "bg-stone-100/70 opacity-60" : ""
+                        }`}
+                      >
+                        <div>
+                          {hasMasa && (
+                            <span className="mb-3 inline-block rounded bg-clay-50 px-2 py-0.5 text-[11px] font-semibold text-clay-800 border border-clay-100">
+                              Masa Azul / Blanca
+                            </span>
+                          )}
+                          <h3 className="display text-2xl font-bold text-stone-900 leading-tight">
+                            {item.name}
+                          </h3>
+                          <p className="mt-2 text-xs leading-relaxed text-stone-600 line-clamp-3">
+                            {item.description}
+                          </p>
+                        </div>
 
-                    <h2 className="display text-2xl font-bold text-stone-900 leading-tight">
-                      {item.name}
-                    </h2>
-                    <p className="mt-2 text-xs leading-relaxed text-stone-600 line-clamp-3">
-                      {item.description}
-                    </p>
-                  </div>
+                        <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-3">
+                          <div>
+                            <span className="block text-[10px] font-semibold text-stone-400 uppercase">
+                              Precio
+                            </span>
+                            <strong className="text-xl font-bold tabular-nums text-stone-900">
+                              {mxn(item.priceCents)}
+                            </strong>
+                          </div>
 
-                  <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-3">
-                    <div>
-                      <span className="block text-[10px] font-semibold text-stone-400 uppercase">
-                        Precio
-                      </span>
-                      <strong className="text-xl font-bold tabular-nums text-stone-900">
-                        {mxn(item.priceCents)}
-                      </strong>
-                    </div>
-
-                    <button
-                      className="btn btn-primary text-xs font-bold py-2 px-3.5"
-                      disabled={!available || Boolean(pending)}
-                      aria-label={`Agregar ${item.name}`}
-                      onClick={() => setCustomizeId(item.id)}
-                    >
-                      {available ? (
-                        <>
-                          <Plus size={15} />
-                          <span>Agregar</span>
-                        </>
-                      ) : (
-                        <span>Agotado</span>
-                      )}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
+                          <button
+                            className="btn btn-primary text-xs font-bold py-2 px-3.5"
+                            disabled={!available || Boolean(pending)}
+                            aria-label={`Agregar ${item.name}`}
+                            onClick={() => setCustomizeId(item.id)}
+                          >
+                            {available ? (
+                              <>
+                                <Plus size={15} />
+                                <span>Agregar</span>
+                              </>
+                            ) : (
+                              <span>Agotado</span>
+                            )}
+                          </button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
           </div>
         )}
 
         <p className="mt-10 text-center text-xs text-stone-500">
           Precios finales en pesos mexicanos (MXN). Disponibilidad actualizada
           en vivo con la cocina.
+        </p>
+        <p className="mt-2 text-center text-xs font-semibold text-stone-600">
+          Lunes a sábado · 9:30 a.m. – 5:00 p.m. · Tel.{" "}
+          <a className="underline" href="tel:+525632149403">
+            56 3214 9403
+          </a>
         </p>
       </main>
 

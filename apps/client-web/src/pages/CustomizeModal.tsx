@@ -55,6 +55,9 @@ export function CustomizeModal({
   const masaModifiers = modifiers.filter((m) => m.kind === "masa");
   const extraModifiers = modifiers.filter((m) => m.kind === "extra");
   const omitModifiers = modifiers.filter((m) => m.kind === "omit");
+  // A dish may offer only some of these groups, so the step numbers count the ones shown.
+  const extraStep = masaModifiers.length ? 2 : 1;
+  const omitStep = extraStep + (extraModifiers.length ? 1 : 0);
 
   return (
     <Modal title={item.name} onClose={onClose}>
@@ -132,7 +135,7 @@ export function CustomizeModal({
       {extraModifiers.length > 0 && (
         <fieldset className="mb-6">
           <legend className="eyebrow mb-2 flex items-center justify-between text-stone-700">
-            <span>2. Ingredientes extra</span>
+            <span>{extraStep}. Ingredientes extra</span>
             <span className="text-[11px] font-medium text-stone-400">
               Opcional
             </span>
@@ -185,7 +188,7 @@ export function CustomizeModal({
       {omitModifiers.length > 0 && (
         <fieldset className="mb-6">
           <legend className="eyebrow mb-2 flex items-center justify-between text-stone-700">
-            <span>3. Preferencias de preparación</span>
+            <span>{omitStep}. Preferencias de preparación</span>
             <span className="text-[11px] font-medium text-stone-400">
               Exclusiones
             </span>

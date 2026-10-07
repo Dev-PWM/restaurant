@@ -63,6 +63,8 @@ Docker execution has not been verified on this workstation; the local Node runti
 
 Default live file: **`.masaflow-realtime/data.json`**. Set `MASAFLOW_DATA_DIR` to use a different directory. Every mutation is synchronously written through an atomic temporary-file replacement, with file and directory fsync before success. If durability cannot be confirmed after replacement, the service blocks further changes until restart and ledger verification. A writer lock prevents concurrent servers from sharing the same file. Startup validates the saved ledger; invalid data is never silently discarded.
 
+**Menu catalog:** a fresh install is seeded from `shared/realtime/catalog.js`: 33 dishes in six sections plus the two **C/QUESILLO** add-ons ($10 on huaraches and gorditas, $5 on sopes, quesadillas and pambazos). Bebidas are not seeded because the printed menu leaves their prices blank. An existing install that still holds the old four-dish placeholder menu (and nothing else) is switched to this catalog once, on the next start; `data.before-zapata-menu-r<revision>.json` is saved beside `data.json` first. Paid history keeps the names and prices it was sold at, and a menu that has been changed in any other way is never replaced.
+
 Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before resetting it. Archives contain complete order records and final revenue, expected cash held, and void counts. Here `voidCount` means unpaid No-Show cancellations; paid refunds are not part of this workflow. Copy the data directory to a separate disk regularly. To restore an archive, stop the service, keep a copy of the current file, copy the chosen archive to `data.json`, then restart. This reopens that archived shift; use the archive as read-only evidence if you do not intend to reopen it.
 
 **Existing installations:** the earlier HTML/SSE app is preserved as `legacy-server.cjs`; its `.masaflow/state.json`, backup tools, source files, and tests remain intact. The new suite starts with a separate ledger and does **not** import old USD/MXN histories automatically. Finish and back up the old shift before switching. `npm run legacy:start` explicitly starts the historical runtime; its documentation is in [docs/LEGACY_README.md](docs/LEGACY_README.md). The new runtime does not serve the old pages or execute their printer/drawer code. Historical backup, restore and login-startup npm commands now use the `legacy:` prefix so they cannot be mistaken for tools for the new ledger.
@@ -73,6 +75,7 @@ Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before r
 |---|---|
 | Typed contracts | `shared/types/realtime.ts` |
 | Ledger and durable mutations | `shared/realtime/engine.js` |
+| Menu catalog (the printed "Los Huaraches de Zapata" menu) | `shared/realtime/catalog.js` |
 | Express, Socket.io, staff authorization | `server.js` |
 | Connection context and shared UI | `shared/ui/` |
 | Customer React app | `apps/client-web/src/` |
