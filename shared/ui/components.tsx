@@ -425,11 +425,15 @@ export function StaffHeader({
   page,
   children,
   lockDisabled = false,
+  onAnalyticsClick,
+  analyticsTourTarget,
 }: {
   page: "pos" | "analytics";
   children?: ReactNode;
   /** Locking drops the session, so it is blocked while a confirmed payment is still unsent. */
   lockDisabled?: boolean;
+  onAnalyticsClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  analyticsTourTarget?: string;
 }) {
   const { snapshot, connected, suspended, logout } = useRealtime();
   return (
@@ -449,6 +453,9 @@ export function StaffHeader({
             className={`btn ${page === "analytics" ? "bg-clay-50 text-clay-700" : ""}`}
             href={appLink("analytics")}
             aria-current={page === "analytics" ? "page" : undefined}
+            data-tour-target={analyticsTourTarget ?? "btn-nav-analytics"}
+            data-tour-action="nav-analytics"
+            onClick={onAnalyticsClick}
           >
             Caja y ventas
           </a>

@@ -27,6 +27,9 @@ import {
   advanceDemoOrder,
   createRushOrders,
   createDemoOrder,
+  createPickyEaterDemoOrder,
+  createNoShowDemoOrder,
+  calculatePracticeMetrics,
   evaluateRush,
   HESITATION_MS,
   markDemoNoShow,
@@ -37,6 +40,15 @@ import {
 } from "../simulator.js";
 import { burstConfetti } from "../confetti";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
+import { ACADEMY_MODULES, CURRICULUM_STEPS } from "../academy/curriculum";
+import type { AcademyModuleId, AcademyStep, GhostSalesMetrics } from "../academy/types";
+import { playSuccessChime, playMistakeThud, triggerHaptic } from "../academy/sound";
+import { CoachmarkSpotlight } from "../academy/CoachmarkSpotlight";
+import { AcademyBanner } from "../academy/AcademyBanner";
+import { AcademyLedgerModal } from "../academy/AcademyLedgerModal";
+import { AcademyInventoryModal } from "../academy/AcademyInventoryModal";
+import { GraduationModal } from "../academy/GraduationModal";
+import { ShadowWarningToast } from "../academy/ShadowWarningToast";
 import {
   chime,
   enableAudio,
@@ -205,6 +217,7 @@ export function TicketCard({
   highlighted = false,
   onSimulatorAdvance,
   onSimulatorNoShow,
+  onSimulatorNoShowOpen,
   onAcknowledgeRestriction,
   restrictionAcknowledged = false,
   errorShake = false,
@@ -228,6 +241,7 @@ export function TicketCard({
   restrictionAcknowledged?: boolean;
   errorShake?: boolean;
   coachTarget?: string;
+  onSimulatorNoShowOpen?: () => void;
 }) {
   const { command, connected } = useRealtime();
   const [noShow, setNoShow] = useState(false),
@@ -367,10 +381,14 @@ export function TicketCard({
           {simulator &&
             order.status === "cooking" &&
             order.items.some((item) =>
-              item.modifiers.some((modifier) => modifier.name === "Sin queso"),
+              item.modifiers.some(
+                (modifier) =>
+                  modifier.name.toLowerCase().includes("sin") ||
+                  modifier.kind === "omit",
+              ),
             ) && (
               <button
-                className={`btn mt-3 w-full border-red-700 bg-red-700 font-black text-white hover:bg-red-800 ${coachTarget === "acknowledge-restriction" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
+                className={`btn mt-3 w-full border-2 border-red-600 bg-red-600 font-black tracking-wide text-white hover:bg-red-700 shadow-md ${coachTarget === "acknowledge-restriction" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
                 data-tour-target={
                   coachTarget === "acknowledge-restriction"
                     ? "acknowledge-restriction"
@@ -381,8 +399,8 @@ export function TicketCard({
                 onClick={onAcknowledgeRestriction}
               >
                 {restrictionAcknowledged
-                  ? "✓ Restricción revisada: Sin queso"
-                  : "Tocar para reconocer: SIN QUESO"}
+                  ? "✓ Restricción revisada: SIN CEBOLLA / SIN QUESO"
+                  : "⚠ Tocar para confirmar: SIN CEBOLLA / SIN QUESO"}
               </button>
             )}
           <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
@@ -473,10 +491,18 @@ export function TicketCard({
               <ArrowRight size={16} />
             </button>
             <button
-              className="btn btn-danger mt-2 w-full"
-              data-tour-action="no-show"
+              className={`btn btn-danger mt-2 w-full ${coachTarget === "noshow-demo-order" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
+              data-tour-action={simulator ? "noshow-open" : "no-show"}
+              data-tour-target={
+                coachTarget === "noshow-demo-order"
+                  ? "noshow-demo-order"
+                  : undefined
+              }
               disabled={(!simulator && !connected) || busy}
-              onClick={() => setNoShow(true)}
+              onClick={() => {
+                setNoShow(true);
+                if (simulator) onSimulatorNoShowOpen?.();
+              }}
             >
               Anular pedido / No-Show
             </button>
@@ -514,8 +540,13 @@ export function TicketCard({
                 Volver
               </button>
               <button
-                className="btn btn-danger flex-1"
-                data-tour-action="no-show"
+                className={`btn btn-danger flex-1 ${coachTarget === "noshow-confirm" ? "relative z-50 ring-4 ring-yellow-400" : ""}`}
+                data-tour-action={simulator ? "noshow-confirm" : "no-show"}
+                data-tour-target={
+                  coachTarget === "noshow-confirm"
+                    ? "noshow-confirm"
+                    : undefined
+                }
                 disabled={(!simulator && !connected) || busy}
                 onClick={async () => {
                   setBusy(true);
@@ -904,6 +935,18 @@ const TOUR_ACTIONS: Record<string, string> = {
   "tender-200": "cash-preset",
   "tender-500": "cash-preset",
   "confirm-demo-payment": "confirm",
+  "noshow-demo-order": "noshow-open",
+  "noshow-confirm": "noshow-confirm",
+  "btn-inventory": "inventory-open",
+  "toggle-86-gordita": "toggle-stock",
+  "close-inventory": "inventory-close",
+  "btn-panic-pause": "panic-pause",
+  "btn-panic-resume": "panic-resume",
+  "btn-nav-analytics": "nav-analytics",
+  "card-revenue-display": "inspect-revenue",
+  "btn-close-shift": "close-shift-open",
+  "input-blind-drop": "blind-drop-input",
+  "btn-confirm-close-shift": "close-shift-confirm",
 };
 const INTERACTIVE =
   "button, a[href], input, select, textarea, summary, [role='tab'], [role='switch']";
@@ -962,20 +1005,29 @@ export function LiveOrders() {
     [savedLiveSnapshot, setSavedLiveSnapshot] = useState<Snapshot | null>(null),
     [demoOrders, setDemoOrders] = useState<Order[]>([]),
     [demoCompletedOrders, setDemoCompletedOrders] = useState<Order[]>([]),
-    [tourStep, setTourStep] = useState(0),
-    [restrictionAcknowledgedIds, setRestrictionAcknowledgedIds] = useState<
-      Set<string>
-    >(() => new Set()),
-    [coachPosition, setCoachPosition] = useState({ left: 16, top: 96 }),
+    [currentModule, setCurrentModule] = useState<AcademyModuleId>("module1_golden_path"),
+    [currentStepIndex, setCurrentStepIndex] = useState(0),
+    [completedModules, setCompletedModules] = useState<AcademyModuleId[]>([]),
+    [explainLockRemaining, setExplainLockRemaining] = useState(2),
+    [shadowWarning, setShadowWarning] = useState<string | null>(null),
+    [ghostInventoryOpen, setGhostInventoryOpen] = useState(false),
+    [ghostInventoryItems, setGhostInventoryItems] = useState([
+      { id: "gordita-chicharron", name: "Gordita de chicharrón prensado", available: true },
+      { id: "taco-suadero", name: "Taco de suadero confitado", available: true },
+      { id: "quesadilla-hongos", name: "Quesadilla de huitlacoche y queso", available: true },
+    ]),
+    [ghostWebOrdersPaused, setGhostWebOrdersPaused] = useState(false),
+    [ghostLedgerOpen, setGhostLedgerOpen] = useState(false),
+    [ghostBlindDropOpen, setGhostBlindDropOpen] = useState(false),
+    [isGraduated, setIsGraduated] = useState(false),
+    [isTrained, setIsTrained] = useState<boolean>(() =>
+      typeof window !== "undefined" && localStorage.getItem("masaflow_trained") === "true",
+    ),
+    [restrictionAcknowledgedIds, setRestrictionAcknowledgedIds] = useState<Set<string>>(() => new Set()),
     [mistakeCountdown, setMistakeCountdown] = useState(0),
     [mistakeOrderId, setMistakeOrderId] = useState<string | null>(null),
-    [mistakeExpired, setMistakeExpired] = useState(false),
-    [mistakeSeen, setMistakeSeen] = useState(false),
     [alarmFlash, setAlarmFlash] = useState(false),
-    [hesitating, setHesitating] = useState(false),
-    [selectedTenderCents, setSelectedTenderCents] = useState<number | null>(
-      null,
-    ),
+    [selectedTenderCents, setSelectedTenderCents] = useState<number | null>(null),
     [rushMode, setRushMode] = useState(false),
     [rushRemaining, setRushRemaining] = useState(RUSH_LIMIT_SECONDS),
     [rushCompleted, setRushCompleted] = useState(0),
@@ -983,23 +1035,14 @@ export function LiveOrders() {
     [rushNoShows, setRushNoShows] = useState(0),
     [rushFinished, setRushFinished] = useState(false),
     [wrongOrderId, setWrongOrderId] = useState<string | null>(null),
-    [pendingPayments, setPendingPayments] = useState<
-      Record<string, PendingPayment>
-    >({}),
+    [pendingPayments, setPendingPayments] = useState<Record<string, PendingPayment>>({}),
     [paymentNotice, setPaymentNotice] = useState(""),
     [activeTab, setActiveTab] = useState<"queue" | "completed">("queue"),
-    [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
-      "review",
-    );
-  const wrongActionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
-    undefined,
-  );
-  // Real payments wait out the undo window here; the timers must outlive renders.
+    [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">("review");
+
+  const wrongActionTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const pendingTimers = useRef(
-    new Map<
-      string,
-      { timer: ReturnType<typeof setTimeout>; tenderedCents: number }
-    >(),
+    new Map<string, { timer: ReturnType<typeof setTimeout>; tenderedCents: number }>(),
   );
   const commandRef = useRef(command);
   const resumeRef = useRef(resumeRealtime);
@@ -1009,9 +1052,8 @@ export function LiveOrders() {
     resumeRef.current = resumeRealtime;
     simulatorRef.current = simulator;
   });
-  const sourceSnapshot = simulator
-    ? (savedLiveSnapshot ?? liveSnapshot)
-    : liveSnapshot;
+
+  const sourceSnapshot = simulator ? (savedLiveSnapshot ?? liveSnapshot) : liveSnapshot;
   const snapshot =
     simulator && sourceSnapshot
       ? {
@@ -1020,42 +1062,38 @@ export function LiveOrders() {
           completedOrders: demoCompletedOrders,
         }
       : sourceSnapshot;
+
   const previousActive = useRef<Set<string> | null>(null);
   const previousCooking = useRef<Set<string> | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
-  const previousTicketPositions = useRef(
-    new Map<string, { left: number; top: number }>(),
-  );
+  const previousTicketPositions = useRef(new Map<string, { left: number; top: number }>());
   const now = useTicketTimer();
   const layoutKey =
-    snapshot?.activeOrders
-      .map((order) => `${order.id}:${order.status}`)
-      .join("|") ?? "";
+    snapshot?.activeOrders.map((order) => `${order.id}:${order.status}`).join("|") ?? "";
   const hasPendingPayment = Object.keys(pendingPayments).length > 0;
 
-  // The control the spotlight is on right now. Everything else is locked out.
-  const guidedTarget =
-    !simulator || rushMode
-      ? null
-      : tourStep === 1
-        ? "accept-demo-order"
-        : tourStep === 2
-          ? "acknowledge-restriction"
-          : tourStep === 3
-            ? "mark-demo-ready"
-            : tourStep === 4
-              ? mistakeCountdown > 0
-                ? "undo-demo-payment"
-                : !payId
-                  ? "pay-demo-order"
-                  : selectedTenderCents === null
-                    ? mistakeSeen
-                      ? "tender-500"
-                      : "tender-200"
-                    : "confirm-demo-payment"
-              : null;
-  const guided = simulator && !rushMode && tourStep >= 1 && tourStep <= 5;
-  const progressStep = Math.min(tourStep, 5);
+  const moduleSteps = useMemo(
+    () => CURRICULUM_STEPS.filter((s) => s.moduleId === currentModule),
+    [currentModule],
+  );
+  const currentStep = simulator && !rushMode ? moduleSteps[currentStepIndex] || null : null;
+  const guidedTarget = currentStep ? currentStep.target : null;
+  const guided = simulator && !rushMode && currentStep !== null;
+  const canExit = isTrained;
+
+  const overallProgressPercent = useMemo(() => {
+    const total = CURRICULUM_STEPS.length;
+    let done = 0;
+    for (const mod of ACADEMY_MODULES) {
+      if (completedModules.includes(mod.id)) {
+        done += CURRICULUM_STEPS.filter((s) => s.moduleId === mod.id).length;
+      } else if (mod.id === currentModule) {
+        done += currentStepIndex;
+      }
+    }
+    return Math.round((done / total) * 100);
+  }, [completedModules, currentModule, currentStepIndex]);
+
   const rushElapsed = RUSH_LIMIT_SECONDS - rushRemaining;
   const rushPassed =
     rushFinished &&
@@ -1065,27 +1103,130 @@ export function LiveOrders() {
       elapsedSeconds: rushElapsed,
     });
 
+  const ghostSalesMetrics: GhostSalesMetrics = useMemo(() => {
+    return calculatePracticeMetrics(demoCompletedOrders);
+  }, [demoCompletedOrders]);
+
+  // Explain-Before-Execute 2-second lock
+  useEffect(() => {
+    if (!simulator || rushMode || !currentStep) {
+      setExplainLockRemaining(0);
+      return;
+    }
+    setExplainLockRemaining(2);
+    const t1 = setTimeout(() => setExplainLockRemaining(1), 1000);
+    const t2 = setTimeout(() => setExplainLockRemaining(0), 2000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [simulator, rushMode, currentModule, currentStepIndex]);
+
+  // Auto-boot simulator on very first visit if staff hasn't graduated
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const trained = localStorage.getItem("masaflow_trained") === "true";
+    if (!trained && liveSnapshot && !simulatorRef.current) {
+      startSimulator();
+    }
+  }, [liveSnapshot]);
+
+  function loadModule(modId: AcademyModuleId) {
+    setCurrentModule(modId);
+    setCurrentStepIndex(0);
+    setPayId(null);
+    setSelectedTenderCents(null);
+    setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setGhostInventoryOpen(false);
+    setGhostLedgerOpen(false);
+    setGhostBlindDropOpen(false);
+
+    if (modId === "module1_golden_path") {
+      setDemoOrders([createDemoOrder()]);
+      setDemoCompletedOrders([]);
+      setActiveTab("queue");
+      setActiveLane("review");
+    } else if (modId === "module2_picky_eater") {
+      setDemoOrders([createPickyEaterDemoOrder()]);
+      setRestrictionAcknowledgedIds(new Set());
+      setActiveTab("queue");
+      setActiveLane("review");
+    } else if (modId === "module3_mistakes_noshow") {
+      const mistakeOrder = { ...createDemoOrder(), status: "ready" as const };
+      const noShowOrder = createNoShowDemoOrder();
+      setDemoOrders([mistakeOrder, noShowOrder]);
+      setActiveTab("queue");
+      setActiveLane("ready");
+    } else if (modId === "module4_panic_86") {
+      setDemoOrders([]);
+      setGhostInventoryOpen(false);
+      setGhostWebOrdersPaused(false);
+      setActiveTab("queue");
+    } else if (modId === "module5_revenue_closeout") {
+      const order1 = payDemoOrder(createDemoOrder(), 20000);
+      const order2 = payDemoOrder(createPickyEaterDemoOrder(), 20000);
+      const order3 = payDemoOrder(createDemoOrder(), 50000);
+      const noShow = markDemoNoShow(createNoShowDemoOrder());
+      setDemoCompletedOrders([order1, order2, order3, noShow]);
+      setDemoOrders([]);
+      setActiveTab("completed");
+    }
+  }
+
+  function advanceStep() {
+    playSuccessChime();
+    triggerHaptic("success");
+    if (currentStepIndex + 1 < moduleSteps.length) {
+      setCurrentStepIndex((prev) => prev + 1);
+    } else {
+      completeModule(currentModule);
+    }
+  }
+
+  function completeModule(modId: AcademyModuleId) {
+    setCompletedModules((prev) => Array.from(new Set([...prev, modId])));
+    playSuccessChime();
+    triggerHaptic("success");
+
+    const moduleOrder: AcademyModuleId[] = [
+      "module1_golden_path",
+      "module2_picky_eater",
+      "module3_mistakes_noshow",
+      "module4_panic_86",
+      "module5_revenue_closeout",
+    ];
+    const currentIndex = moduleOrder.indexOf(modId);
+    if (currentIndex < moduleOrder.length - 1) {
+      const nextModule = moduleOrder[currentIndex + 1];
+      loadModule(nextModule);
+    } else {
+      if (!rushPassed) {
+        startRushChallenge();
+      } else {
+        setIsGraduated(true);
+        burstConfetti();
+      }
+    }
+  }
+
+  function handleGraduateAndGoLive() {
+    localStorage.setItem("masaflow_trained", "true");
+    setIsTrained(true);
+    setIsGraduated(false);
+    exitSimulator();
+  }
+
   function startSimulator() {
     if (!liveSnapshot || hasPendingPayment) return;
-    // Starting from a tap is the user gesture that lets the alarm sound play.
     void enableAudio();
     setSavedLiveSnapshot(liveSnapshot);
     suspendRealtime();
     setSimulator(true);
-    setDemoOrders([createDemoOrder()]);
-    setDemoCompletedOrders([]);
-    setPayId(null);
-    setTourStep(1);
-    setRestrictionAcknowledgedIds(new Set());
-    setMistakeCountdown(0);
-    setMistakeOrderId(null);
-    setMistakeExpired(false);
-    setMistakeSeen(false);
-    setSelectedTenderCents(null);
     setRushMode(false);
     setRushFinished(false);
-    setActiveTab("queue");
-    setActiveLane("review");
+    setCompletedModules([]);
+    loadModule("module1_golden_path");
   }
 
   function exitSimulator() {
@@ -1095,94 +1236,95 @@ export function LiveOrders() {
     setDemoOrders([]);
     setDemoCompletedOrders([]);
     setPayId(null);
-    setTourStep(0);
+    setCurrentStepIndex(0);
+    setCompletedModules([]);
     setRestrictionAcknowledgedIds(new Set());
     setMistakeCountdown(0);
     setMistakeOrderId(null);
-    setMistakeExpired(false);
-    setMistakeSeen(false);
     setAlarmFlash(false);
-    setHesitating(false);
     setSelectedTenderCents(null);
     setRushMode(false);
     setRushFinished(false);
     setWrongOrderId(null);
-    // Drop the ghost data first, then reconnect: init_data brings back the live queue.
+    setShadowWarning(null);
+    setGhostInventoryOpen(false);
+    setGhostLedgerOpen(false);
+    setGhostBlindDropOpen(false);
+    setIsGraduated(false);
     resumeRealtime();
   }
 
   function advanceSimulatorOrder(order: Order) {
-    if (order.status === "cooking" && !restrictionAcknowledgedIds.has(order.id))
-      return;
+    if (order.status === "cooking" && !restrictionAcknowledgedIds.has(order.id)) return;
     const next = advanceDemoOrder(order);
     setDemoOrders((orders) =>
       orders.map((current) => (current.id === order.id ? next : current)),
     );
-    setTourStep(
-      order.status === "review" ? (rushMode ? 7 : 2) : rushMode ? 7 : 4,
-    );
     setActiveLane(next.status === "cooking" ? "cooking" : "ready");
+    if (!rushMode) {
+      advanceStep();
+    }
   }
 
   function acknowledgeDemoRestriction(orderId: string) {
     setRestrictionAcknowledgedIds((ids) => new Set(ids).add(orderId));
-    if (!rushMode) setTourStep(3);
+    if (!rushMode) {
+      advanceStep();
+    }
   }
 
   function markSimulatorNoShow(orderId: string) {
     const order = demoOrders.find((candidate) => candidate.id === orderId);
     if (!order) return;
     const noShow = markDemoNoShow(order);
-    setDemoOrders((orders) =>
-      orders.filter((candidate) => candidate.id !== orderId),
-    );
+    setDemoOrders((orders) => orders.filter((candidate) => candidate.id !== orderId));
     setDemoCompletedOrders((completed) => [...completed, noShow]);
     if (rushMode) {
       setRushResolved((count) => count + 1);
       setRushNoShows((count) => count + 1);
+    } else {
+      advanceStep();
     }
   }
 
   function undoDemoMistake() {
     setMistakeCountdown(0);
     setMistakeOrderId(null);
-    setMistakeExpired(false);
-    setMistakeSeen(true);
-    setSelectedTenderCents(null);
-    setTourStep(4);
+    advanceStep();
   }
 
   function completeSimulatorPayment(orderId: string, tenderedCents: number) {
     const order = demoOrders.find((candidate) => candidate.id === orderId);
     if (!order) return;
-    if (!rushMode && tourStep === 4) {
-      if (!mistakeSeen && tenderedCents === 20000) {
-        // The trap: the customer actually handed over $500. Flash, sound the
-        // alarm and open the undo window on the ticket, exactly like a live till.
+
+    if (!rushMode && currentModule === "module3_mistakes_noshow") {
+      if (currentStep?.target === "confirm-demo-payment" && currentStepIndex === 2) {
         setPayId(null);
         setSelectedTenderCents(null);
         setMistakeOrderId(orderId);
-        setMistakeExpired(false);
         setMistakeCountdown(UNDO_WINDOW_SECONDS);
         setAlarmFlash(true);
         chime("alarm");
+        playMistakeThud();
+        triggerHaptic("mistake");
+        advanceStep();
         return;
       }
-      if (!mistakeSeen || tenderedCents !== 50000) return;
     }
+
     const completed = payDemoOrder(order, tenderedCents);
-    setDemoOrders((orders) =>
-      orders.filter((candidate) => candidate.id !== orderId),
-    );
+    setDemoOrders((orders) => orders.filter((candidate) => candidate.id !== orderId));
     setDemoCompletedOrders((previous) => [...previous, completed]);
     setPayId(null);
-    setActiveTab(rushMode ? "queue" : "completed");
-    setTourStep(rushMode ? 7 : 5);
-    setMistakeCountdown(0);
     setSelectedTenderCents(null);
+    setMistakeCountdown(0);
+
     if (rushMode) {
       setRushCompleted((count) => count + 1);
       setRushResolved((count) => count + 1);
+      setActiveTab("queue");
+    } else {
+      advanceStep();
     }
   }
 
@@ -1202,10 +1344,8 @@ export function LiveOrders() {
     setSelectedTenderCents(null);
     setActiveTab("queue");
     setActiveLane("review");
-    setTourStep(7);
   }
 
-  /** Live cash: hold the emission for the undo window, then send pos_order_paid once. */
   function queueLivePayment(orderId: string, tenderedCents: number) {
     if (pendingTimers.current.has(orderId)) return;
     const timer = setTimeout(
@@ -1232,7 +1372,6 @@ export function LiveOrders() {
         : current,
     );
     try {
-      // The server broadcasts state before it acks, so by now the ticket has already left the lane.
       const reply = await commandRef.current("pos_order_paid", {
         orderId,
         tenderedCents,
@@ -1248,7 +1387,7 @@ export function LiveOrders() {
 
   function undoLivePayment(orderId: string) {
     const entry = pendingTimers.current.get(orderId);
-    if (!entry) return; // Already sent: too late to cancel.
+    if (!entry) return;
     clearTimeout(entry.timer);
     pendingTimers.current.delete(orderId);
     setPendingPayments(({ [orderId]: _undone, ...rest }) => rest);
@@ -1269,35 +1408,56 @@ export function LiveOrders() {
     };
   }
 
-  /** Strict lockout: during the guided steps only the spotlighted control (and Exit/Sound) responds. */
+  function triggerShadowWarning(message: string) {
+    playMistakeThud();
+    triggerHaptic("mistake");
+    setShadowWarning(message);
+    if (wrongActionTimer.current) clearTimeout(wrongActionTimer.current);
+    wrongActionTimer.current = setTimeout(() => {
+      setShadowWarning(null);
+      setWrongOrderId(null);
+    }, 1400);
+  }
+
   function handleGuidedClick(event: ReactMouseEvent<HTMLDivElement>) {
-    if (!guided) return;
+    if (!guided || !currentStep) return;
     const target = event.target;
     if (!(target instanceof HTMLElement)) return;
     const interactive = target.closest<HTMLElement>(INTERACTIVE);
     if (!interactive || interactive.closest("[data-tour-allow]")) return;
-    const actionElement = target.closest<HTMLElement>("[data-tour-action]");
-    const wrongTender =
-      actionElement?.dataset.tourAction === "cash-preset" &&
-      Number(actionElement.dataset.tourCents) !== (mistakeSeen ? 50000 : 20000);
-    if (
-      actionElement &&
-      !wrongTender &&
-      guidedTarget &&
-      actionElement.dataset.tourAction === TOUR_ACTIONS[guidedTarget]
-    )
+
+    if (explainLockRemaining > 0) {
+      event.preventDefault();
+      event.stopPropagation();
+      triggerShadowWarning("Lee la explicación antes de continuar.");
       return;
+    }
+
+    const actionElement = target.closest<HTMLElement>("[data-tour-action]");
+    const targetAttr = actionElement?.dataset.tourTarget || interactive.dataset.tourTarget;
+    const actionAttr = actionElement?.dataset.tourAction;
+
+    const wrongTender =
+      actionAttr === "cash-preset" &&
+      Number(actionElement?.dataset.tourCents) !==
+        (currentStep.target === "tender-500" ? 50000 : 20000);
+
+    const isMatch =
+      (targetAttr === currentStep.target ||
+        (actionAttr && actionAttr === TOUR_ACTIONS[currentStep.target])) &&
+      !wrongTender;
+
+    if (isMatch) {
+      return;
+    }
+
     event.preventDefault();
     event.stopPropagation();
     const card = interactive.closest<HTMLElement>("[data-order-id]");
     if (card?.dataset.orderId) setWrongOrderId(card.dataset.orderId);
-    if ("vibrate" in navigator) navigator.vibrate(35);
-    if (wrongActionTimer.current) clearTimeout(wrongActionTimer.current);
-    wrongActionTimer.current = setTimeout(() => setWrongOrderId(null), 300);
+    triggerShadowWarning("Aún no. Termina el paso actual primero.");
   }
 
-  // Mistake window: if «Deshacer» is not tapped in time the payment would have
-  // been recorded on a real till, so the step fails and starts over.
   useEffect(() => {
     if (!simulator || mistakeCountdown <= 0) return;
     const timer = setTimeout(() => {
@@ -1307,10 +1467,12 @@ export function LiveOrders() {
       }
       setMistakeCountdown(0);
       setMistakeOrderId(null);
-      setMistakeExpired(true);
-      setSelectedTenderCents(null);
       setAlarmFlash(true);
       chime("alarm");
+      playMistakeThud();
+      triggerHaptic("mistake");
+      triggerShadowWarning("¡Tiempo agotado! En la caja real se habría registrado el monto erróneo.");
+      loadModule("module3_mistakes_noshow");
     }, 1000);
     return () => clearTimeout(timer);
   }, [simulator, mistakeCountdown]);
@@ -1321,13 +1483,6 @@ export function LiveOrders() {
     return () => clearTimeout(timer);
   }, [alarmFlash]);
 
-  // Hesitation: still on the same spotlight after 5 s → pulse it.
-  useEffect(() => {
-    setHesitating(false);
-    if (!guidedTarget) return;
-    const timer = setTimeout(() => setHesitating(true), HESITATION_MS);
-    return () => clearTimeout(timer);
-  }, [guidedTarget]);
 
   useEffect(() => {
     if (!rushMode || rushRemaining <= 0) return;
@@ -1380,65 +1535,8 @@ export function LiveOrders() {
     };
   }, []);
 
-  const trainingMessage =
-    tourStep === 1
-      ? "¡Nuevo pedido! Toca «Aceptar» para avisar que empezamos a cocinar."
-      : tourStep === 2
-        ? "Lee el modificador rojo y toca «SIN QUESO» para confirmar que viste la restricción."
-        : tourStep === 3
-          ? "Restricción revisada. Cuando termines de cocinar, marca el pedido como listo."
-          : tourStep === 4
-            ? guidedTarget === "undo-demo-payment"
-              ? "¡Espera! El cliente te dio $500, no $200. Toca «Deshacer» antes de que termine la cuenta."
-              : guidedTarget === "pay-demo-order"
-                ? mistakeExpired
-                  ? "Se acabó el tiempo: en la caja real ese pago ya se habría registrado con el monto equivocado. Inténtalo de nuevo: toca «Cobrar al entregar»."
-                  : mistakeSeen
-                    ? "Corrección lista. El cliente entregó $500: toca «Cobrar al entregar» y cóbrale con ese billete."
-                    : "El cliente paga con un billete de $200. Toca «Cobrar al entregar»."
-                : guidedTarget === "confirm-demo-payment"
-                  ? mistakeSeen
-                    ? "El cliente entregó $500. Confirma el efectivo de práctica."
-                    : "Confirma el pago de práctica."
-                  : mistakeSeen
-                    ? "El cliente entregó $500. Selecciona ese billete."
-                    : "El cliente entrega $200. Selecciona ese billete."
-            : tourStep === 5
-              ? "¡Excelente, estás listo! La práctica terminó sin tocar la caja real."
-              : rushMode
-                ? `Reto almuerzo · ${rushResolved}/${RUSH_TICKET_COUNT} resueltas · ${rushRemaining}s restantes.`
-                : "";
-  useLayoutEffect(() => {
-    if (!guidedTarget) return;
-    let frame = 0;
-    const position = () => {
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        const target = document.querySelector<HTMLElement>(
-          `[data-tour-target="${guidedTarget}"]`,
-        );
-        if (!target) return;
-        const rect = target.getBoundingClientRect();
-        const left = Math.max(
-          12,
-          Math.min(window.innerWidth - 332, rect.left + rect.width / 2 - 160),
-        );
-        const top =
-          rect.bottom + 12 + 160 < window.innerHeight
-            ? rect.bottom + 12
-            : Math.max(12, rect.top - 170);
-        setCoachPosition({ left, top });
-      });
-    };
-    position();
-    window.addEventListener("resize", position);
-    window.addEventListener("scroll", position, true);
-    return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("resize", position);
-      window.removeEventListener("scroll", position, true);
-    };
-  }, [guidedTarget, tourStep, payId, mistakeCountdown]);
+  const trainingMessage = currentStep?.instruction || "";
+  const overallProgress = Math.round((completedModules.length / 5) * 100);
 
   useEffect(() => {
     if (!liveSnapshot) return;
@@ -1598,7 +1696,7 @@ export function LiveOrders() {
   };
   return (
     <div
-      className={`min-h-screen ${simulator ? "border-8 border-dashed border-yellow-400" : ""} ${hesitating ? "tour-hesitating" : ""}`}
+      className={`min-h-screen ${simulator ? "border-8 border-dashed border-yellow-400" : ""}`}
       onClickCapture={handleGuidedClick}
       style={
         simulator
@@ -1610,65 +1708,75 @@ export function LiveOrders() {
       }
     >
       {simulator && (
-        <div className="sticky top-0 z-[70] space-y-2 overflow-hidden bg-yellow-300 px-4 py-3 pt-5 font-extrabold text-stone-950 shadow-md">
-          <div
-            className="simulator-hazard-stripes pointer-events-none absolute inset-x-0 top-0 h-2"
-            aria-hidden="true"
-          />
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span>
-              MODO DE PRUEBA — Las ventas no se registran ni se envían pedidos.
-            </span>
-            <button
-              className="btn border-stone-950 bg-stone-950 text-white hover:bg-stone-800"
-              data-tour-allow="exit"
-              onClick={exitSimulator}
-            >
-              Salir del simulador
-            </button>
-          </div>
-          {rushMode || rushFinished ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span>
-                {rushFinished
-                  ? `Reto terminado · ${rushResolved}/${RUSH_TICKET_COUNT} resueltos · ${rushCompleted} cobrados · ${rushNoShows} No-Show · ${rushElapsed}s.`
-                  : trainingMessage}
-              </span>
-              {!rushMode && (
-                <button
-                  className="btn min-h-10 border-stone-950 bg-white px-3 py-2 text-sm text-stone-950"
-                  data-tour-allow="rush"
-                  onClick={startRushChallenge}
-                >
-                  Repetir reto de {RUSH_LIMIT_SECONDS} segundos
-                </button>
-              )}
-            </div>
-          ) : guided ? (
-            <div>
-              <div className="mb-1 flex justify-between text-xs">
-                <span>Paso {progressStep} de 5 · Guía interactiva</span>
-                <span>{Math.round((progressStep / 5) * 100)}%</span>
-              </div>
-              <div
-                className="h-2 overflow-hidden rounded-full bg-yellow-100"
-                role="progressbar"
-                aria-valuenow={progressStep}
-                aria-valuemin={0}
-                aria-valuemax={5}
-                aria-label={`Paso ${progressStep} de 5`}
-              >
-                <div
-                  className="h-full rounded-full bg-clay-800 transition-all duration-500"
-                  style={{ width: `${(progressStep / 5) * 100}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
-        </div>
+        <AcademyBanner
+          currentModuleId={currentModule}
+          completedModules={completedModules}
+          currentStep={currentStep}
+          overallProgressPercent={overallProgress}
+          rushMode={rushMode}
+          rushRemaining={rushRemaining}
+          rushResolved={rushResolved}
+          rushTotal={RUSH_TICKET_COUNT}
+          canExit={isTrained || completedModules.length === 5}
+          onSelectModule={loadModule}
+          onStartRush={startRushChallenge}
+          onResetModule={() => loadModule(currentModule)}
+          onExit={exitSimulator}
+        />
       )}
-      <StaffHeader page="pos" lockDisabled={hasPendingPayment}>
-        {!simulator && (
+      <StaffHeader
+        page="pos"
+        lockDisabled={hasPendingPayment}
+        onAnalyticsClick={
+          simulator
+            ? (e) => {
+                e.preventDefault();
+                setGhostLedgerOpen(true);
+                if (currentModule === "module5_revenue_closeout" && currentStepIndex === 0) {
+                  advanceStep();
+                }
+              }
+            : undefined
+        }
+        analyticsTourTarget="btn-nav-analytics"
+      >
+        {simulator ? (
+          <>
+            <button
+              className="btn bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100"
+              data-tour-target="btn-inventory"
+              data-tour-action="inventory-open"
+              onClick={() => {
+                setGhostInventoryOpen(true);
+                if (currentModule === "module4_panic_86" && currentStepIndex === 0) {
+                  advanceStep();
+                }
+              }}
+            >
+              <SlidersHorizontal size={16} />
+              Inventario (Práctica)
+            </button>
+            <button
+              role="switch"
+              aria-checked={ghostWebOrdersPaused}
+              className={`btn ${ghostWebOrdersPaused ? "btn-danger" : "bg-stone-100 text-stone-800"}`}
+              data-tour-target={ghostWebOrdersPaused ? "btn-panic-resume" : "btn-panic-pause"}
+              data-tour-action={ghostWebOrdersPaused ? "panic-resume" : "panic-pause"}
+              onClick={() => {
+                const nextState = !ghostWebOrdersPaused;
+                setGhostWebOrdersPaused(nextState);
+                if (currentModule === "module4_panic_86" && currentStepIndex === 3 && nextState) {
+                  advanceStep();
+                } else if (currentModule === "module4_panic_86" && currentStepIndex === 4 && !nextState) {
+                  advanceStep();
+                }
+              }}
+            >
+              {ghostWebOrdersPaused ? <Play size={16} /> : <Pause size={16} />}
+              {ghostWebOrdersPaused ? "Reanudar pedidos web" : "Pausar pedidos web"}
+            </button>
+          </>
+        ) : (
           <>
             <button className="btn" onClick={() => setInventory(true)}>
               <SlidersHorizontal size={16} />
@@ -1788,7 +1896,7 @@ export function LiveOrders() {
                 </span>
               </button>
             )}
-            {simulator && !rushMode && tourStep === 5 && (
+            {simulator && !rushMode && (
               <button
                 className="btn border-clay-700 bg-clay-50 font-bold text-clay-950 hover:bg-clay-100"
                 data-tour-allow="rush"
@@ -1972,13 +2080,7 @@ export function LiveOrders() {
                                 now={now}
                                 simulator={simulator}
                                 highlighted={
-                                  simulator &&
-                                  ((tourStep === 1 &&
-                                    order.status === "review") ||
-                                    (tourStep === 2 &&
-                                      order.status === "cooking") ||
-                                    (tourStep === 3 &&
-                                      order.status === "ready"))
+                                  simulator && currentStep?.targetLane === order.status
                                 }
                                 errorShake={wrongOrderId === order.id}
                                 coachTarget={guidedTarget ?? undefined}
@@ -1999,7 +2101,9 @@ export function LiveOrders() {
                                 }
                                 onPay={() => {
                                   setPayId(order.id);
-                                  if (simulator) setTourStep(4);
+                                  if (simulator && currentStep?.action === "pay") {
+                                    advanceStep();
+                                  }
                                 }}
                               />
                             </ErrorBoundary>
@@ -2035,7 +2139,6 @@ export function LiveOrders() {
           onClose={() => {
             setPayId(null);
             if (simulator) {
-              setTourStep(4);
               setSelectedTenderCents(null);
             }
           }}
@@ -2043,7 +2146,12 @@ export function LiveOrders() {
           guidedTarget={guidedTarget}
           onExitSimulator={exitSimulator}
           trainingMessage={simulator ? trainingMessage : undefined}
-          onSimulatorTenderSelected={setSelectedTenderCents}
+          onSimulatorTenderSelected={(cents) => {
+            setSelectedTenderCents(cents);
+            if (currentStep?.action === "cash-preset") {
+              advanceStep();
+            }
+          }}
           onConfirm={simulator ? completeSimulatorPayment : queueLivePayment}
         />
       )}
@@ -2089,59 +2197,104 @@ export function LiveOrders() {
               >
                 {rushPassed ? "Repetir reto" : "Intentar de nuevo"}
               </button>
-              <button
-                className="btn flex-1"
-                data-tour-allow="exit"
-                onClick={exitSimulator}
-              >
-                Volver al turno real
-              </button>
+              {rushPassed ? (
+                <button
+                  className="btn btn-primary bg-emerald-700 border-emerald-700 flex-1 text-white font-bold"
+                  onClick={() => {
+                    setRushFinished(false);
+                    setIsGraduated(true);
+                  }}
+                >
+                  ¡Ver Graduación!
+                </button>
+              ) : (
+                <button
+                  className="btn flex-1"
+                  data-tour-allow="exit"
+                  onClick={() => {
+                    setRushFinished(false);
+                    setRushMode(false);
+                    loadModule("module5_revenue_closeout");
+                  }}
+                >
+                  Volver a Ganancias y Cierre
+                </button>
+              )}
             </div>
           </section>
         </>
       )}
-      {guided && (
+      {simulator && currentStep && !rushMode && (
+        <CoachmarkSpotlight
+          step={currentStep}
+          explainLockRemaining={explainLockRemaining}
+          onTargetClickAllowed={explainLockRemaining === 0}
+        />
+      )}
+      {simulator && (
         <>
-          <div
-            className="pointer-events-none fixed inset-0 z-30 bg-black/60 backdrop-blur-sm"
-            aria-hidden="true"
+          <AcademyInventoryModal
+            isOpen={ghostInventoryOpen}
+            onClose={() => {
+              setGhostInventoryOpen(false);
+              if (currentModule === "module4_panic_86" && currentStepIndex === 2) {
+                advanceStep();
+              }
+            }}
+            items={ghostInventoryItems}
+            onToggleItem={(itemId) => {
+              setGhostInventoryItems((prev) =>
+                prev.map((it) =>
+                  it.id === itemId ? { ...it, available: !it.available } : it,
+                ),
+              );
+              if (
+                currentModule === "module4_panic_86" &&
+                currentStepIndex === 1 &&
+                itemId === "gordita-chicharron"
+              ) {
+                advanceStep();
+              }
+            }}
+            guidedTarget={guidedTarget}
+            onToggleAllowed={explainLockRemaining === 0}
           />
-          {!payId && guidedTarget && (
-            <aside
-              className="pointer-events-none fixed z-[60] max-w-sm rounded-2xl border-2 border-yellow-400 bg-white p-5 text-stone-950 shadow-2xl motion-safe:animate-bounce"
-              style={coachPosition}
-              role="status"
-              aria-live="polite"
-            >
-              <strong className="block text-sm font-black uppercase tracking-wide text-clay-800">
-                Guía de MasaFlow · Paso {progressStep} de 5
-              </strong>
-              <p className="mt-2 text-sm font-semibold leading-relaxed">
-                {trainingMessage}
-              </p>
-            </aside>
-          )}
-          {tourStep === 5 && (
-            <aside
-              className="pointer-events-none fixed bottom-4 right-4 z-[60] max-w-sm rounded-2xl border-2 border-emerald-600 bg-white p-5 text-stone-950 shadow-2xl"
-              role="status"
-              aria-live="polite"
-            >
-              <strong className="block text-lg font-black text-emerald-800">
-                ¡Excelente, estás listo!
-              </strong>
-              <p className="mt-2 text-sm font-semibold leading-relaxed">
-                {trainingMessage}
-              </p>
-              <button
-                className="btn btn-primary pointer-events-auto mt-4 w-full"
-                data-tour-allow="exit"
-                onClick={exitSimulator}
-              >
-                Finalizar guía y volver al turno real
-              </button>
-            </aside>
-          )}
+          <AcademyLedgerModal
+            metrics={ghostSalesMetrics}
+            isOpen={ghostLedgerOpen}
+            onClose={() => setGhostLedgerOpen(false)}
+            guidedTarget={guidedTarget}
+            onInspectRevenue={() => {
+              if (currentModule === "module5_revenue_closeout" && currentStepIndex === 1) {
+                advanceStep();
+              }
+            }}
+            onOpenCloseShift={() => {
+              setGhostBlindDropOpen(true);
+              if (currentModule === "module5_revenue_closeout" && currentStepIndex === 2) {
+                advanceStep();
+              }
+            }}
+            isBlindDropOpen={ghostBlindDropOpen}
+            onBlindDropConfirmed={() => {
+              setGhostBlindDropOpen(false);
+              setGhostLedgerOpen(false);
+              if (currentModule === "module5_revenue_closeout") {
+                completeModule("module5_revenue_closeout");
+              }
+            }}
+            onCardClickAllowed={explainLockRemaining === 0}
+          />
+          <GraduationModal
+            isOpen={isGraduated}
+            onGraduateAndGoLive={handleGraduateAndGoLive}
+            onRepeatTraining={() => {
+              setIsGraduated(false);
+              setCompletedModules([]);
+              loadModule("module1_golden_path");
+            }}
+          />
+          <ShadowWarningToast message={shadowWarning} />
         </>
       )}
     </div>

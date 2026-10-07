@@ -138,6 +138,96 @@ export function markDemoNoShow(order) {
 }
 
 /**
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function createPickyEaterDemoOrder(now = new Date()) {
+  const order = createDemoOrder(now, {
+    number: 2,
+    id: "demo-order-picky-002",
+  });
+  order.customerName = "Carlos (Sin Queso)";
+  return order;
+}
+
+/**
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function createNoShowDemoOrder(now = new Date()) {
+  const order = createDemoOrder(now, {
+    number: 3,
+    id: "demo-order-noshow-003",
+  });
+  order.customerName = "Roberto (No Llegó)";
+  order.status = "ready";
+  order.acceptedAt = now.toISOString();
+  order.readyAt = now.toISOString();
+  return order;
+}
+
+/**
+ * Calculate client-side practice metrics from completed and active demo orders.
+ * Completely immune to polluting data.json.
+ *
+ * @param {Order[]} completedOrders
+ * @returns {{
+ *   revenueCents: number,
+ *   paidOrders: number,
+ *   noShows: number,
+ *   voidCount: number,
+ *   tenderedCents: number,
+ *   changeCents: number,
+ *   completedOrders: number,
+ *   itemPerformance: Array<{id: string, name: string, quantity: number, revenueCents: number}>
+ * }}
+ */
+export function calculatePracticeMetrics(completedOrders = []) {
+  let revenueCents = 0;
+  let paidOrders = 0;
+  let noShows = 0;
+  let tenderedCents = 0;
+  let changeCents = 0;
+  /** @type {Map<string, {id: string, name: string, quantity: number, revenueCents: number}>} */
+  const itemMap = new Map();
+
+  for (const order of completedOrders) {
+    if (order.status === "completed" && order.transaction) {
+      paidOrders += 1;
+      revenueCents += order.transaction.totalCents;
+      tenderedCents += order.transaction.tenderedCents;
+      changeCents += order.transaction.changeCents;
+      for (const item of order.items) {
+        const existing = itemMap.get(item.menuItemId) || {
+          id: item.menuItemId,
+          name: item.name,
+          quantity: 0,
+          revenueCents: 0,
+        };
+        existing.quantity += item.quantity;
+        existing.revenueCents += item.lineTotalCents;
+        itemMap.set(item.menuItemId, existing);
+      }
+    } else if (order.status === "no_show") {
+      noShows += 1;
+    }
+  }
+
+  return {
+    revenueCents,
+    paidOrders,
+    noShows,
+    voidCount: noShows,
+    tenderedCents,
+    changeCents,
+    completedOrders: paidOrders,
+    itemPerformance: Array.from(itemMap.values()).sort(
+      (a, b) => b.quantity - a.quantity,
+    ),
+  };
+}
+
+/**
  * Decides whether a Lunch Rush attempt earns the «Velocidad de Taquero Experto» badge.
  *
  * Grading policy (decided with the owner): every ticket must be *paid*, so the exam
@@ -152,3 +242,4 @@ export function evaluateRush({ paid, noShows, elapsedSeconds }) {
   void noShows;
   return paid >= RUSH_TICKET_COUNT && elapsedSeconds <= RUSH_LIMIT_SECONDS;
 }
+
