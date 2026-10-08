@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import type { TableInfo, MenuItem } from "../../../../shared/types/zapata";
+import { detectOrderBadges } from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import { UNDO_WINDOW_SECONDS, needsAcknowledgement } from "../simulator.js";
@@ -70,7 +71,7 @@ export function CashTender({
   order: Order;
   onClose: () => void;
   /** Queues the payment. Live mode starts the undo window; the simulator grades it. */
-  onConfirm: (orderId: string, tenderedCents: number, via?: "exact") => void;
+  onConfirm: (orderId: string, tenderedCents: number, via?: "exact" | "spei") => void;
   simulator?: boolean;
   /** Practice: the cash field accepts typing (otherwise it is read-only and only the bills work). */
   typing?: boolean;
@@ -175,7 +176,8 @@ export function CashTender({
         <button
           type="button"
           data-tour-target={simulator ? "btn-spei-tender" : undefined}
-          className="btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100"
+          disabled={!simulator && !connected}
+          className="btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
           onClick={() => setShowSpei(true)}
         >
           <Building2 size={16} />
@@ -196,7 +198,7 @@ export function CashTender({
           onClose={() => setShowSpei(false)}
           onConfirmReceived={() => {
             setShowSpei(false);
-            onConfirm(order.id, order.totalCents, "exact");
+            onConfirm(order.id, order.totalCents, "spei");
           }}
         />
       )}
@@ -262,22 +264,9 @@ export function TicketCard({
     100,
     Math.max(4, Math.round((elapsedSeconds / agingLimitSeconds) * 100)),
   );
-  const omissions = order.items.flatMap((item) =>
-    item.modifiers.filter((modifier) => modifier.kind === "omit"),
-  );
-  const hasSinGrasa = order.items.some(
-    (item) =>
-      item.name.toLowerCase().includes("sin grasa") ||
-      item.modifiers?.some(
-        (m) =>
-          m.name.toLowerCase().includes("sin grasa") ||
-          m.name.toLowerCase().includes("comal seco"),
-      ),
-  );
-  const hasExtraQuesillo = order.items.some((item) =>
-    item.modifiers?.some((m) => m.name.toLowerCase().includes("quesillo")),
-  );
-  const isSPEI = Boolean((order as any).notes?.toLowerCase().includes("spei"));
+  const { hasSinGrasa, hasExtraQuesillo, isSPEI, omissions: detectedOmissions } =
+    detectOrderBadges(order);
+  const omissions = detectedOmissions.map((d) => d.omission);
   const requiresAcknowledgement = simulator && needsAcknowledgement(order);
   async function advance() {
     if (performance.now() < actionLock.current) return;
@@ -1080,7 +1069,11 @@ function LiveBoard({
   const pendingTimers = useRef(
     new Map<
       string,
-      { timer: ReturnType<typeof setTimeout>; tenderedCents: number }
+      {
+        timer: ReturnType<typeof setTimeout>;
+        tenderedCents: number;
+        via?: "exact" | "spei";
+      }
     >(),
   );
   const commandRef = useRef(command);
@@ -1110,7 +1103,9 @@ function LiveBoard({
   const view = academy.step?.view;
   useEffect(() => {
     if (!simulator || !view) return;
-    if (view.tab) setActiveTab(view.tab as any);
+    if (view.tab === "queue" || view.tab === "completed") {
+      setActiveTab(view.tab);
+    }
     if (view.lane) setActiveLane(view.lane);
     if (view.kitchenOnly !== undefined) setKitchenOnly(view.kitchenOnly);
   }, [simulator, academy.step?.id, academy.state.runId]);
@@ -1124,14 +1119,18 @@ function LiveBoard({
   // Non-intrusive onboarding: do not force-trap on login.
   // The "Comenzar Entrenamiento" button pulses prominently if untrained.
 
-  /** Live cash: hold the emission for the undo window, then send pos_order_paid once. */
-  function queueLivePayment(orderId: string, tenderedCents: number) {
+  /** Live cash / SPEI: hold the emission for the undo window, then send pos_order_paid once. */
+  function queueLivePayment(
+    orderId: string,
+    tenderedCents: number,
+    via?: "exact" | "spei",
+  ) {
     if (pendingTimers.current.has(orderId)) return;
     const timer = setTimeout(
-      () => void settleLivePayment(orderId, tenderedCents),
+      () => void settleLivePayment(orderId, tenderedCents, via),
       UNDO_WINDOW_SECONDS * 1000,
     );
-    pendingTimers.current.set(orderId, { timer, tenderedCents });
+    pendingTimers.current.set(orderId, { timer, tenderedCents, via });
     setPendingPayments((current) => ({
       ...current,
       [orderId]: {
@@ -1143,7 +1142,11 @@ function LiveBoard({
     setPayId(null);
   }
 
-  async function settleLivePayment(orderId: string, tenderedCents: number) {
+  async function settleLivePayment(
+    orderId: string,
+    tenderedCents: number,
+    via?: "exact" | "spei",
+  ) {
     pendingTimers.current.delete(orderId);
     setPendingPayments((current) =>
       current[orderId]
@@ -1155,6 +1158,7 @@ function LiveBoard({
       const reply = await commandRef.current("pos_order_paid", {
         orderId,
         tenderedCents,
+        ...(via === "spei" ? { method: "spei" } : {}),
       });
       if (!reply.ok)
         setPaymentNotice(
@@ -1202,6 +1206,7 @@ function LiveBoard({
         void commandRef.current("pos_order_paid", {
           orderId,
           tenderedCents: entry.tenderedCents,
+          ...(entry.via === "spei" ? { method: "spei" } : {}),
         });
       }
       timers.clear();

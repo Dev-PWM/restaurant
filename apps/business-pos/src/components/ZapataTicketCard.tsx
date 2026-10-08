@@ -1,14 +1,16 @@
-import React, { memo } from "react";
-import { AlertCircle, Clock3, Utensils, Building2, Flame } from "lucide-react";
+import React, { memo, useState } from "react";
+import { AlertCircle, Flame, Building2 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import { mxn, orderLabel } from "../../../../shared/ui/components";
+import { detectOrderBadges } from "../../../../shared/types/zapata";
 
 export interface ZapataTicketCardProps {
   order: Order;
   onAdvance?: () => void;
   onPay?: () => void;
   onNoShow?: () => void;
-  onAcknowledgeRestriction?: () => void;
+  onAcknowledgeRestriction?: (omissionKey: string) => void;
+  acknowledgedRestrictions?: Set<string>;
   restrictionAcknowledged?: boolean;
   simulator?: boolean;
   isSPEI?: boolean;
@@ -21,37 +23,36 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
   onPay,
   onNoShow,
   onAcknowledgeRestriction,
+  acknowledgedRestrictions,
   restrictionAcknowledged = false,
   simulator = false,
-  isSPEI = false,
+  isSPEI: explicitIsSPEI,
   cookingStyle,
 }: ZapataTicketCardProps) {
+  const [localAcknowledged, setLocalAcknowledged] = useState<Set<string>>(new Set());
   const isCooking = order.status === "cooking";
   const isReview = order.status === "review";
   const isReady = order.status === "ready";
 
-  // Scan items for modifiers
-  const hasSinGrasa =
-    cookingStyle === "sin_grasa" ||
-    order.items.some(
-      (item) =>
-        item.name.toLowerCase().includes("sin grasa") ||
-        item.modifiers?.some((m) =>
-          m.name.toLowerCase().includes("sin grasa") ||
-          m.name.toLowerCase().includes("comal seco")
-        )
+  const badges = detectOrderBadges(order, cookingStyle);
+  const isSPEI = explicitIsSPEI ?? badges.isSPEI;
+  const { hasSinGrasa, hasExtraQuesillo, omissions } = badges;
+
+  const isOmissionAcknowledged = (key: string) =>
+    restrictionAcknowledged ||
+    acknowledgedRestrictions?.has(key) ||
+    localAcknowledged.has(key);
+
+  const handleAcknowledge = (key: string) => {
+    setLocalAcknowledged((prev) => new Set(prev).add(key));
+    onAcknowledgeRestriction?.(key);
+  };
+
+  const allOmissionsAcknowledged =
+    omissions.length === 0 ||
+    omissions.every(({ itemIndex, omission }) =>
+      isOmissionAcknowledged(`${itemIndex}-${omission.id}`)
     );
-
-  const hasExtraQuesillo = order.items.some(
-    (item) =>
-      item.modifiers?.some((m) =>
-        m.name.toLowerCase().includes("quesillo")
-      )
-  );
-
-  const omissions = order.items.flatMap((item) =>
-    (item.modifiers || []).filter((m) => m.kind === "omit")
-  );
 
   return (
     <article
@@ -114,23 +115,27 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
             </span>
           )}
 
-          {omissions.map((omission) => (
-            <button
-              key={omission.id}
-              type="button"
-              data-tour-target={simulator ? `badge-omit-${omission.id}` : undefined}
-              onClick={onAcknowledgeRestriction}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black uppercase text-white transition-transform ${
-                restrictionAcknowledged
-                  ? "bg-emerald-700 ring-2 ring-emerald-400"
-                  : "bg-red-600 animate-pulse hover:scale-105 active:scale-95"
-              }`}
-            >
-              <AlertCircle className="size-3.5" />
-              {omission.name.toUpperCase()}
-              {restrictionAcknowledged && " ✓"}
-            </button>
-          ))}
+          {omissions.map(({ itemIndex, omission }) => {
+            const compositeKey = `${itemIndex}-${omission.id}`;
+            const acknowledged = isOmissionAcknowledged(compositeKey);
+            return (
+              <button
+                key={compositeKey}
+                type="button"
+                data-tour-target={simulator ? `badge-omit-${omission.id}` : undefined}
+                onClick={() => handleAcknowledge(compositeKey)}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-black uppercase text-white transition-transform ${
+                  acknowledged
+                    ? "bg-emerald-700 ring-2 ring-emerald-400"
+                    : "bg-red-600 animate-pulse hover:scale-105 active:scale-95"
+                }`}
+              >
+                <AlertCircle className="size-3.5" />
+                {omission.name.toUpperCase()}
+                {acknowledged && " ✓"}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -186,8 +191,9 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
           <button
             type="button"
             data-tour-target={simulator ? "mark-demo-ready" : undefined}
+            disabled={omissions.length > 0 && !allOmissionsAcknowledged}
             onClick={onAdvance}
-            className="btn min-h-[44px] flex-1 bg-emerald-600 font-black text-sm text-white hover:bg-emerald-700"
+            className="btn min-h-[44px] flex-1 bg-emerald-600 font-black text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
           >
             Marcar Lista
           </button>

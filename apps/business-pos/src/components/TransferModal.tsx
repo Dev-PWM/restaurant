@@ -1,7 +1,7 @@
-import React, { memo, useState } from "react";
-import { Building2, Copy, Check, AlertTriangle, ShieldCheck, X } from "lucide-react";
+import React, { memo, useState, useRef, useEffect } from "react";
+import { Building2, Copy, Check, AlertTriangle, ShieldCheck } from "lucide-react";
 import { BBVA_BANK_INFO } from "../../../../shared/types/zapata";
-import { mxn } from "../../../../shared/ui/components";
+import { Modal, mxn } from "../../../../shared/ui/components";
 
 export interface TransferModalProps {
   orderTotalCents: number;
@@ -21,54 +21,63 @@ export const TransferModal = memo(function TransferModal({
   simulator = false,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
+  const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const handleCopy = () => {
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(BBVA_BANK_INFO.clabe).catch(() => {});
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopy = async () => {
+    if (!navigator?.clipboard?.writeText) return;
+    try {
+      await navigator.clipboard.writeText(BBVA_BANK_INFO.clabe);
+      setCopied(true);
+      if (copyTimerRef.current) {
+        clearTimeout(copyTimerRef.current);
+      }
+      copyTimerRef.current = setTimeout(() => {
+        setCopied(false);
+        copyTimerRef.current = null;
+      }, 2500);
+    } catch {
+      // If clipboard access is denied or fails, do not set copied to true
     }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
   };
 
+  const rawOrderNumber = orderNumber ? String(orderNumber).replace(/^#/, "") : "";
+  const paymentConcept = rawOrderNumber
+    ? `${BBVA_BANK_INFO.conceptPrefix}${rawOrderNumber}`
+    : "";
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="transfer-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+    <Modal
+      title="Transferencia SPEI · BBVA"
+      onClose={onClose}
+      layer={simulator ? "inline" : "native"}
     >
       <div
         data-tour-target={simulator ? "spei-modal" : undefined}
-        className="w-full max-w-lg rounded-2xl border-2 border-stone-200 bg-[#FDFBF7] p-6 shadow-2xl transition-all"
+        className="space-y-4 text-stone-900"
       >
-        <div className="flex items-start justify-between border-b border-stone-200 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
-              <Building2 className="size-6" />
-            </div>
-            <div>
-              <h2
-                id="transfer-modal-title"
-                className="text-xl font-black tracking-tight text-stone-900"
-              >
-                Transferencia SPEI · BBVA
-              </h2>
-              <p className="text-xs font-semibold text-stone-500">
-                Pago directo de banco a banco sin comisiones
-              </p>
-            </div>
+        <div className="flex items-center gap-3 border-b border-stone-200 pb-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-blue-600 text-white shadow-xs">
+            <Building2 className="size-5" />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex size-9 items-center justify-center rounded-xl border border-stone-300 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-            aria-label="Cerrar modal de transferencia"
-          >
-            <X className="size-5" />
-          </button>
+          <div>
+            <h3 className="text-base font-black tracking-tight text-stone-900">
+              Pago Directo SPEI
+            </h3>
+            <p className="text-xs font-semibold text-stone-500">
+              Sin comisiones de pasarela · Banco a banco
+            </p>
+          </div>
         </div>
 
-        <div className="my-5 rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+        <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
           <div className="flex items-center justify-between">
             <span className="text-sm font-bold text-stone-700">Monto exacto a transferir:</span>
             <strong className="text-3xl font-black tabular-nums text-blue-900">
@@ -77,13 +86,13 @@ export const TransferModal = memo(function TransferModal({
           </div>
           {(orderNumber || customerName) && (
             <div className="mt-2 text-xs font-medium text-stone-600">
-              {orderNumber && <span className="mr-2">Orden #{orderNumber}</span>}
+              {orderNumber && <span className="mr-2">Orden #{rawOrderNumber}</span>}
               {customerName && <span>Cliente: {customerName}</span>}
             </div>
           )}
         </div>
 
-        <div className="space-y-3.5 rounded-xl border border-stone-200 bg-white p-4">
+        <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
           <div>
             <span className="text-[11px] font-black uppercase tracking-wider text-stone-500">
               Banco Receptor
@@ -126,24 +135,35 @@ export const TransferModal = memo(function TransferModal({
               </button>
             </div>
           </div>
+
+          {paymentConcept && (
+            <div>
+              <span className="text-[11px] font-black uppercase tracking-wider text-stone-500">
+                Concepto de Pago / Referencia
+              </span>
+              <p className="mt-0.5 font-mono text-base font-black text-stone-900">
+                {paymentConcept}
+              </p>
+            </div>
+          )}
         </div>
 
-        <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-950">
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-950">
           <AlertTriangle className="size-4 shrink-0 text-amber-600" />
           <p>
             <strong>Cajero:</strong> Verifica la notificación en la aplicación móvil de BBVA antes de confirmar la entrega del pedido.
           </p>
         </div>
 
-        {onConfirmReceived && (
-          <div className="mt-5 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn flex-1 border-stone-300 bg-stone-100 font-bold text-stone-700 hover:bg-stone-200"
-            >
-              Cancelar
-            </button>
+        <div className="flex gap-3 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn flex-1 border-stone-300 bg-stone-100 font-bold text-stone-700 hover:bg-stone-200"
+          >
+            Cancelar
+          </button>
+          {onConfirmReceived && (
             <button
               type="button"
               data-tour-target={simulator ? "confirm-spei-payment" : undefined}
@@ -153,9 +173,9 @@ export const TransferModal = memo(function TransferModal({
               <ShieldCheck className="size-5" />
               Confirmar Recepción SPEI
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
+    </Modal>
   );
 });

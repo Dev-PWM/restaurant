@@ -59,6 +59,7 @@ export interface Order {
   status: OrderStatus;
   items: OrderLine[];
   totalCents: number;
+  notes?: string;
   createdAt: string;
   acceptedAt: string | null;
   paidAt: string | null;
@@ -113,7 +114,11 @@ export interface Snapshot {
 }
 export interface Commands {
   submit_client_order: OrderInput;
-  pos_order_paid: { orderId: string; tenderedCents: number };
+  pos_order_paid: {
+    orderId: string;
+    tenderedCents: number;
+    method?: "cash" | "spei";
+  };
   pos_update_status: { orderId: string; status: "cooking" | "ready" };
   pos_mark_noshow: { orderId: string };
   admin_toggle_stock: {

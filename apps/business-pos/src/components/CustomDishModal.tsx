@@ -92,10 +92,14 @@ export const CustomDishModal = memo(function CustomDishModal({
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4">
           <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+            <label
+              htmlFor="custom-dish-name"
+              className="block text-xs font-black uppercase tracking-wider text-stone-700"
+            >
               Nombre del Platillo *
             </label>
             <input
+              id="custom-dish-name"
               type="text"
               required
               placeholder="Ej. Huarache de Costilla Especial"
@@ -107,10 +111,14 @@ export const CustomDishModal = memo(function CustomDishModal({
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+              <label
+                htmlFor="custom-dish-category"
+                className="block text-xs font-black uppercase tracking-wider text-stone-700"
+              >
                 Categoría *
               </label>
               <select
+                id="custom-dish-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ZapataCategory)}
                 className="mt-1.5 w-full rounded-xl border-2 border-stone-300 bg-white px-3 py-2.5 font-bold text-stone-900 focus:border-[#2E94A5] focus:outline-hidden"
@@ -126,14 +134,18 @@ export const CustomDishModal = memo(function CustomDishModal({
             </div>
 
             <div>
-              <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+              <label
+                htmlFor="custom-dish-price"
+                className="block text-xs font-black uppercase tracking-wider text-stone-700"
+              >
                 Precio Base (MXN) *
               </label>
               <div className="relative mt-1.5">
                 <span className="absolute left-3.5 top-2.5 font-bold text-stone-500">$</span>
                 <input
+                  id="custom-dish-price"
                   type="number"
-                  step="0.50"
+                  step="0.01"
                   min="0"
                   required
                   placeholder="0.00"
@@ -146,10 +158,14 @@ export const CustomDishModal = memo(function CustomDishModal({
           </div>
 
           <div>
-            <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+            <label
+              htmlFor="custom-dish-description"
+              className="block text-xs font-black uppercase tracking-wider text-stone-700"
+            >
               Descripción Corta (Opcional)
             </label>
             <input
+              id="custom-dish-description"
               type="text"
               placeholder="Ingredientes o notas para el cliente..."
               value={description}

@@ -341,7 +341,7 @@ export function usePracticeBoard({
   );
 
   const pay = useCallback(
-    (orderId: string, cents: number, via?: "exact") => {
+    (orderId: string, cents: number, via?: "exact" | "spei") => {
       const order = orders.find((candidate) => candidate.id === orderId);
       if (!order) return;
       if (!rush && academy.step?.id === "errores-3" && cents === 20000) {
