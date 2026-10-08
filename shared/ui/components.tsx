@@ -472,10 +472,17 @@ export function PinGate({ children }: { children: ReactNode }) {
 }
 export function Brand() {
   return (
-    <div className="inline-flex items-center gap-3">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-600 text-white">
-        <ChefHat size={24} />
-      </span>
+    // shrink-0: on a phone the header is tight, and it is the buttons beside the name that must give, never the name.
+    <div className="inline-flex shrink-0 items-center gap-3">
+      {/* The restaurant's mascot. Decorative: the name right beside it says the same thing. */}
+      <img
+        src={`${import.meta.env.BASE_URL}logo.png`}
+        alt=""
+        width={37}
+        height={56}
+        decoding="async"
+        className="h-12 w-auto shrink-0 sm:h-14"
+      />
       <span className="text-xl font-bold tracking-tight">
         MasaFlow<span className="text-clay-600">.</span>
       </span>

@@ -101,3 +101,14 @@ npm run build
 Logs, the Admin UI, load tests and security scans are covered in [docs/OPERATIONS_AND_SECURITY.md](docs/OPERATIONS_AND_SECURITY.md).
 
 See [docs/REALTIME_ARCHITECTURE.md](docs/REALTIME_ARCHITECTURE.md) for lifecycle, cash recognition, security, persistence, chart semantics, performance limits and test boundaries.
+
+## Logo
+
+The mascot is `docs/brand/mascot-source.jpg`. Everything else is generated from it: the header logo, the favicon, the home-screen icons (including the Android maskable one) and the iPhone icon. To change the logo, replace that picture and rebuild the icons (macOS, no extra tools):
+
+```sh
+swiftc -module-cache-path "$TMPDIR/swiftcache" scripts/build-logo.swift -o "$TMPDIR/build-logo"
+"$TMPDIR/build-logo" docs/brand/mascot-source.jpg shared/pwa assets/apple-touch-icon.png
+```
+
+The script removes the white sticker background (it expects a white or very light background around the drawing), so a picture on a coloured background needs that step adjusted. Then run `npm run build`.

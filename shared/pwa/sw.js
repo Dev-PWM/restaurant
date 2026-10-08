@@ -8,7 +8,11 @@ const appShell = new URL("realtime.html", scope).href;
 const precache = [
   appShell,
   new URL("manifest.webmanifest", scope).href,
-  new URL("masaflow.svg", scope).href,
+  // The header logo is drawn by a component, so it is not in the HTML; cache it up front so the first
+  // offline visit still shows it.
+  new URL("logo.png", scope).href,
+  new URL("favicon-32.png", scope).href,
+  new URL("icon-192.png", scope).href,
 ];
 
 self.addEventListener("install", (event) => {
