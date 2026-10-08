@@ -575,7 +575,7 @@ export function TicketCard({
             <p className="mb-5">
               Se quitará {orderLabel(order)} de la fila. El historial conservará
               sus platillos y cantidades como No-Show; no se registrará ningún
-              ingreso de efectivo.
+              ingreso.
             </p>
             <div className="flex gap-3">
               <button className="btn flex-1" onClick={() => setNoShow(false)}>
@@ -792,7 +792,7 @@ export function CompletedOrdersSection({
                 <th className="px-4 py-3.5">Duración Servicio</th>
                 <th className="px-4 py-3.5">Platillos</th>
                 <th className="px-4 py-3.5 text-right">Total Cobrado</th>
-                <th className="px-4 py-3.5">Detalle Efectivo</th>
+                <th className="px-4 py-3.5">Detalle del pago</th>
                 <th className="px-4 py-3.5 text-center">Estado</th>
               </tr>
             </thead>

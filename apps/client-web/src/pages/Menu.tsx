@@ -319,13 +319,15 @@ export function Menu() {
             Tu orden está en pausa.
           </h1>
           <p className="mt-3 text-base leading-relaxed text-amber-950">
-            Paga{" "}
+            {pending?.paymentIntent === "spei" ? "Tu total es" : "Paga"}{" "}
             <strong className="tabular-nums">
               {pendingTotalCents === null
                 ? "el total confirmado en mostrador"
                 : `${mxn(pendingTotalCents)} MXN`}
             </strong>{" "}
-            en el mostrador para que empecemos a cocinar.
+            {pending?.paymentIntent === "spei"
+              ? "y pagas por transferencia. En cuanto se confirme tu pedido verás los datos del banco."
+              : "en el mostrador para que empecemos a cocinar."}
           </p>
           <p className="mt-3 text-sm text-amber-900">
             Tu pedido se enviará con la misma referencia al verificarlo; no se
@@ -385,7 +387,7 @@ export function Menu() {
       </header>
 
       <main className="mx-auto max-w-[90rem] px-4 pb-36 pt-6 sm:px-6 sm:pt-10 lg:pr-[22rem]">
-        {/* Hero & Cash Upfront Guidance */}
+        {/* Hero & payment-at-pickup guidance */}
         <div className="mb-8 grid items-stretch gap-6 md:grid-cols-[1.5fr_1fr]">
           <div className="menu-hero flex flex-col justify-center rounded-3xl p-6 sm:p-8 shadow-xs">
             <span className="menu-hero__eyebrow inline-block text-xs font-bold uppercase tracking-wider">
@@ -398,12 +400,12 @@ export function Menu() {
             </h1>
             <p className="menu-hero__copy mt-3 text-sm sm:text-base max-w-md leading-relaxed">
               Huaraches, sopes, quesadillas, gorditas y pambazos recién salidos
-              del comal. Envía tu pedido para revisión y paga en efectivo al
-              recogerlo.
+              del comal. Envía tu pedido para revisión y paga al recogerlo, en
+              efectivo o por transferencia SPEI.
             </p>
           </div>
 
-          {/* Cash-at-pickup guidance */}
+          {/* Payment-at-pickup guidance: cash at the counter or a SPEI transfer */}
           <div className="flex flex-col justify-between rounded-3xl border border-amber-300 bg-amber-50/80 p-6 shadow-2xs">
             <div>
               <div className="flex items-center gap-2 text-sm font-bold text-amber-950">
@@ -412,13 +414,14 @@ export function Menu() {
               </div>
               <p className="mt-2 text-sm leading-relaxed text-stone-800 font-medium">
                 El negocio revisará tu pedido y, si lo acepta, comenzará a
-                prepararlo. Paga en efectivo en el mostrador al recogerlo.
+                prepararlo. Al hacer tu pedido eliges cómo pagar: en efectivo
+                en el mostrador o por transferencia SPEI.
               </p>
             </div>
 
             <div className="mt-4 pt-4 border-t border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
               <span className="font-semibold">✓ Cero comisiones</span>
-              <span className="font-semibold">✓ 100% Efectivo</span>
+              <span className="font-semibold">✓ Efectivo o SPEI</span>
               <span className="font-semibold">✓ Al momento</span>
             </div>
           </div>

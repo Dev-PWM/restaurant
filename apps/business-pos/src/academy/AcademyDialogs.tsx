@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useAcademy } from "./AcademyProvider";
 import { MODULES, getModule, RUSH_TIPS } from "./curriculum.js";
-import { isAvailable, nextModuleId } from "./engine.js";
+import { isAvailable, nextModuleId, rushOffered } from "./engine.js";
 
 /** Training dialogs are not native <dialog>s: they stack at z-layer-academy-top like everything else. */
 export function AcademyDialog({
@@ -332,7 +332,7 @@ export function RecapCard() {
   const right = module.quiz.options.find((option) => option.correct);
   const next = nextModuleId(state);
   const nextModule = next ? getModule(next) : undefined;
-  const readyForRush = !next && academy.requiredDone && !state.rushPassed;
+  const readyForRush = rushOffered(state);
   return (
     <AcademyDialog label="Módulo completado">
       <div className="space-y-4 p-5">
@@ -384,17 +384,7 @@ export function RecapCard() {
           </div>
         )}
         <div className="flex flex-col gap-2 sm:flex-row">
-          {nextModule ? (
-            <button
-              type="button"
-              data-tour-allow="next"
-              onClick={() => academy.dispatch({ type: "CONTINUE" })}
-              className="btn btn-primary min-h-12 flex-1 gap-2 text-base font-black"
-            >
-              Siguiente: {nextModule.title}
-              <ArrowRight className="size-5" aria-hidden="true" />
-            </button>
-          ) : readyForRush ? (
+          {readyForRush && (
             <button
               type="button"
               data-tour-allow="rush"
@@ -404,7 +394,22 @@ export function RecapCard() {
               <Flame className="size-5" aria-hidden="true" />
               Empezar el Reto Almuerzo
             </button>
-          ) : null}
+          )}
+          {nextModule && (
+            <button
+              type="button"
+              data-tour-allow="next"
+              onClick={() => academy.dispatch({ type: "CONTINUE" })}
+              className={`btn min-h-12 flex-1 gap-2 ${
+                readyForRush
+                  ? "rounded-2xl border-stone-600 bg-stone-800 text-sm font-bold text-white"
+                  : "btn-primary text-base font-black"
+              }`}
+            >
+              Siguiente: {nextModule.title}
+              <ArrowRight className="size-5" aria-hidden="true" />
+            </button>
+          )}
           <button
             type="button"
             data-tour-allow="menu"

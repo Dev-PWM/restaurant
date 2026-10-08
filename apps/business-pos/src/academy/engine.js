@@ -80,6 +80,15 @@ export function requiredDone(state) {
 }
 
 /**
+ * Is the timed challenge on offer? As soon as the required modules are done, not only after every optional one:
+ * the exam is what graduates a tablet, and the recap must not bury it behind a long chain of optional lessons.
+ * @param {AcademyState} state
+ */
+export function rushOffered(state) {
+  return requiredDone(state) && !state.rushPassed;
+}
+
+/**
  * A module is open when the tablet already graduated, or when every module before
  * it is finished. New staff therefore walk the curriculum in order; anyone who
  * graduated can replay any module.

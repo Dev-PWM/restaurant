@@ -8,11 +8,13 @@ Code: `apps/business-pos/src/academy/`. Scenario data: `apps/business-pos/src/si
 
 ## 1. How a trainee meets it
 
-- A tablet that has never trained opens straight into the Academy, **but only if the till is idle**: practising suspends
-  the live feed, so if there are live orders (or a payment waiting out its undo window) at page load, the board stays
-  live and shows nothing new. The «Entrenamiento» button starts it at any quiet moment.
-- The live till is locked behind the training: «Salir» (back to the real board) appears once the required modules and the
-  Reto Almuerzo are done. Until then the bar shows «Caja real bloqueada».
+- A tablet that has never trained does **not** open the Academy by itself (it used to; the board was changed to
+  «non-intrusive onboarding: do not force-trap on login»). The real board opens normally and the «Comenzar Entrenamiento»
+  button pulses, with the number of pending modules on it. Practising suspends the live feed, so the button is disabled
+  while a payment is waiting out its undo window; start it at any quiet moment.
+- «Salir del Simulador» (back to the real board) is always in the Academy bar, even before the required modules and the
+  Reto Almuerzo are done, so training can never trap anyone away from the live till. Finishing the curriculum is what
+  writes `masaflow_trained`; leaving early does not.
 - **Emergency skip:** in the module menu, hold the red button for 5 seconds. This writes
   `masaflow_training_skipped` (an ISO date) and unlocks the till. It never writes `masaflow_trained`, so the
   reminder banner keeps appearing on that tablet.

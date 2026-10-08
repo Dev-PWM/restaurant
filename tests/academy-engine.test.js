@@ -477,3 +477,19 @@ test("every control marked data-help has a glossary entry, so explore mode can e
   ].filter((id) => !lib.glossaryEntry(id));
   assert.deepEqual(missing, [], "explore mode would show nothing for these");
 });
+
+test("the exam is offered as soon as the required modules are done, not after every optional one", async () => {
+  const lib = await load();
+  let state = lib.createState();
+  assert.equal(lib.rushOffered(state), false);
+  for (const id of lib.REQUIRED_MODULES) {
+    assert.equal(lib.rushOffered(state), false, `not before ${id}`);
+    state = playModule(lib, state, id);
+  }
+  // Optional modules are still pending, yet the recap must already be able to offer the Reto Almuerzo.
+  assert.ok(lib.nextModuleId(state) !== null, "optional modules remain");
+  assert.equal(lib.rushOffered(state), true);
+  // Passing it ends the offer; it is never offered to a tablet that already passed.
+  assert.equal(lib.rushOffered({ ...state, rushPassed: true }), false);
+  assert.equal(lib.rushOffered(lib.createState({ completed: lib.REQUIRED_MODULES.slice(0, -1) })), false);
+});
