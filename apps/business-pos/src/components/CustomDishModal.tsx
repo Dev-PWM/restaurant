@@ -1,229 +1,217 @@
-import React, { memo, useState } from "react";
-import { PlusCircle, Sparkles, X, Check, Flame, HelpCircle } from "lucide-react";
+import { memo, useState, type FormEvent } from "react";
+import { PlusCircle, Sparkles } from "lucide-react";
 import type {
+  Commands,
   MenuItem,
-  ZapataCategory,
-} from "../../../../shared/types/zapata";
-import {
-  getQuesilloPriceForCategory,
-  allowsGreaseChoiceForCategory,
-} from "../../../../shared/types/zapata";
-import { mxn } from "../../../../shared/ui/components";
+  Modifier,
+} from "../../../../shared/types/realtime";
+import { uuid } from "../../../../shared/ui/RealtimeProvider";
+import { Modal, centsOf, mxn } from "../../../../shared/ui/components";
+
+/** Sections a dish can live in, in menu order. The server holds the same list and refuses anything else. */
+const CATEGORIES = [
+  "Huaraches",
+  "Gorditas",
+  "Sopes",
+  "Quesadillas",
+  "Pambazos",
+  "Especiales de Zapata",
+  "Bebidas",
+] as const;
+
+export type NewDish = Commands["admin_add_menu_item"];
 
 export interface CustomDishModalProps {
   onClose: () => void;
-  onSave: (dish: MenuItem) => void;
+  /** Resolves to an error message to show, or null when the dish was saved. */
+  onSubmit: (dish: NewDish) => Promise<string | null>;
+  /** Today's menu, used only to show what a dish in the chosen section will offer. */
+  menuItems: MenuItem[];
+  modifiers: Modifier[];
   simulator?: boolean;
+}
+
+/** What a new dish in this section gets: the same as the dishes already there. */
+function rulesFor(category: string, menuItems: MenuItem[], modifiers: Modifier[]) {
+  const sample = menuItems.find((item) => item.category === category);
+  const offered = modifiers.filter((m) => sample?.modifierIds.includes(m.id));
+  return {
+    quesilloCents:
+      offered.find((m) => m.kind === "extra" && m.id.startsWith("quesillo-"))
+        ?.priceCents ?? 0,
+    cookingChoice: offered.some((m) => m.kind === "prep"),
+    toppings: offered.some((m) => m.kind === "omit" || m.kind === "extra"),
+  };
 }
 
 export const CustomDishModal = memo(function CustomDishModal({
   onClose,
-  onSave,
+  onSubmit,
+  menuItems,
+  modifiers,
   simulator = false,
 }: CustomDishModalProps) {
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<ZapataCategory>("huaraches");
+  const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [priceInput, setPriceInput] = useState("");
   const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  // One id per dialog: if the answer is lost and the cashier taps save again, the server sees the same dish.
+  const [id] = useState(uuid);
 
-  const quesilloPrice = getQuesilloPriceForCategory(category);
-  const allowsQuesillo = quesilloPrice > 0;
-  const allowsGrease = allowsGreaseChoiceForCategory(category);
+  const priceCents = centsOf(priceInput.trim());
+  const valid = name.trim().length > 0 && priceCents !== null && priceCents > 0;
+  const rules = rulesFor(category, menuItems, modifiers);
 
-  const parsedPrice = parseFloat(priceInput);
-  const isValidPrice = !isNaN(parsedPrice) && parsedPrice > 0;
-  const priceCents = Math.round((isValidPrice ? parsedPrice : 0) * 100);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!name.trim() || !isValidPrice) return;
-
-    const newDish: MenuItem = {
-      id: `custom-${category}-${Date.now()}`,
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!valid || saving || priceCents === null) return;
+    setSaving(true);
+    setError("");
+    const problem = await onSubmit({
+      id,
       name: name.trim(),
       category,
-      basePrice: parsedPrice,
-      allowsQuesillo,
-      quesilloPrice,
-      allowsGreaseChoice: allowsGrease,
-      description: description.trim() || `Platillo especial: ${name.trim()}`,
-    };
-
-    onSave(newDish);
-  };
+      priceCents,
+      ...(description.trim() ? { description: description.trim() } : {}),
+    });
+    setSaving(false);
+    if (problem) setError(problem);
+    else onClose();
+  }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="custom-dish-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs"
+    <Modal
+      title="Crear nuevo platillo"
+      onClose={onClose}
+      layer={simulator ? "inline" : "native"}
+      closeTarget={simulator ? "close-custom-dish" : undefined}
     >
-      <div
+      <form
+        onSubmit={(event) => void handleSubmit(event)}
         data-tour-target={simulator ? "custom-dish-modal" : undefined}
-        className="w-full max-w-lg rounded-2xl border-2 border-stone-200 bg-[#FDFBF7] p-6 shadow-2xl transition-all"
+        className="space-y-4"
       >
-        <div className="flex items-start justify-between border-b border-stone-200 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-11 items-center justify-center rounded-xl bg-[#2E94A5] text-white shadow-xs">
-              <Sparkles className="size-6" />
-            </div>
-            <div>
-              <h2
-                id="custom-dish-title"
-                className="text-xl font-black tracking-tight text-stone-900"
-              >
-                Crear Nuevo Platillo
-              </h2>
-              <p className="text-xs font-semibold text-stone-500">
-                Inventario dinámico · Los Huaraches de Zapata
-              </p>
-            </div>
+        <div className="flex items-center gap-3 border-b border-stone-200 pb-3">
+          <div className="flex size-10 items-center justify-center rounded-xl bg-[#2E94A5] text-white">
+            <Sparkles className="size-5" />
           </div>
+          <p className="text-sm text-stone-600">
+            El platillo aparece en el menú de los clientes al instante, con las
+            mismas opciones que los demás de su sección.
+          </p>
+        </div>
+
+        <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+          Nombre del platillo *
+          <input
+            data-tour-target={simulator ? "custom-dish-name" : undefined}
+            className="field mt-1.5 w-full text-base font-semibold normal-case tracking-normal"
+            type="text"
+            maxLength={60}
+            placeholder="Ej. Huarache de Costilla"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+          />
+        </label>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+            Sección *
+            <select
+              data-tour-target={simulator ? "custom-dish-category" : undefined}
+              className="field mt-1.5 w-full text-base font-bold normal-case tracking-normal"
+              value={category}
+              onChange={(event) => setCategory(event.target.value)}
+            >
+              {CATEGORIES.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+            Precio (MXN) *
+            <input
+              data-tour-target={simulator ? "custom-dish-price" : undefined}
+              className="field mt-1.5 w-full text-base font-bold tabular-nums normal-case tracking-normal"
+              type="text"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={priceInput}
+              onChange={(event) => setPriceInput(event.target.value)}
+              aria-invalid={priceInput !== "" && priceCents === null}
+            />
+          </label>
+        </div>
+
+        <label className="block text-xs font-black uppercase tracking-wider text-stone-700">
+          Descripción corta (opcional)
+          <input
+            className="field mt-1.5 w-full text-sm normal-case tracking-normal"
+            type="text"
+            maxLength={140}
+            placeholder="Ingredientes o notas para el cliente…"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+          />
+        </label>
+
+        <div
+          className="rounded-xl border border-stone-200 bg-stone-50 p-3.5 text-xs"
+          data-testid="custom-dish-rules"
+        >
+          <p className="mb-2 font-black uppercase tracking-wider text-stone-500">
+            Opciones que tendrá en «{category}»
+          </p>
+          <ul className="space-y-1.5 text-stone-700">
+            <li className="flex justify-between gap-3">
+              <span>Con quesillo</span>
+              <strong>
+                {rules.quesilloCents ? `+${mxn(rules.quesilloCents)}` : "No aplica"}
+              </strong>
+            </li>
+            <li className="flex justify-between gap-3">
+              <span>«Al comal» o «Frito» (obligatorio)</span>
+              <strong>{rules.cookingChoice ? "Sí" : "No aplica"}</strong>
+            </li>
+            <li className="flex justify-between gap-3">
+              <span>Sin cebolla, sin cilantro, salsas</span>
+              <strong>{rules.toppings ? "Gratis" : "No aplica"}</strong>
+            </li>
+          </ul>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900"
+          >
+            {error}
+          </p>
+        )}
+
+        <div className="flex gap-3 pt-1">
           <button
             type="button"
             onClick={onClose}
-            className="flex size-9 items-center justify-center rounded-xl border border-stone-300 text-stone-500 hover:bg-stone-100 hover:text-stone-800"
-            aria-label="Cerrar modal"
+            className="btn flex-1 border-stone-300 bg-stone-100 font-bold text-stone-700 hover:bg-stone-200"
           >
-            <X className="size-5" />
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            data-tour-target={simulator ? "save-custom-dish" : undefined}
+            disabled={!valid || saving}
+            className="btn btn-primary flex-1 font-black disabled:opacity-50"
+          >
+            <PlusCircle className="size-5" />
+            {saving ? "Guardando…" : "Guardar platillo"}
           </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-          <div>
-            <label
-              htmlFor="custom-dish-name"
-              className="block text-xs font-black uppercase tracking-wider text-stone-700"
-            >
-              Nombre del Platillo *
-            </label>
-            <input
-              id="custom-dish-name"
-              type="text"
-              required
-              placeholder="Ej. Huarache de Costilla Especial"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border-2 border-stone-300 bg-white px-4 py-2.5 text-stone-900 font-semibold focus:border-[#2E94A5] focus:outline-hidden"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label
-                htmlFor="custom-dish-category"
-                className="block text-xs font-black uppercase tracking-wider text-stone-700"
-              >
-                Categoría *
-              </label>
-              <select
-                id="custom-dish-category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value as ZapataCategory)}
-                className="mt-1.5 w-full rounded-xl border-2 border-stone-300 bg-white px-3 py-2.5 font-bold text-stone-900 focus:border-[#2E94A5] focus:outline-hidden"
-              >
-                <option value="huaraches">Huaraches (+$10 Quesillo)</option>
-                <option value="gorditas">Gorditas (+$10 Quesillo)</option>
-                <option value="sopes">Sopes (+$5 Quesillo)</option>
-                <option value="quesadillas">Quesadillas (+$5 Quesillo)</option>
-                <option value="pambazos">Pambazos (+$5 Quesillo)</option>
-                <option value="especiales">Especiales de Zapata</option>
-                <option value="bebidas">Bebidas</option>
-              </select>
-            </div>
-
-            <div>
-              <label
-                htmlFor="custom-dish-price"
-                className="block text-xs font-black uppercase tracking-wider text-stone-700"
-              >
-                Precio Base (MXN) *
-              </label>
-              <div className="relative mt-1.5">
-                <span className="absolute left-3.5 top-2.5 font-bold text-stone-500">$</span>
-                <input
-                  id="custom-dish-price"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  required
-                  placeholder="0.00"
-                  value={priceInput}
-                  onChange={(e) => setPriceInput(e.target.value)}
-                  className="w-full rounded-xl border-2 border-stone-300 bg-white py-2.5 pl-8 pr-4 text-stone-900 font-bold tabular-nums focus:border-[#2E94A5] focus:outline-hidden"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label
-              htmlFor="custom-dish-description"
-              className="block text-xs font-black uppercase tracking-wider text-stone-700"
-            >
-              Descripción Corta (Opcional)
-            </label>
-            <input
-              id="custom-dish-description"
-              type="text"
-              placeholder="Ingredientes o notas para el cliente..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border-2 border-stone-300 bg-white px-4 py-2 text-sm text-stone-900 focus:border-[#2E94A5] focus:outline-hidden"
-            />
-          </div>
-
-          {/* Smart Automation Rules Preview */}
-          <div className="rounded-xl border border-stone-200 bg-stone-50 p-3.5 text-xs">
-            <p className="font-black uppercase tracking-wider text-stone-500 mb-2">
-              Reglas Automáticas de Zapata
-            </p>
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-stone-700">Extra Quesillo:</span>
-                {allowsQuesillo ? (
-                  <span className="font-bold text-[#E03188] bg-rose-50 px-2 py-0.5 rounded-md border border-[#E03188]/30">
-                    +${quesilloPrice}.00 MXN
-                  </span>
-                ) : (
-                  <span className="text-stone-500">No aplica</span>
-                )}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-stone-700">Selector Grasa / Al Comal Seco:</span>
-                <span className={`font-bold ${allowsGrease ? "text-purple-700" : "text-stone-500"}`}>
-                  {allowsGrease ? "Habilitado (Gratis)" : "Deshabilitado"}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-stone-700">Personalización de Verduras (Cebolla, Cilantro, etc.):</span>
-                <span className="font-bold text-emerald-700">
-                  Gratis ($0.00)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-6 flex gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn flex-1 border-stone-300 bg-stone-100 font-bold text-stone-700 hover:bg-stone-200"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={!name.trim() || !isValidPrice}
-              className="btn flex-1 bg-[#2E94A5] font-black text-white hover:bg-[#257b8a] disabled:opacity-50"
-            >
-              <PlusCircle className="size-5" />
-              Guardar Platillo
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   );
 });

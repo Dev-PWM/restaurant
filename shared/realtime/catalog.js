@@ -80,9 +80,25 @@ const section = (category, modifierIds, rows) =>
     modifierIds: [...modifierIds],
   }));
 
+/**
+ * The sections a dish can belong to and the options each one offers. The printed menu above uses the same
+ * rules, and a dish the owner creates gets the same ones, so a new huarache is priced and prepared like
+ * every other huarache. Drinks have no cooking style or toppings.
+ * @type {Record<string, string[]>}
+ */
+const CATEGORY_MODIFIERS = {
+  Huaraches: [QUESILLO_10, ...EVERY_DISH],
+  Sopes: [QUESILLO_5, ...EVERY_DISH],
+  Quesadillas: [QUESILLO_5, ...EVERY_DISH],
+  Gorditas: [QUESILLO_10, ...EVERY_DISH],
+  Pambazos: [QUESILLO_5, ...EVERY_DISH],
+  "Especiales de Zapata": [...EVERY_DISH],
+  Bebidas: [],
+};
+
 /** @type {MenuItem[]} */
 const MENU_ITEMS = [
-  ...section("Huaraches", [QUESILLO_10, ...EVERY_DISH], [
+  ...section("Huaraches", CATEGORY_MODIFIERS.Huaraches, [
     ["huarache-bistec", "Huarache de Bistec", 9000, "Huarache con bistec."],
     ["huarache-suadero", "Huarache de Suadero", 9000, "Huarache con suadero."],
     ["huarache-longaniza", "Huarache de Longaniza", 6500, "Huarache con longaniza."],
@@ -95,7 +111,7 @@ const MENU_ITEMS = [
     ["huarache-huevo", "Huarache de Huevo", 5000, "Huarache con huevo."],
     ["huarache-sencillo", "Huarache Sencillo", 3500, "Huarache sencillo."],
   ]),
-  ...section("Sopes", [QUESILLO_5, ...EVERY_DISH], [
+  ...section("Sopes", CATEGORY_MODIFIERS.Sopes, [
     ["sope-bistec", "Sope de Bistec", 5500, "Sope con bistec."],
     ["sope-suadero", "Sope de Suadero", 5500, "Sope con suadero."],
     ["sope-chicharron", "Sope de Chicharrón", 4500, "Sope con chicharrón."],
@@ -104,7 +120,7 @@ const MENU_ITEMS = [
     ["sope-tinga-res", "Sope de Tinga de Res", 4500, "Sope con tinga de res."],
     ["sope-sencillo", "Sope Sencillo", 3500, "Sope sencillo."],
   ]),
-  ...section("Quesadillas", [QUESILLO_5, ...EVERY_DISH], [
+  ...section("Quesadillas", CATEGORY_MODIFIERS.Quesadillas, [
     ["quesadilla-queso", "Quesadilla de Queso", 4000, "Quesadilla con queso."],
     ["quesadilla-chicharron", "Quesadilla de Chicharrón", 4000, "Quesadilla con chicharrón."],
     ["quesadilla-champinones", "Quesadilla de Champiñones", 4000, "Quesadilla con champiñones."],
@@ -114,16 +130,16 @@ const MENU_ITEMS = [
     ["quesadilla-longaniza", "Quesadilla de Longaniza", 5500, "Quesadilla con longaniza."],
     ["quesadilla-suadero", "Quesadilla de Suadero", 5500, "Quesadilla con suadero."],
   ]),
-  ...section("Gorditas", [QUESILLO_10, ...EVERY_DISH], [
+  ...section("Gorditas", CATEGORY_MODIFIERS.Gorditas, [
     ["gordita-suadero", "Gordita de Suadero", 6500, "Gordita con suadero."],
     ["gordita-chicharron", "Gordita de Chicharrón", 5000, "Gordita con chicharrón."],
     ["gordita-especial", "Gordita Especial", 7500, "Gordita especial."],
   ]),
-  ...section("Pambazos", [QUESILLO_5, ...EVERY_DISH], [
+  ...section("Pambazos", CATEGORY_MODIFIERS.Pambazos, [
     ["pambazo-papas-longaniza", "Pambazo de Papas con Longaniza", 5000, "Pambazo con papas y longaniza."],
     ["pambazo-guisado", "Pambazo de Guisado", 6000, "Pambazo con guisado."],
   ]),
-  ...section("Especiales de Zapata", [...EVERY_DISH], [
+  ...section("Especiales de Zapata", CATEGORY_MODIFIERS["Especiales de Zapata"], [
     ["especial-derecho", "Especial Derecho", 13500, "¡Derecho! Cecina, longaniza, nopal y quesillo."],
     ["especial-izquierdo", "Especial Izquierdo", 6000, "¡Izquierdo! Base de nopal, frijoles, pico de gallo, queso, crema, carne o guisado."],
   ]),
@@ -178,6 +194,7 @@ function reconcileCatalog(state) {
 module.exports = {
   MENU_ITEMS,
   MODIFIERS,
+  CATEGORY_MODIFIERS,
   TABLE_COUNT,
   defaultTables,
   REQUIRED_CHOICE_KINDS,

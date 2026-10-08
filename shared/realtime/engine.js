@@ -6,6 +6,7 @@ const { randomUUID, createHash } = require("node:crypto");
 const {
   MENU_ITEMS,
   MODIFIERS,
+  CATEGORY_MODIFIERS,
   TABLE_COUNT,
   defaultTables,
   REQUIRED_CHOICE_KINDS,
@@ -534,6 +535,66 @@ function createEngine({ directory, persist = writeAtomic }) {
         "Disponibilidad inválida.",
       );
       next.acceptingOrders = data.acceptingOrders;
+    } else if (event === "admin_add_menu_item") {
+      const data = /** @type {Commands['admin_add_menu_item']} */ (input);
+      ensure(UUID.test(data.id), "Identificador inválido.");
+      ensure(
+        typeof data.name === "string" &&
+          data.name.trim().length > 0 &&
+          data.name.trim().length <= 60,
+        "Escribe un nombre de hasta 60 caracteres.",
+      );
+      ensure(
+        Object.hasOwn(CATEGORY_MODIFIERS, data.category),
+        "Elige una categoría de la lista.",
+      );
+      ensure(
+        Number.isSafeInteger(data.priceCents) &&
+          data.priceCents > 0 &&
+          data.priceCents <= 1_000_000,
+        "El precio debe ser mayor a cero y de hasta $10,000.00.",
+      );
+      ensure(
+        data.description === undefined ||
+          (typeof data.description === "string" &&
+            data.description.trim().length <= 140),
+        "La descripción puede tener hasta 140 caracteres.",
+      );
+      const name = data.name.trim();
+      const id = `custom-${data.id}`;
+      const description = data.description?.trim() || `Platillo especial: ${name}`;
+      const existing = next.menuItems.find((item) => item.id === id);
+      if (existing) {
+        // A retry after a lost acknowledgement must repeat the same dish, not create a second one.
+        ensure(
+          existing.name === name &&
+            existing.category === data.category &&
+            existing.priceCents === data.priceCents &&
+            existing.description === description,
+          "Ese identificador ya se usó con otros datos.",
+          "ITEM_CONFLICT",
+        );
+        return { ok: true };
+      }
+      ensure(
+        !next.menuItems.some(
+          (item) =>
+            item.category === data.category &&
+            item.name.trim().toLowerCase() === name.toLowerCase(),
+        ),
+        "Ya existe un platillo con ese nombre en esa categoría.",
+        "DUPLICATE_ITEM",
+      );
+      ensure(next.menuItems.length < 200, "El menú ya tiene demasiados platillos.");
+      next.menuItems.push({
+        id,
+        name,
+        description,
+        category: data.category,
+        priceCents: data.priceCents,
+        available: true,
+        modifierIds: [...CATEGORY_MODIFIERS[data.category]],
+      });
     } else if (event === "pos_set_table") {
       const data = /** @type {Commands['pos_set_table']} */ (input);
       ensure(

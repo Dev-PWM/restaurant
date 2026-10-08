@@ -167,6 +167,17 @@ export interface Commands {
   };
   pos_toggle_accepting_orders: { acceptingOrders: boolean };
   pos_set_table: { number: number; status: TableStatus };
+  /**
+   * Adds a dish the owner invented. The client generates `id` so a retry after a lost acknowledgement cannot
+   * create it twice. Its options (quesillo price, comal/frito, toppings) come from the category, on the server.
+   */
+  admin_add_menu_item: {
+    id: string;
+    name: string;
+    category: string;
+    priceCents: number;
+    description?: string;
+  };
   pos_close_shift: { shiftId: string; expectedRevision: number };
 }
 export type Command = keyof Commands;

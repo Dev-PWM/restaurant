@@ -30,6 +30,12 @@ export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     cents / 100,
   );
+/** Cents typed into a money field, or null while the text is not a valid amount (up to 7 digits and 2 decimals). */
+export function centsOf(text: string) {
+  if (!/^\d{1,7}(?:\.\d{0,2})?$/.test(text)) return null;
+  const [whole, fraction = ""] = text.split(".");
+  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
+}
 /** How a payment was made, in the words staff use. Receipts saved before transfers existed have no method: cash. */
 export const paymentMethodLabel = (transaction: Pick<Transaction, "method">) =>
   transaction.method === "spei" ? "Transferencia SPEI" : "Efectivo";

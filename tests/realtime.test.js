@@ -287,6 +287,100 @@ test("older ledgers without tables or order types load safely, and corrupt table
   fs.writeFileSync(file, JSON.stringify(saved));
   assert.throws(() => createEngine({ directory }), /Mesa inválida/);
 });
+test("an owner-made dish gets its category's options, orders like the printed menu, and survives a restart", (t) => {
+  const { directory, engine } = fixture(t);
+  const add = (extra = {}) => {
+    const data = {
+      id: randomUUID(),
+      name: "Huarache de Costilla",
+      category: "Huaraches",
+      priceCents: 12000,
+      ...extra,
+    };
+    return { data, reply: engine.dispatch("admin_add_menu_item", data) };
+  };
+  const { data: huarache } = add({ description: "  Con costilla de res.  " });
+  const dish = engine.getState().menuItems.at(-1);
+  assert.deepEqual(
+    { id: dish.id, name: dish.name, category: dish.category, priceCents: dish.priceCents, available: dish.available, description: dish.description },
+    {
+      id: `custom-${huarache.id}`,
+      name: "Huarache de Costilla",
+      category: "Huaraches",
+      priceCents: 12000,
+      available: true,
+      description: "Con costilla de res.",
+    },
+  );
+  // A new huarache is cooked, topped and priced like every other huarache.
+  assert.deepEqual(
+    dish.modifierIds,
+    engine.getState().menuItems.find((item) => item.id === "huarache-bistec").modifierIds,
+  );
+  const order = (modifierIds, menuItemId = dish.id) =>
+    submit(engine, { items: [{ menuItemId, quantity: 1, modifierIds }] });
+  assert.throws(() => order([]), /comal o frito/);
+  order(["prep-frito", "quesillo-10"]);
+  assert.equal(engine.getState().activeOrders.at(-1).totalCents, 13000);
+  // A drink has no cooking style, toppings or quesillo.
+  const { data: agua } = add({ name: "Agua de jamaica", category: "Bebidas", priceCents: 3000 });
+  const drink = engine.getState().menuItems.at(-1);
+  assert.deepEqual(drink.modifierIds, []);
+  order([], drink.id);
+  assert.equal(engine.getState().activeOrders.at(-1).totalCents, 3000);
+  assert.throws(() => order(["prep-comal"], drink.id), /agotado/);
+  // The owner can still switch it off like any dish.
+  engine.dispatch("admin_toggle_stock", { id: drink.id, kind: "item", available: false });
+  assert.throws(() => order([], drink.id), /agotado/);
+  // Durable, and later catalog upgrades never touch it.
+  const restarted = createEngine({ directory });
+  assert.equal(restarted.catalogBackup, null);
+  assert.deepEqual(
+    restarted.getState().menuItems.filter((item) => item.id.startsWith("custom-")).map((item) => [item.id, item.available]),
+    [[`custom-${huarache.id}`, true], [`custom-${agua.id}`, false]],
+  );
+});
+test("adding a dish is idempotent, refuses duplicates and conflicts, and validates every field", (t) => {
+  const { engine } = fixture(t);
+  const items = () => engine.getState().menuItems.length;
+  const base = { id: randomUUID(), name: "Gordita de Rajas", category: "Gorditas", priceCents: 6000 };
+  const before = items();
+  engine.dispatch("admin_add_menu_item", base);
+  const revision = engine.getState().revision;
+  assert.equal(items(), before + 1);
+  // A lost acknowledgement followed by a retry changes nothing.
+  assert.deepEqual(engine.dispatch("admin_add_menu_item", { ...base }), { ok: true });
+  assert.equal(engine.getState().revision, revision);
+  assert.equal(items(), before + 1);
+  // The same id with different content is a conflict, never a silent overwrite.
+  assert.throws(
+    () => engine.dispatch("admin_add_menu_item", { ...base, priceCents: 9900 }),
+    { code: "ITEM_CONFLICT" },
+  );
+  // Same name in the same category is a duplicate even with different case or spacing; another category is fine.
+  assert.throws(
+    () => engine.dispatch("admin_add_menu_item", { ...base, id: randomUUID(), name: "  gordita DE rajas " }),
+    { code: "DUPLICATE_ITEM" },
+  );
+  engine.dispatch("admin_add_menu_item", { ...base, id: randomUUID(), category: "Sopes" });
+  assert.equal(items(), before + 2);
+  const bad = (change, pattern) =>
+    assert.throws(
+      () => engine.dispatch("admin_add_menu_item", { ...base, id: randomUUID(), name: "Otro", ...change }),
+      pattern,
+    );
+  bad({ id: "not-a-uuid" }, /Identificador/);
+  bad({ name: "   " }, /nombre/);
+  bad({ name: "x".repeat(61) }, /nombre/);
+  bad({ name: 42 }, /nombre/);
+  bad({ category: "Postres" }, /categoría/);
+  bad({ category: "__proto__" }, /categoría/);
+  for (const priceCents of [0, -100, 1.5, "6000", null, 1_000_001, Number.NaN])
+    bad({ priceCents }, /precio/);
+  bad({ description: "x".repeat(141) }, /descripción/);
+  bad({ description: 5 }, /descripción/);
+  assert.equal(items(), before + 2);
+});
 test("receipts saved before transfers existed load as cash, and a corrupt method refuses to load", (t) => {
   const { directory, engine } = fixture(t);
   const order = submit(engine);
@@ -607,6 +701,7 @@ test("Socket.io PIN gates every staff event and protects other customers and fin
     "pos_update_status",
     "pos_mark_noshow",
     "admin_toggle_stock",
+    "admin_add_menu_item",
     "pos_toggle_accepting_orders",
     "pos_set_table",
     "pos_close_shift",

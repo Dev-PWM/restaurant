@@ -134,7 +134,7 @@ async function createService(options = {}) {
         socket.emit("state_updated", snapshot(socket, s));
         if (staff(socket)) socket.emit("metrics_updated", s.salesMetrics);
       }
-      if (event === "admin_toggle_stock")
+      if (event === "admin_toggle_stock" || event === "admin_add_menu_item")
         io.emit("menu_updated", {
           menuItems: s.menuItems,
           modifiers: s.modifiers,
@@ -244,6 +244,7 @@ async function createService(options = {}) {
         "pos_update_status",
         "pos_mark_noshow",
         "admin_toggle_stock",
+        "admin_add_menu_item",
         "pos_toggle_accepting_orders",
         "pos_set_table",
         "pos_close_shift",

@@ -36,7 +36,7 @@ import { practiceDish, usePracticeBoard } from "../academy/usePracticeBoard";
 import type { AcademyEvent } from "../academy/types";
 import { TableMap } from "../components/TableMap";
 import { TransferModal } from "../components/TransferModal";
-import { CustomDishModal } from "../components/CustomDishModal";
+import { CustomDishModal, type NewDish } from "../components/CustomDishModal";
 import {
   chime,
   AudioUnlockButton,
@@ -48,16 +48,11 @@ import {
   orderLabel,
   SoundButton,
   StaffHeader,
+  centsOf,
   paymentSummary,
   time,
   useNow,
 } from "../../../../shared/ui/components";
-/** Cents typed into the cash field, or null while the text is not a valid amount. */
-function centsOf(text: string) {
-  if (!/^\d{1,7}(?:\.\d{0,2})?$/.test(text)) return null;
-  const [whole, fraction = ""] = text.split(".");
-  return Number(whole) * 100 + Number(fraction.padEnd(2, "0"));
-}
 
 export function CashTender({
   order,
@@ -1070,6 +1065,17 @@ function LiveBoard({
   const snapshot = practice.snapshot;
   // Live: the server's tables, shared with every customer screen. Practice: local tables that send nothing.
   const tables = snapshot?.tables ?? [];
+  /** Saves a dish the owner invented. Practice never reaches the server: it only reports the tap to the lesson. */
+  async function submitCustomDish(
+    dish: NewDish,
+  ): Promise<string | null> {
+    if (simulator) {
+      report({ type: "custom-dish-saved", name: dish.name, category: dish.category });
+      return null;
+    }
+    const reply = await command("admin_add_menu_item", dish);
+    return reply.ok ? null : reply.error;
+  }
   async function toggleTable(number: number) {
     const table = tables.find((candidate) => candidate.number === number);
     if (!table) return;
@@ -1588,7 +1594,11 @@ function LiveBoard({
             <button
               className="btn border-stone-300 bg-white font-bold text-stone-700 hover:bg-stone-50"
               data-help="custom-dish"
-              onClick={() => setCustomDishModalOpen(true)}
+              data-tour-target={simulator ? "btn-custom-dish" : undefined}
+              onClick={() => {
+                setCustomDishModalOpen(true);
+                report({ type: "custom-dish-open" });
+              }}
             >
               <PlusCircle size={16} />
               <span>Crear Platillo</span>
@@ -1895,10 +1905,10 @@ function LiveBoard({
       {customDishModalOpen && (
         <CustomDishModal
           simulator={simulator}
+          menuItems={snapshot.menuItems}
+          modifiers={snapshot.modifiers}
           onClose={() => setCustomDishModalOpen(false)}
-          onSave={() => {
-            setCustomDishModalOpen(false);
-          }}
+          onSubmit={submitCustomDish}
         />
       )}
       {payOrder && (
