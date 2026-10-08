@@ -13,17 +13,18 @@ export const RUSH_LIMIT_SECONDS = 60;
 
 /**
  * @param {Date} [now]
- * @param {{number?: number, id?: string}} [options]
+ * @param {{number?: number, id?: string, scale?: number}} [options]
  * @returns {Order}
  */
 export function createDemoOrder(now = new Date(), options = {}) {
   const number = options.number ?? 1;
   const id = options.id ?? `demo-order-${String(number).padStart(3, "0")}`;
-  const itemScale = 1 + ((number - 1) % 3);
+  const itemScale = options.scale ?? 1 + ((number - 1) % 3);
+  // Real menu items at real prices: 3 × $50.00 + 1 × $35.00 = $185.00 per unit of scale.
   const items = [
     {
-      menuItemId: "demo-gordita-chicharron",
-      name: "Gordita de chicharrón",
+      menuItemId: "gordita-chicharron",
+      name: "Gordita de Chicharrón",
       quantity: 3 * itemScale,
       modifiers: [
         {
@@ -41,16 +42,16 @@ export function createDemoOrder(now = new Date(), options = {}) {
           kind: "extra",
         },
       ],
-      unitPriceCents: 4500,
-      lineTotalCents: 4500 * 3 * itemScale,
+      unitPriceCents: 5000,
+      lineTotalCents: 5000 * 3 * itemScale,
     },
     {
-      menuItemId: "demo-sope",
-      name: "Sope",
-      quantity: 2 * itemScale,
+      menuItemId: "sope-sencillo",
+      name: "Sope Sencillo",
+      quantity: 1 * itemScale,
       modifiers: [],
-      unitPriceCents: 2500,
-      lineTotalCents: 2500 * 2 * itemScale,
+      unitPriceCents: 3500,
+      lineTotalCents: 3500 * 1 * itemScale,
     },
   ];
   return {
@@ -244,3 +245,136 @@ export function evaluateRush({ paid, noShows, elapsedSeconds }) {
   return paid >= RUSH_TICKET_COUNT && elapsedSeconds <= RUSH_LIMIT_SECONDS;
 }
 
+/** @param {Order} order @returns {boolean} Does the ticket carry a «SIN …» request the cook must read? */
+export function needsAcknowledgement(order) {
+  return order.items.some((item) =>
+    item.modifiers.some((modifier) => modifier.kind === "omit"),
+  );
+}
+
+/**
+ * @param {Order} order
+ * @param {Order["status"]} status
+ * @param {Date} now
+ * @returns {Order}
+ */
+function inStatus(order, status, now) {
+  const at = now.toISOString();
+  return {
+    ...order,
+    status,
+    acceptedAt: status === "review" ? null : at,
+    readyAt: status === "ready" ? at : null,
+  };
+}
+
+/**
+ * «Conoce tu Tablero»: one ticket in each lane, so every lane and the ticket itself
+ * have something to point at.
+ * @param {Date} [now]
+ * @returns {Order[]}
+ */
+export function createTourOrders(now = new Date()) {
+  return [
+    {
+      ...createDemoOrder(now, { number: 1, id: "tour-order-001", scale: 1 }),
+      customerName: "María (Demo)",
+    },
+    {
+      ...inStatus(
+        createDemoOrder(now, { number: 2, id: "tour-order-002", scale: 1 }),
+        "cooking",
+        now,
+      ),
+      customerName: "Carlos (Demo)",
+    },
+    {
+      ...inStatus(
+        createDemoOrder(now, { number: 3, id: "tour-order-003", scale: 1 }),
+        "ready",
+        now,
+      ),
+      customerName: "Lupita (Demo)",
+    },
+  ];
+}
+
+/**
+ * «Cobros al Centavo»: a ready ticket of $370.00, big enough that $300 falls short.
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function createCashDemoOrder(now = new Date()) {
+  return {
+    ...inStatus(
+      createDemoOrder(now, { number: 2, id: "demo-order-cash-002", scale: 2 }),
+      "ready",
+      now,
+    ),
+    customerName: "Don Pedro (Demo)",
+  };
+}
+
+/**
+ * «La Cocina al Comal»: three tickets already cooking, without «SIN» requests so the
+ * module is about the kitchen view and not about reading badges.
+ * @param {Date} [now]
+ * @returns {Order[]}
+ */
+export function createKitchenOrders(now = new Date()) {
+  return [
+    ["Ana (Demo)", 1],
+    ["Luis (Demo)", 2],
+    ["Sofía (Demo)", 1],
+  ].map(([name, scale], index) => {
+    const order = inStatus(
+      createDemoOrder(now, {
+        number: index + 1,
+        id: `kitchen-order-00${index + 1}`,
+        scale: Number(scale),
+      }),
+      "cooking",
+      now,
+    );
+    return {
+      ...order,
+      customerName: String(name),
+      items: order.items.map((item) => ({ ...item, modifiers: [] })),
+    };
+  });
+}
+
+/**
+ * Finished tickets for the history and close-out modules: three paid and one No-Show.
+ * @param {Date} [now]
+ * @returns {Order[]}
+ */
+export function createHistoryOrders(now = new Date()) {
+  const paid = [
+    ["Ana (Demo)", 1, 20000],
+    ["Luis (Demo)", 2, 50000],
+    ["Sofía (Demo)", 1, 20000],
+  ].map(([name, scale, tendered], index) => ({
+    ...payDemoOrder(
+      inStatus(
+        createDemoOrder(now, {
+          number: index + 1,
+          id: `history-order-00${index + 1}`,
+          scale: Number(scale),
+        }),
+        "ready",
+        now,
+      ),
+      Number(tendered),
+      now,
+    ),
+    customerName: String(name),
+  }));
+  return [
+    ...paid,
+    {
+      ...markDemoNoShow(createNoShowDemoOrder(now)),
+      customerName: "Roberto (No Llegó)",
+    },
+  ];
+}

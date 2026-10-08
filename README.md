@@ -79,6 +79,7 @@ Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before r
 | Express, Socket.io, staff authorization | `server.js` |
 | Structured logging (pino, daily files) | `shared/logger.js` |
 | Training simulator and exam grading | `apps/business-pos/src/simulator.js` |
+| Interactive training (curriculum, state machine, coachmarks), see `docs/ACADEMY.md` | `apps/business-pos/src/academy/` |
 | Load tests, ReDoS scan, Semgrep and Gitleaks config | `scripts/loadtest.cjs`, `artillery/`, `scripts/scan-regex.cjs`, `.semgrep/`, `.gitleaks.toml` |
 | Connection context and shared UI | `shared/ui/` |
 | Customer React app | `apps/client-web/src/` |

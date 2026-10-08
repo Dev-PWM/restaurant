@@ -95,3 +95,62 @@ test("the undo window and hesitation timing match the training spec", async () =
   assert.equal(UNDO_WINDOW_SECONDS, 5);
   assert.equal(HESITATION_MS, 5000);
 });
+
+test("tour board has one ticket per lane and the first one carries a «SIN» request", async () => {
+  const { createTourOrders, needsAcknowledgement } = await simulator;
+  const orders = createTourOrders(new Date("2026-10-05T12:00:00.000Z"));
+
+  assert.deepEqual(
+    orders.map((order) => order.status),
+    ["review", "cooking", "ready"],
+  );
+  assert.equal(new Set(orders.map((order) => order.id)).size, 3);
+  assert.ok(orders.every((order) => order.totalCents === 18500));
+  assert.ok(orders.every(needsAcknowledgement));
+  assert.equal(orders[0].acceptedAt, null);
+  assert.ok(orders[1].acceptedAt);
+  assert.ok(orders[2].readyAt);
+});
+
+test("cash demo ticket is big enough that $300 falls short and $500 settles it", async () => {
+  const { createCashDemoOrder, payDemoOrder } = await simulator;
+  const ready = createCashDemoOrder(new Date("2026-10-05T12:00:00.000Z"));
+
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.totalCents, 37000);
+  assert.throws(() => payDemoOrder(ready, 30000), /cover the order total/);
+  const paid = payDemoOrder(ready, 50000);
+  assert.equal(paid.transaction.changeCents, 13000);
+  assert.equal(payDemoOrder(ready, 37000).transaction.changeCents, 0);
+});
+
+test("kitchen orders are all cooking and have no «SIN» requests to read", async () => {
+  const { createKitchenOrders, needsAcknowledgement } = await simulator;
+  const orders = createKitchenOrders(new Date("2026-10-05T12:00:00.000Z"));
+
+  assert.equal(orders.length, 3);
+  assert.ok(orders.every((order) => order.status === "cooking"));
+  assert.ok(orders.every((order) => !needsAcknowledgement(order)));
+  assert.equal(new Set(orders.map((order) => order.number)).size, 3);
+  assert.equal(new Set(orders.map((order) => order.id)).size, 3);
+});
+
+test("history orders give the practice summary known numbers", async () => {
+  const { createHistoryOrders, calculatePracticeMetrics } = await simulator;
+  const orders = createHistoryOrders(new Date("2026-10-05T12:00:00.000Z"));
+  const metrics = calculatePracticeMetrics(orders);
+
+  assert.equal(orders.length, 4);
+  assert.equal(metrics.paidOrders, 3);
+  assert.equal(metrics.noShows, 1);
+  assert.equal(metrics.revenueCents, 74000);
+  assert.equal(metrics.tenderedCents, 90000);
+  assert.equal(metrics.changeCents, 16000);
+  assert.deepEqual(
+    metrics.itemPerformance.map((item) => [item.name, item.quantity]),
+    [
+      ["Gordita de Chicharrón", 12],
+      ["Sope Sencillo", 4],
+    ],
+  );
+});

@@ -1,16 +1,28 @@
-import { AlertTriangle } from "lucide-react";
+import { createPortal } from "react-dom";
+import { TriangleAlert } from "lucide-react";
+import { useAcademy } from "./AcademyProvider";
 
-export function ShadowWarningToast({ message }: { message: string | null }) {
-  if (!message) return null;
-
-  return (
-    <div
-      role="alert"
-      aria-live="assertive"
-      className="fixed bottom-6 left-1/2 z-[100] -translate-x-1/2 flex items-center gap-3 rounded-2xl border-2 border-red-600 bg-red-600 px-5 py-3 text-white shadow-2xl animate-shake"
-    >
-      <AlertTriangle className="h-5 w-5 shrink-0 text-yellow-300" />
-      <span className="text-sm font-bold tracking-wide">{message}</span>
-    </div>
+/**
+ * «Aún no» warning. It sits under the training bar (never at the bottom, where the coach
+ * card docks), ignores the pointer, and uses the system layer so nothing can hide it.
+ */
+export function ShadowWarningToast() {
+  const { warning } = useAcademy();
+  if (!warning) return null;
+  return createPortal(
+    <div className="z-layer-system pointer-events-none fixed inset-x-0 top-[calc(var(--academy-bar-h,0px)_+_0.5rem)] flex justify-center px-3">
+      <div
+        role="alert"
+        aria-live="assertive"
+        className="animate-shake flex max-w-md items-center gap-3 rounded-2xl border-2 border-red-600 bg-red-600 px-5 py-3 text-white shadow-2xl"
+      >
+        <TriangleAlert
+          className="size-5 shrink-0 text-yellow-300"
+          aria-hidden="true"
+        />
+        <span className="text-sm font-bold leading-snug">{warning}</span>
+      </div>
+    </div>,
+    document.body,
   );
 }

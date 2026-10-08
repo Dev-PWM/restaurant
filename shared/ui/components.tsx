@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowRight,
   Check,
   ChefHat,
+  CircleHelp,
   LockKeyhole,
   Maximize2,
   Minimize2,
@@ -43,7 +51,7 @@ export function ConnectionBanner() {
       {!connected && !suspended && (
         <div
           role="alert"
-          className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-red-800 p-3 font-bold text-white"
+          className="z-layer-system sticky top-0 flex items-center justify-center gap-2 bg-red-800 p-3 font-bold text-white"
         >
           <WifiOff size={18} />
           Sin Conexión{" "}
@@ -166,31 +174,51 @@ export function Modal({
   title,
   children,
   onClose,
+  layer = "native",
+  closeTarget,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  /** Training only: lets the spotlight find the close button. */
+  closeTarget?: string;
+  /**
+   * «native» is a browser <dialog> (top layer, focus trap for free). «inline» is a fixed
+   * panel at z-layer-modal rendered in a portal: the training simulator uses it so the
+   * coach card and spotlight (z-layer-academy) can stay above the dialog they explain.
+   */
+  layer?: "native" | "inline";
 }) {
   const { connected, suspended, error } = useRealtime();
   const ref = useRef<HTMLDialogElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    ref.current?.showModal();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      aria-label={title}
-    >
-      <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-stone-200 bg-cream p-5">
-        <h2 className="text-xl font-bold">{title}</h2>
-        <button className="btn" aria-label="Cerrar ventana" onClick={onClose}>
-          <X size={18} />
-        </button>
-      </header>
+    if (layer === "native") ref.current?.showModal();
+    else panel.current?.focus();
+  }, [layer]);
+  useEffect(() => {
+    if (layer !== "inline") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [layer, onClose]);
+  const header = (
+    <header className="z-layer-board sticky top-0 flex items-center justify-between gap-4 border-b border-stone-200 bg-cream p-5">
+      <h2 className="text-xl font-bold">{title}</h2>
+      <button
+        className="btn min-h-11 min-w-11"
+        aria-label="Cerrar ventana"
+        data-tour-target={closeTarget}
+        onClick={onClose}
+      >
+        <X size={18} />
+      </button>
+    </header>
+  );
+  const notices = (
+    <>
       {!connected && !suspended && (
         <p
           role="alert"
@@ -204,6 +232,44 @@ export function Modal({
           {error}
         </p>
       )}
+    </>
+  );
+  if (layer === "inline")
+    return createPortal(
+      <div
+        className="z-layer-modal fixed inset-0 flex items-end justify-center bg-stone-900/55 pt-[var(--academy-bar-h,0px)] sm:items-center sm:p-4 sm:pt-[calc(var(--academy-bar-h,0px)_+_1rem)]"
+        data-academy-modal
+      >
+        <div
+          ref={panel}
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          tabIndex={-1}
+          className="max-h-[calc(100dvh_-_var(--academy-bar-h,0px)_-_0.5rem)] w-full overflow-y-auto overscroll-contain rounded-t-2xl border border-stone-200 bg-cream pb-[env(safe-area-inset-bottom)] text-stone-900 shadow-xl outline-none sm:max-w-[580px] sm:rounded-2xl"
+        >
+          <div className="z-layer-board sticky top-0 bg-cream">
+            {header}
+            {/* The coach card for steps inside this dialog is portaled here, so it can never cover the dialog's own buttons. */}
+            <div data-academy-coach-slot />
+          </div>
+          {notices}
+          <div className="p-5">{children}</div>
+        </div>
+      </div>,
+      document.body,
+    );
+  return (
+    <dialog
+      ref={ref}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      aria-label={title}
+    >
+      {header}
+      {notices}
       <div className="p-5">{children}</div>
     </dialog>
   );
@@ -213,11 +279,14 @@ export function ToggleSwitch({
   onChange,
   label,
   disabled = false,
+  tourTarget,
 }: {
   checked: boolean;
   onChange: () => void;
   label: string;
   disabled?: boolean;
+  /** Training only: lets the spotlight find this switch. */
+  tourTarget?: string;
 }) {
   return (
     <button
@@ -226,6 +295,8 @@ export function ToggleSwitch({
       aria-checked={checked}
       aria-label={label}
       disabled={disabled}
+      data-help="inventory-toggle"
+      data-tour-target={tourTarget}
       onClick={onChange}
       className={`flex min-h-12 min-w-20 items-center justify-center gap-2 rounded-full px-3 text-xs font-bold ${checked ? "bg-emerald-800 text-white" : "bg-stone-200 text-stone-700"}`}
     >
@@ -410,6 +481,7 @@ export function FullscreenButton() {
     <button
       className="btn"
       onClick={toggle}
+      data-help="fullscreen"
       title={
         fullscreen
           ? "Salir de pantalla completa"
@@ -427,13 +499,17 @@ export function StaffHeader({
   lockDisabled = false,
   onAnalyticsClick,
   analyticsTourTarget,
+  onHelp,
 }: {
   page: "pos" | "analytics";
   children?: ReactNode;
   /** Locking drops the session, so it is blocked while a confirmed payment is still unsent. */
   lockDisabled?: boolean;
+  /** Training only: replaces the page navigation with a practice screen and marks the link as a spotlight target. */
   onAnalyticsClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   analyticsTourTarget?: string;
+  /** Opens the button cheat sheet. */
+  onHelp?: () => void;
 }) {
   const { snapshot, connected, suspended, logout } = useRealtime();
   return (
@@ -453,8 +529,8 @@ export function StaffHeader({
             className={`btn ${page === "analytics" ? "bg-clay-50 text-clay-700" : ""}`}
             href={appLink("analytics")}
             aria-current={page === "analytics" ? "page" : undefined}
-            data-tour-target={analyticsTourTarget ?? "btn-nav-analytics"}
-            data-tour-action="nav-analytics"
+            data-help="nav-analytics"
+            data-tour-target={analyticsTourTarget}
             onClick={onAnalyticsClick}
           >
             Caja y ventas
@@ -481,21 +557,34 @@ export function StaffHeader({
           <PWAInstallButton />
           <FullscreenButton />
           {children}
-          {!suspended && (
+          {onHelp && !suspended && (
             <button
               className="btn"
-              onClick={logout}
-              disabled={lockDisabled}
-              title={
-                lockDisabled
-                  ? "Espera a que se registre el pago en curso"
-                  : undefined
-              }
-              aria-label="Bloquear sesión"
+              onClick={onHelp}
+              aria-label="Ayuda: qué hace cada botón"
+              title="Ayuda: qué hace cada botón"
             >
-              <LockKeyhole size={16} />
+              <CircleHelp size={16} />
+              <span className="hidden sm:inline">Ayuda</span>
             </button>
           )}
+          <button
+            className="btn"
+            onClick={logout}
+            disabled={lockDisabled || suspended}
+            data-help="lock"
+            data-tour-target={suspended ? "btn-lock" : undefined}
+            title={
+              suspended
+                ? "No disponible durante el entrenamiento"
+                : lockDisabled
+                  ? "Espera a que se registre el pago en curso"
+                  : undefined
+            }
+            aria-label="Bloquear sesión"
+          >
+            <LockKeyhole size={16} />
+          </button>
         </div>
       </div>
     </header>
@@ -533,6 +622,41 @@ export function OrderLines({ order }: { order: Order }) {
     </ul>
   );
 }
+/**
+ * One shared one-second clock. Only components that actually display elapsed time
+ * subscribe, so a tick re-renders each ticket's timer instead of the whole board, and
+ * nothing ticks when nobody is subscribed.
+ */
+const clock = {
+  listeners: new Set<() => void>(),
+  value: 0,
+  timer: undefined as ReturnType<typeof setInterval> | undefined,
+};
+function subscribeClock(listener: () => void) {
+  clock.listeners.add(listener);
+  if (clock.listeners.size === 1) {
+    clock.value = Date.now();
+    clock.timer = setInterval(() => {
+      clock.value = Date.now();
+      clock.listeners.forEach((notify) => notify());
+    }, 1000);
+  }
+  // A late subscriber must not show a stale value from the previous tick.
+  clock.value = Date.now();
+  listener();
+  return () => {
+    clock.listeners.delete(listener);
+    if (clock.listeners.size === 0) clearInterval(clock.timer);
+  };
+}
+const idleSubscribe = () => () => {};
+/** Current time in ms, refreshed every second while `enabled`; 0 when disabled (do not read it then). */
+export function useNow(enabled = true) {
+  return useSyncExternalStore(
+    enabled ? subscribeClock : idleSubscribe,
+    enabled ? () => clock.value : () => 0,
+  );
+}
 export function useTicketTimer(intervalMs = 1000) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -557,7 +681,12 @@ export async function enableAudio(): Promise<boolean> {
     return false;
   }
 }
-export function AudioUnlockButton() {
+export function AudioUnlockButton({
+  onUnlocked,
+}: {
+  /** Called after the browser actually allowed sound (the training uses it to confirm the step). */
+  onUnlocked?: () => void;
+}) {
   const [ready, setReady] = useState(
     () => typeof audio !== "undefined" && audio.state === "running",
   );
@@ -568,6 +697,8 @@ export function AudioUnlockButton() {
       <button
         type="button"
         data-tour-allow="audio"
+        data-tour-target="btn-audio-unlock"
+        data-help="audio-unlock"
         className={`btn ${ready ? "border-emerald-300 bg-emerald-50 text-emerald-900" : "border-amber-400 bg-amber-50 font-bold text-amber-950"}`}
         aria-label={
           ready
@@ -580,7 +711,10 @@ export function AudioUnlockButton() {
           const unlocked = await enableAudio();
           setReady(unlocked);
           setFailed(!unlocked);
-          if (unlocked) chime("new");
+          if (unlocked) {
+            chime("new");
+            onUnlocked?.();
+          }
           setBusy(false);
         }}
         disabled={busy}
@@ -668,6 +802,7 @@ export function SoundButton() {
   return (
     <button
       data-tour-allow="audio"
+      data-help="sound"
       className={`btn transition-colors ${
         mode === "mute"
           ? "border-stone-300 text-stone-400 line-through"

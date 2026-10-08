@@ -545,13 +545,13 @@ export function Menu() {
             <input
               type="search"
               placeholder="Buscar antojito…"
-              className="field w-full pl-9 pr-8 text-xs font-medium"
+              className="field w-full pl-9 pr-11 text-xs font-medium"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
               <button
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700"
+                className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center text-stone-400 hover:text-stone-700"
                 onClick={() => setSearchQuery("")}
                 aria-label="Borrar búsqueda"
               >

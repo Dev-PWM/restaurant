@@ -1,30 +1,13 @@
-import type { Modifier, Order } from "../../../../shared/types/realtime";
+export type { AcademyAction, AcademyState, Phase } from "./engine.js";
+export type {
+  AcademyEvent,
+  ModuleDef,
+  ModuleId,
+  ResolvedStep,
+  Step,
+} from "./curriculum.js";
 
-export type AcademyModuleId =
-  | "module1_golden_path"
-  | "module2_picky_eater"
-  | "module3_mistakes_noshow"
-  | "module4_panic_86"
-  | "module5_revenue_closeout"
-  | "lunch_rush"
-  | "graduated";
-
-export interface AcademyStep {
-  id: string;
-  moduleId: AcademyModuleId;
-  moduleNumber: number;
-  moduleTitle: string;
-  stepNumber: number;
-  totalSteps: number;
-  target: string;
-  action: string;
-  title: string;
-  instruction: string;
-  backendConsequence: string;
-  valueWhy: string;
-  targetLane?: "review" | "cooking" | "ready" | "completed";
-}
-
+/** Totals shown on the practice «Caja y ventas» screen, computed from practice tickets only. */
 export interface GhostSalesMetrics {
   revenueCents: number;
   paidOrders: number;
@@ -41,34 +24,8 @@ export interface GhostSalesMetrics {
   }>;
 }
 
-export interface AcademyState {
-  isActive: boolean;
-  currentModule: AcademyModuleId;
-  currentStepIndex: number;
-  completedModules: AcademyModuleId[];
-  explainLockRemaining: number;
-  ghostOrders: Order[];
-  ghostCompletedOrders: Order[];
-  ghostMetrics: GhostSalesMetrics;
-  ghostInventory: {
-    items: Array<{ id: string; name: string; available: boolean }>;
-    modifiers: Modifier[];
-  };
-  ghostWebOrdersPaused: boolean;
-  inventoryModalOpen: boolean;
-  closeShiftModalOpen: boolean;
-  mistakeCountdown: number;
-  mistakeOrderId: string | null;
-  mistakeExpired: boolean;
-  mistakeSeen: boolean;
-  selectedTenderCents: number | null;
-  rushMode: boolean;
-  rushRemaining: number;
-  rushCompleted: number;
-  rushResolved: number;
-  rushNoShows: number;
-  rushFinished: number | boolean;
-  isGraduated: boolean;
-  shadowWarning: string | null;
-  acknowledgedRestrictions: Set<string>;
+export interface PracticeInventoryItem {
+  id: string;
+  name: string;
+  available: boolean;
 }
