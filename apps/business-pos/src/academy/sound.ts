@@ -1,5 +1,5 @@
 /**
- * Tactical audio and haptic feedback engine for MasaFlow Academy.
+ * Tactical audio and haptic feedback engine for the Academy.
  * Utilizes Web Audio API oscillators to avoid external asset dependencies
  * and triggers navigator.vibrate for muscle-memory reinforcement.
  */

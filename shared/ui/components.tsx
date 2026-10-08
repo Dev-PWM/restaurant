@@ -25,6 +25,7 @@ import {
   X,
 } from "lucide-react";
 import type { Modifier, Order, Transaction } from "../types/realtime";
+import { RESTAURANT_NAME } from "./brand";
 import { useRealtime } from "./RealtimeProvider";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
@@ -122,7 +123,7 @@ export function PWAServiceWorker() {
         scope: import.meta.env.BASE_URL,
       })
       .catch((error: unknown) =>
-        console.error("MasaFlow service worker registration failed.", error),
+        console.error("Service worker registration failed.", error),
       );
   }, []);
   return null;
@@ -178,11 +179,11 @@ export function PWAInstallButton() {
         Instalar app
       </button>
       {showHelp && (
-        <Modal title="Instalar MasaFlow" onClose={() => setShowHelp(false)}>
+        <Modal title={`Instalar ${RESTAURANT_NAME}`} onClose={() => setShowHelp(false)}>
           <p>
             En Safari, pulsa <strong>Compartir</strong> y elige{" "}
-            <strong>Añadir a pantalla de inicio</strong> para abrir MasaFlow
-            como una aplicación.
+            <strong>Añadir a pantalla de inicio</strong> para abrir{" "}
+            {RESTAURANT_NAME} como una aplicación.
           </p>
         </Modal>
       )}
@@ -464,7 +465,7 @@ export function PinGate({ children }: { children: ReactNode }) {
           </button>
         </form>
         <p className="mt-5 text-xs text-stone-500">
-          Acceso exclusivo del personal · MasaFlow
+          Acceso exclusivo del personal · {RESTAURANT_NAME}
         </p>
       </section>
     </div>
@@ -472,12 +473,26 @@ export function PinGate({ children }: { children: ReactNode }) {
 }
 export function Brand() {
   return (
-    <div className="inline-flex items-center gap-3">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-clay-600 text-white">
-        <ChefHat size={24} />
-      </span>
-      <span className="text-xl font-bold tracking-tight">
-        MasaFlow<span className="text-clay-600">.</span>
+    // shrink-0: on a phone the header is tight, and it is the buttons beside the name that must give, never the name.
+    // The phone sizes are the smallest that still read well: the buttons next to it cannot shrink below their text.
+    <div className="inline-flex shrink-0 items-center gap-2 sm:gap-3">
+      {/* The restaurant's mascot. Decorative: the name right beside it says the same thing. */}
+      <img
+        src={`${import.meta.env.BASE_URL}logo.png`}
+        alt=""
+        width={37}
+        height={56}
+        decoding="async"
+        className="h-11 w-auto shrink-0 sm:h-14"
+      />
+      {/* The two-line name from the printed menu: pink «Los Huaraches» over teal «De Zapata». */}
+      <span className="flex flex-col leading-none">
+        <span className="text-[11.5px] font-black uppercase tracking-normal text-[#E03188] sm:text-[0.8125rem] sm:tracking-wide">
+          Los Huaraches
+        </span>
+        <span className="mt-0.5 text-xl font-black tracking-tight text-[#2E94A5] sm:text-[1.375rem]">
+          De Zapata
+        </span>
       </span>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Download, Smartphone, X } from "lucide-react";
+import { RESTAURANT_NAME } from "./brand";
 import { usePWAInstall } from "./usePWAInstall";
 
 export function PWAInstallButton() {
@@ -46,7 +47,7 @@ export function PWAInstallButton() {
                 </button>
               </div>
               <p className="mt-2 text-sm text-stone-600">
-                Para usar MasaFlow en modo Kiosko sin barras del navegador:
+                Para usar {RESTAURANT_NAME} en modo Kiosko sin barras del navegador:
               </p>
               <ol className="mt-3 list-decimal pl-5 text-sm text-stone-700 space-y-1.5">
                 <li>

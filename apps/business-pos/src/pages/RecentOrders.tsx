@@ -166,7 +166,7 @@ export function RecentOrders({
             </span>
           </div>
           <p className="text-xs text-stone-500 mt-1">
-            Real-time verified cash receipts from the MasaFlow ledger.
+            Real-time verified cash receipts from the ledger.
           </p>
         </div>
 

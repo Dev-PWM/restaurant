@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { ArrowRight, Award, CheckCircle2, Sparkles } from "lucide-react";
 import { burstConfetti } from "../confetti";
 import { useAcademy } from "./AcademyProvider";
+import { RESTAURANT_NAME } from "../../../../shared/ui/brand";
 import { MODULES } from "./curriculum.js";
 
 /** Shown after the timed challenge is passed: celebrates, lists what was earned, hands over the live till. */
@@ -37,7 +38,7 @@ export function GraduationModal({ onEnterLive }: { onEnterLive: () => void }) {
             <Award className="size-12" aria-hidden="true" />
           </span>
           <p className="text-xs font-black uppercase tracking-wide">
-            Certificación MasaFlow
+            Certificación · {RESTAURANT_NAME}
           </p>
           <h2 className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">
             ¡Taquero Experto!
