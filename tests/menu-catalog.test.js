@@ -23,8 +23,6 @@ const order = (engine, items) => ({
   customerName: "Ana",
   items,
 });
-const menuItem = (engine, id) =>
-  engine.getState().menuItems.filter((item) => item.id === id);
 const quote = (engine, items) => {
   const data = order(engine, items);
   engine.dispatch("submit_client_order", data);
@@ -169,10 +167,24 @@ test("C/QUESILLO costs $10 on huaraches and gorditas and $5 elsewhere, and canno
   const wrongTier = [
     { menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-5", "prep-comal"] },
     { menuItemId: "sope-bistec", quantity: 1, modifierIds: ["quesillo-10", "prep-comal"] },
-    { menuItemId: "especial-derecho", quantity: 1, modifierIds: ["quesillo-5", "prep-comal"] },
   ];
   for (const line of wrongTier)
     assert.throws(() => quote(engine, [line]), /agotado/);
+});
+
+test("unconfirmed specials cannot be ordered until the owner confirms their recipe and price", (t) => {
+  const engine = createEngine({ directory: directoryFixture(t) });
+  for (const menuItemId of ["especial-derecho", "especial-izquierdo"]) {
+    assert.throws(
+      () => quote(engine, [{ menuItemId, quantity: 1, modifierIds: ["prep-comal"] }]),
+      (error) => error.code === "SPECIAL_UNCONFIRMED",
+      menuItemId,
+    );
+  }
+  assert.equal(
+    quote(engine, [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["prep-comal"] }]).totalCents,
+    9000,
+  );
 });
 
 test("a dish that offers a masa choice still requires exactly one available masa", (t) => {
@@ -393,9 +405,7 @@ test("every catalog dish requires exactly one of comal or frito, never defaults,
     () => quote(engine, line(["prep-comal", "prep-frito"])),
     /comal o frito/,
   );
-  // The choice is required on every section, including the specials.
-  for (const dish of menuItem(engine, "especial-derecho"))
-    assert.throws(() => quote(engine, line([], dish.id)), /comal o frito/);
+  // The cooking choice remains required on orderable dishes.
   const comal = quote(engine, line(["prep-comal"]));
   const frito = quote(engine, line(["prep-frito"]));
   assert.equal(comal.totalCents, 5500);

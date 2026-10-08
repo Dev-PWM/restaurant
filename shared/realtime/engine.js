@@ -10,6 +10,7 @@ const {
   TABLE_COUNT,
   defaultTables,
   REQUIRED_CHOICE_KINDS,
+  UNCONFIRMED_SPECIAL_IDS,
   hasLegacyPlaceholderMenu,
   reconcileCatalog,
 } = require("./catalog");
@@ -453,6 +454,11 @@ function createEngine({ directory, persist = writeAtomic }) {
       const items = data.items.map((line) => {
         const menu = next.menuItems.find((m) => m.id === line.menuItemId);
         ensure(menu?.available, "Un platillo está agotado.", "SOLD_OUT");
+        ensure(
+          !UNCONFIRMED_SPECIAL_IDS.includes(menu.id),
+          "Consulta los especiales con la cocina antes de pedir.",
+          "SPECIAL_UNCONFIRMED",
+        );
         ensure(
           Number.isInteger(line.quantity) &&
             line.quantity >= 1 &&

@@ -39,6 +39,9 @@ function defaultTables() {
 /** Modifier kinds where the customer must pick exactly one of the dish's options. */
 const REQUIRED_CHOICE_KINDS = ["masa", "prep"];
 
+/** The printed menu does not confirm these specials' prices or Izquierdo's carne/guisado choices. */
+const UNCONFIRMED_SPECIAL_IDS = ["especial-derecho", "especial-izquierdo"];
+
 /** @type {Modifier[]} */
 const MODIFIERS = [
   {
@@ -140,6 +143,8 @@ const MENU_ITEMS = [
     ["pambazo-guisado", "Pambazo de Guisado", 6000, "Pambazo con guisado."],
   ]),
   ...section("Especiales de Zapata", CATEGORY_MODIFIERS["Especiales de Zapata"], [
+    // Provisional ledger prices: the supplied printed image leaves these amounts blank.
+    // Customer orders are blocked in engine.js until the owner confirms recipe, choices and prices.
     ["especial-derecho", "Especial Derecho", 13500, "¡Derecho! Cecina, longaniza, nopal y quesillo."],
     ["especial-izquierdo", "Especial Izquierdo", 6000, "¡Izquierdo! Base de nopal, frijoles, pico de gallo, queso, crema, carne o guisado."],
   ]),
@@ -198,6 +203,7 @@ module.exports = {
   TABLE_COUNT,
   defaultTables,
   REQUIRED_CHOICE_KINDS,
+  UNCONFIRMED_SPECIAL_IDS,
   hasLegacyPlaceholderMenu,
   reconcileCatalog,
 };

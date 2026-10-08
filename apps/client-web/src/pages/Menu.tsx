@@ -41,6 +41,19 @@ export const pendingTotalKey = "masaflow.v3.pendingTotalCents";
 
 type CartLine = OrderInput["items"][number];
 
+// The printed menu lists these as separate specials, but leaves their prices blank and does not
+// name the carne/guisado choices for Izquierdo. Keep them visible without taking an ambiguous order.
+const SPECIAL_DETAILS: Partial<Record<string, { included: string; note: string }>> = {
+  "especial-derecho": {
+    included: "Cecina, longaniza, nopal y quesillo.",
+    note: "Confirma con la cocina si lleva ambas carnes y el precio de hoy.",
+  },
+  "especial-izquierdo": {
+    included: "Base de nopal, frijoles, pico de gallo, queso y crema.",
+    note: "Elige carne o guisado con la cocina y confirma el precio de hoy.",
+  },
+};
+
 export { itemAvailable };
 
 function restoredPending(): OrderInput | null {
@@ -134,11 +147,16 @@ export function Menu() {
     return snapshot.menuItems.filter((item) => {
       const matchesCategory = category === "Todo" || item.category === category;
       const query = searchQuery.trim().toLowerCase();
+      const special = SPECIAL_DETAILS[item.id];
       const matchesSearch =
         !query ||
-        item.name.toLowerCase().includes(query) ||
-        item.description.toLowerCase().includes(query) ||
-        item.category.toLowerCase().includes(query);
+        [
+          item.name,
+          item.description,
+          item.category,
+          special?.included,
+          special?.note,
+        ].some((text) => text?.toLowerCase().includes(query));
       return matchesCategory && matchesSearch;
     });
   }, [snapshot, category, searchQuery]);
@@ -504,40 +522,70 @@ export function Menu() {
                 <h2>
                   {groupName}
                 </h2>
+                {groupName === "Especiales de Zapata" && (
+                  <p className="menu-specials-intro">
+                    Dos recetas de la casa. Consulta sus detalles y precio antes de pedir.
+                  </p>
+                )}
                 <div className="menu-items">
                   {groupItems.map((item) => {
                     const available = itemAvailable(item, snapshot.modifiers);
+                    const special = SPECIAL_DETAILS[item.id];
 
                     return (
                       <article
                         key={item.id}
-                        className="menu-item"
+                        className={`menu-item${special ? " menu-item-special" : ""}`}
                         data-available={available}
                       >
                         <div className="menu-item-copy">
                           <h3>
                             {item.name}
                           </h3>
-                          <p>
-                            {item.description}
-                          </p>
+                          {special ? (
+                            <>
+                              <p className="menu-special-included">
+                                <strong>Según el menú:</strong> {special.included}
+                              </p>
+                              <p className="menu-special-note">{special.note}</p>
+                            </>
+                          ) : (
+                            <p>{item.description}</p>
+                          )}
                         </div>
                         <div className="menu-item-action">
-                          <strong>{mxn(item.priceCents)}</strong>
-                          <button
-                            disabled={!available || Boolean(pending)}
-                            aria-label={`Agregar ${item.name}`}
-                            onClick={() => setCustomizeId(item.id)}
-                          >
-                            {available ? (
-                              <>
-                                <Plus size={16} aria-hidden="true" />
-                                <span>Agregar</span>
-                              </>
-                            ) : (
-                              <span>Agotado</span>
-                            )}
-                          </button>
+                          {special ? (
+                            <>
+                              <strong className="menu-special-price">
+                                {available ? "Precio por confirmar" : "No disponible hoy"}
+                              </strong>
+                              <a
+                                className="menu-special-contact"
+                                href="tel:+525632149403"
+                                aria-label={`Consultar ${item.name} por teléfono`}
+                              >
+                                Consultar
+                              </a>
+                            </>
+                          ) : (
+                            <>
+                              <strong>{mxn(item.priceCents)}</strong>
+                              <button
+                                disabled={!available || Boolean(pending)}
+                                aria-label={`Agregar ${item.name}`}
+                                onClick={() => setCustomizeId(item.id)}
+                              >
+                                {available ? (
+                                  <>
+                                    <Plus size={16} aria-hidden="true" />
+                                    <span>Agregar</span>
+                                  </>
+                                ) : (
+                                  <span>Agotado</span>
+                                )}
+                              </button>
+                            </>
+                          )}
                         </div>
                       </article>
                     );
@@ -549,8 +597,8 @@ export function Menu() {
         )}
 
         <p className="mt-10 text-center text-xs text-stone-500">
-          Precios finales en pesos mexicanos (MXN). Disponibilidad actualizada
-          en vivo con la cocina.
+          Precios visibles en pesos mexicanos (MXN). Consulta precio y
+          disponibilidad de los especiales con la cocina.
         </p>
         <p className="mt-2 text-center text-xs font-semibold text-stone-600">
           Lunes a sábado · 9:30 a.m. – 5:00 p.m. · Tel.{" "}
