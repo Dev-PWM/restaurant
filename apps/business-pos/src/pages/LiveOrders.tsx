@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import type { TableInfo, MenuItem } from "../../../../shared/types/zapata";
-import { detectOrderBadges } from "../../../../shared/types/zapata";
+import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import { UNDO_WINDOW_SECONDS, needsAcknowledgement } from "../simulator.js";
@@ -181,7 +181,7 @@ export function CashTender({
           onClick={() => setShowSpei(true)}
         >
           <Building2 size={16} />
-          Transferencia SPEI · BBVA
+          Transferencia SPEI · {BBVA_BANK_INFO.bank}
         </button>
         <p className="mt-4 text-center text-xs text-stone-500">
           Confirma solo después de recibir el efectivo o verificar la transferencia. Tendrás{" "}
@@ -384,7 +384,7 @@ export function TicketCard({
               {isSPEI && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs">
                   <Building2 size={13} />
-                  SPEI BBVA
+                  SPEI {BBVA_BANK_INFO.bank}
                 </span>
               )}
               {hasSinGrasa && (

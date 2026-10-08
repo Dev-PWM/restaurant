@@ -1,8 +1,8 @@
-import React, { memo, useState } from "react";
+import React, { memo, useState, useEffect } from "react";
 import { AlertCircle, Flame, Building2 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
 import { mxn, orderLabel } from "../../../../shared/ui/components";
-import { detectOrderBadges } from "../../../../shared/types/zapata";
+import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 
 export interface ZapataTicketCardProps {
   order: Order;
@@ -30,6 +30,11 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
   cookingStyle,
 }: ZapataTicketCardProps) {
   const [localAcknowledged, setLocalAcknowledged] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setLocalAcknowledged(new Set());
+  }, [order.id, order.items]);
+
   const isCooking = order.status === "cooking";
   const isReview = order.status === "review";
   const isReady = order.status === "ready";
@@ -48,10 +53,13 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
     onAcknowledgeRestriction?.(key);
   };
 
+  const getOmissionKey = (itemIndex: number, menuItemId: string, omissionId: string) =>
+    `${menuItemId || itemIndex}-${omissionId}`;
+
   const allOmissionsAcknowledged =
     omissions.length === 0 ||
-    omissions.every(({ itemIndex, omission }) =>
-      isOmissionAcknowledged(`${itemIndex}-${omission.id}`)
+    omissions.every(({ itemIndex, menuItemId, omission }) =>
+      isOmissionAcknowledged(getOmissionKey(itemIndex, menuItemId, omission.id))
     );
 
   return (
@@ -76,7 +84,7 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
             {isSPEI && (
               <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white">
                 <Building2 className="size-3.5" />
-                SPEI BBVA
+                SPEI {BBVA_BANK_INFO.bank}
               </span>
             )}
           </div>
@@ -115,8 +123,8 @@ export const ZapataTicketCard = memo(function ZapataTicketCard({
             </span>
           )}
 
-          {omissions.map(({ itemIndex, omission }) => {
-            const compositeKey = `${itemIndex}-${omission.id}`;
+          {omissions.map(({ itemIndex, menuItemId, omission }) => {
+            const compositeKey = getOmissionKey(itemIndex, menuItemId, omission.id);
             const acknowledged = isOmissionAcknowledged(compositeKey);
             return (
               <button

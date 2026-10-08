@@ -119,7 +119,7 @@ export interface DetectedOrderBadges {
   hasSinGrasa: boolean;
   hasExtraQuesillo: boolean;
   isSPEI: boolean;
-  omissions: Array<{ itemIndex: number; omission: Modifier }>;
+  omissions: Array<{ itemIndex: number; menuItemId: string; omission: Modifier }>;
 }
 
 export function detectOrderBadges(
@@ -147,7 +147,7 @@ export function detectOrderBadges(
   const omissions = order.items.flatMap((item, itemIndex) =>
     (item.modifiers || [])
       .filter((m) => m.kind === 'omit')
-      .map((omission) => ({ itemIndex, omission }))
+      .map((omission) => ({ itemIndex, menuItemId: item.menuItemId, omission }))
   );
 
   return { hasSinGrasa, hasExtraQuesillo, isSPEI, omissions };
