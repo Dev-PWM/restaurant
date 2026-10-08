@@ -62,6 +62,7 @@ export function CashTender({
   typing = false,
   onTender,
   onAmountTyped,
+  onSpeiOpen,
 }: {
   order: Order;
   onClose: () => void;
@@ -72,6 +73,8 @@ export function CashTender({
   typing?: boolean;
   onTender?: (tenderedCents: number) => void;
   onAmountTyped?: (cents: number, sufficient: boolean) => void;
+  /** Practice: the transfer dialog opened (the lesson waits for it). */
+  onSpeiOpen?: () => void;
 }) {
   const { connected } = useRealtime();
   const [value, setValue] = useState("");
@@ -176,7 +179,10 @@ export function CashTender({
           className={`btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 disabled:opacity-50 ${
             order.paymentIntent === "spei" ? "ring-4 ring-blue-400 ring-offset-2" : ""
           }`}
-          onClick={() => setShowSpei(true)}
+          onClick={() => {
+            setShowSpei(true);
+            if (simulator) onSpeiOpen?.();
+          }}
         >
           <Building2 size={16} />
           Transferencia SPEI · {BBVA_BANK_INFO.bank}
@@ -397,7 +403,10 @@ export function TicketCard({
                 </span>
               )}
               {isSPEI && (
-                <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs">
+                <span
+                  data-tour-target={simulator ? "badge-spei" : undefined}
+                  className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs"
+                >
                   <Building2 size={13} />
                   SPEI {BBVA_BANK_INFO.bank}
                 </span>
@@ -430,7 +439,7 @@ export function TicketCard({
             </div>
           )}
           <OrderLines order={order} />
-          {requiresAcknowledgement && isCooking && (
+          {requiresAcknowledgement && (isReview || isCooking) && (
             <button
               className="btn mt-3 w-full border-2 border-red-600 bg-red-600 font-black uppercase tracking-wide text-white shadow-md hover:bg-red-700"
               data-tour-target="acknowledge-restriction"
@@ -455,12 +464,21 @@ export function TicketCard({
               className="btn btn-primary mt-4 w-full"
               data-help="accept"
               data-tour-target={simulator ? "accept-demo-order" : undefined}
-              disabled={(!simulator && !connected) || busy}
+              disabled={
+                (!simulator && !connected) ||
+                busy ||
+                (requiresAcknowledgement && !restrictionAcknowledged)
+              }
               onClick={() => void advance()}
             >
               <Check size={17} />
               Aceptar y empezar a cocinar
             </button>
+            {requiresAcknowledgement && !restrictionAcknowledged && (
+              <p className="mt-2 text-center text-xs font-bold text-red-700">
+                Primero toca la etiqueta roja para confirmar que la leíste.
+              </p>
+            )}
             <button
               className="btn btn-danger mt-2 w-full"
               data-help="noshow"
@@ -1555,7 +1573,7 @@ function LiveBoard({
             </h1>
             <p className="mt-3 text-stone-600">
               {activeTab === "queue"
-                ? `${snapshot.activeOrders.length} pedidos en fila · Solo efectivo, siempre al mostrador.`
+                ? `${snapshot.activeOrders.length} pedidos en fila · Efectivo o transferencia SPEI, siempre al mostrador.`
                 : `${snapshot.completedOrders.filter((o) => o.status === "completed").length} pedidos entregados en este turno.`}
             </p>
           </div>
@@ -1924,6 +1942,7 @@ function LiveBoard({
           onAmountTyped={(cents, sufficient) =>
             report({ type: "amount-typed", cents, sufficient })
           }
+          onSpeiOpen={() => report({ type: "spei-open" })}
           onConfirm={simulator ? practice.pay : queueLivePayment}
         />
       )}

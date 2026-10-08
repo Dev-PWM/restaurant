@@ -63,6 +63,8 @@ export function createDemoOrder(now = new Date(), options = {}) {
     number,
     customerName: "María (Demo)",
     status: "review",
+    paymentIntent: "cash",
+    orderType: "takeout",
     items,
     totalCents: items.reduce((sum, item) => sum + item.lineTotalCents, 0),
     createdAt: now.toISOString(),
@@ -375,11 +377,12 @@ export function createKitchenOrders(now = new Date()) {
  * @returns {Order[]}
  */
 export function createHistoryOrders(now = new Date()) {
+  // Two cash sales and one SPEI transfer, so the practice «Caja y ventas» shows the cash/SPEI split the real one shows.
   const paid = [
-    ["Ana (Demo)", 1, 20000],
-    ["Luis (Demo)", 2, 50000],
-    ["Sofía (Demo)", 1, 20000],
-  ].map(([name, scale, tendered], index) => ({
+    ["Ana (Demo)", 1, 20000, "cash"],
+    ["Luis (Demo)", 2, 50000, "cash"],
+    ["Sofía (Demo)", 1, 18500, "spei"],
+  ].map(([name, scale, tendered, method], index) => ({
     ...payDemoOrder(
       inStatus(
         createDemoOrder(now, {
@@ -392,6 +395,7 @@ export function createHistoryOrders(now = new Date()) {
       ),
       Number(tendered),
       now,
+      method === "spei" ? "spei" : "cash",
     ),
     customerName: String(name),
   }));
@@ -437,4 +441,133 @@ export function togglePracticeTable(tables, number, now = new Date()) {
         ? { ...table, status: "available", occupiedSince: null }
         : { ...table, status: "occupied", occupiedSince: now.toISOString() },
   );
+}
+
+/**
+ * Copies of the real catalog modifiers the new practice tickets use. The ticket's header chips are found by
+ * modifier id («prep-comal», «quesillo-…»), so a practice modifier with the right name but another id would
+ * show no chip. tests/pos-simulator.test.js pins every copy to shared/realtime/catalog.js.
+ */
+export const PRACTICE_MODIFIERS = Object.freeze({
+  comal: { id: "prep-comal", name: "Al comal (sin grasa)", priceCents: 0, available: true, kind: "prep" },
+  frito: { id: "prep-frito", name: "Frito (con grasa)", priceCents: 0, available: true, kind: "prep" },
+  quesillo: { id: "quesillo-10", name: "Con Quesillo (huaraches y gorditas)", priceCents: 1000, available: true, kind: "extra" },
+  sinCebolla: { id: "omit-cebolla", name: "Sin cebolla", priceCents: 0, available: true, kind: "omit" },
+  salsaRoja: { id: "salsa-roja", name: "Con salsa roja", priceCents: 0, available: true, kind: "extra" },
+});
+
+/**
+ * One ticket line with real menu names and prices.
+ * @param {string} menuItemId @param {string} name @param {number} unitBase
+ * @param {number} quantity @param {import("../../../shared/types/realtime").Modifier[]} modifiers
+ */
+function line(menuItemId, name, unitBase, quantity, modifiers) {
+  const unitPriceCents =
+    unitBase + modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
+  return {
+    menuItemId,
+    name,
+    quantity,
+    modifiers,
+    unitPriceCents,
+    lineTotalCents: unitPriceCents * quantity,
+  };
+}
+
+/**
+ * @param {string} id @param {number} number @param {string} customerName
+ * @param {ReturnType<typeof line>[]} items
+ * @param {Partial<Order>} [extra]
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+function practiceOrder(id, number, customerName, items, extra = {}, now = new Date()) {
+  return {
+    id,
+    sessionId: "demo-session",
+    shiftId: "demo-shift",
+    fingerprint: "demo-order",
+    number,
+    customerName,
+    status: "review",
+    paymentIntent: "cash",
+    orderType: "takeout",
+    items,
+    totalCents: items.reduce((sum, item) => sum + item.lineTotalCents, 0),
+    createdAt: now.toISOString(),
+    acceptedAt: null,
+    paidAt: null,
+    readyAt: null,
+    completedAt: null,
+    transaction: null,
+    ...extra,
+  };
+}
+
+/**
+ * «Pagar con transferencia»: a ready ticket of $155.00 whose customer chose SPEI when ordering, so the
+ * transfer button is highlighted «(eligió el cliente)».
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function createSpeiDemoOrder(now = new Date()) {
+  const at = now.toISOString();
+  return practiceOrder(
+    "spei-order-001",
+    1,
+    "Sofía (Transferencia)",
+    [
+      line("huarache-bistec", "Huarache de Bistec", 9000, 1, [PRACTICE_MODIFIERS.comal, PRACTICE_MODIFIERS.quesillo]),
+      line("sope-bistec", "Sope de Bistec", 5500, 1, [PRACTICE_MODIFIERS.frito]),
+    ],
+    { status: "ready", paymentIntent: "spei", acceptedAt: at, readyAt: at },
+    now,
+  );
+}
+
+/**
+ * «Lee el ticket»: one ticket that shows every chip at once: dine-in, SPEI, comal pieces, fried pieces and
+ * quesillo, plus a red «Sin cebolla» and a green salsa tag.
+ * @param {Date} [now]
+ * @returns {Order}
+ */
+export function createTagShowcaseOrder(now = new Date()) {
+  return practiceOrder(
+    "tags-order-001",
+    1,
+    "Lupe (Demo)",
+    [
+      line("huarache-bistec", "Huarache de Bistec", 9000, 2, [
+        PRACTICE_MODIFIERS.comal,
+        PRACTICE_MODIFIERS.quesillo,
+        PRACTICE_MODIFIERS.sinCebolla,
+      ]),
+      line("sope-bistec", "Sope de Bistec", 5500, 1, [PRACTICE_MODIFIERS.frito, PRACTICE_MODIFIERS.salsaRoja]),
+    ],
+    { orderType: "dine_in", paymentIntent: "spei" },
+    now,
+  );
+}
+
+/**
+ * «Tiempos del comal»: four tickets, oldest first in each lane, so the first button the lesson spotlights is
+ * always the ticket that has waited longest. The red ones are well past the limits (review 3 min, cooking
+ * 15 min) and the amber cooking ticket stays amber for ten minutes, so nothing changes colour under the trainee.
+ * @param {Date} [now]
+ * @returns {Order[]}
+ */
+export function createTimingOrders(now = new Date()) {
+  const ago = (minutes) => new Date(now.getTime() - minutes * 60_000).toISOString();
+  const one = [line("huarache-bistec", "Huarache de Bistec", 9000, 1, [PRACTICE_MODIFIERS.comal])];
+  const fried = [line("sope-bistec", "Sope de Bistec", 5500, 2, [PRACTICE_MODIFIERS.frito])];
+  return [
+    practiceOrder("timing-order-001", 1, "Luis (16 min en el comal)", one, {
+      status: "cooking", createdAt: ago(17), acceptedAt: ago(16),
+    }, now),
+    practiceOrder("timing-order-002", 2, "Marta (6 min en el comal)", fried, {
+      status: "cooking", createdAt: ago(7), acceptedAt: ago(6),
+    }, now),
+    practiceOrder("timing-order-003", 3, "Carlos (4 min esperando)", one, { createdAt: ago(4) }, now),
+    practiceOrder("timing-order-004", 4, "Ana (recién llegó)", fried, { createdAt: ago(0.3) }, now),
+  ];
 }

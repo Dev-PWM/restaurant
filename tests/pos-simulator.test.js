@@ -144,8 +144,13 @@ test("history orders give the practice summary known numbers", async () => {
   assert.equal(metrics.paidOrders, 3);
   assert.equal(metrics.noShows, 1);
   assert.equal(metrics.revenueCents, 74000);
-  assert.equal(metrics.tenderedCents, 90000);
-  assert.equal(metrics.changeCents, 16000);
+  // Two cash sales ($185 paid with $200, $370 paid with $500) and one $185 transfer.
+  assert.equal(metrics.tenderedCents, 70000);
+  assert.equal(metrics.changeCents, 14500);
+  assert.equal(metrics.cashCents, 55500);
+  assert.equal(metrics.speiCents, 18500);
+  assert.equal(metrics.speiOrders, 1);
+  assert.equal(metrics.cashCents + metrics.speiCents, metrics.revenueCents);
   assert.deepEqual(
     metrics.itemPerformance.map((item) => [item.name, item.quantity]),
     [
@@ -191,4 +196,86 @@ test("a practice SPEI transfer is the exact total with no change, and counts apa
   assert.equal(metrics.cashCents, ready.totalCents);
   assert.equal(metrics.tenderedCents, 50000);
   assert.equal(metrics.revenueCents, metrics.cashCents + metrics.speiCents);
+});
+
+test("practice modifiers are exact copies of the real catalog, so the ticket chips render", async () => {
+  const { PRACTICE_MODIFIERS, createSpeiDemoOrder, createTagShowcaseOrder, createTimingOrders } =
+    await simulator;
+  const catalog = require("../shared/realtime/catalog.js");
+  const real = (id) => catalog.MODIFIERS.find((modifier) => modifier.id === id);
+  for (const modifier of Object.values(PRACTICE_MODIFIERS))
+    assert.deepEqual(modifier, real(modifier.id), `${modifier.id} drifted from catalog.js`);
+  // Every modifier on every new lesson ticket is one of them, and every dish is a real, correctly priced dish.
+  const now = new Date();
+  const tickets = [createSpeiDemoOrder(now), createTagShowcaseOrder(now), ...createTimingOrders(now)];
+  for (const ticket of tickets)
+    for (const item of ticket.items) {
+      const dish = catalog.MENU_ITEMS.find((candidate) => candidate.id === item.menuItemId);
+      assert.ok(dish, `${item.menuItemId} is not on the real menu`);
+      assert.equal(item.name, dish.name);
+      for (const modifier of item.modifiers) {
+        assert.deepEqual(modifier, real(modifier.id));
+        assert.ok(dish.modifierIds.includes(modifier.id), `${dish.id} does not offer ${modifier.id}`);
+      }
+      const modifiersCents = item.modifiers.reduce((sum, modifier) => sum + modifier.priceCents, 0);
+      assert.equal(item.unitPriceCents, dish.priceCents + modifiersCents);
+      assert.equal(item.lineTotalCents, item.unitPriceCents * item.quantity);
+    }
+  for (const ticket of tickets)
+    assert.equal(ticket.totalCents, ticket.items.reduce((sum, item) => sum + item.lineTotalCents, 0));
+});
+
+test("the SPEI and tag lesson tickets carry exactly what their lessons point at", async () => {
+  const { createSpeiDemoOrder, createTagShowcaseOrder, needsAcknowledgement } = await simulator;
+  const spei = createSpeiDemoOrder();
+  assert.equal(spei.status, "ready");
+  assert.equal(spei.paymentIntent, "spei");
+  assert.equal(spei.totalCents, 15500);
+  assert.equal(needsAcknowledgement(spei), false);
+  const tags = createTagShowcaseOrder();
+  assert.equal(tags.status, "review");
+  assert.equal(tags.orderType, "dine_in");
+  assert.equal(tags.paymentIntent, "spei");
+  const ids = tags.items.flatMap((item) => item.modifiers.map((modifier) => modifier.id));
+  for (const id of ["prep-comal", "prep-frito", "quesillo-10", "omit-cebolla"])
+    assert.ok(ids.includes(id), id);
+  // The red tag is what the last step of that lesson asks the trainee to read.
+  assert.equal(needsAcknowledgement(tags), true);
+  const pieces = (id) =>
+    tags.items.filter((item) => item.modifiers.some((modifier) => modifier.id === id)).reduce((sum, item) => sum + item.quantity, 0);
+  assert.equal(pieces("prep-comal"), 2);
+  assert.equal(pieces("prep-frito"), 1);
+});
+
+test("timing tickets are oldest first in each lane and sit well inside their colour windows", async () => {
+  const { createTimingOrders, needsAcknowledgement } = await simulator;
+  const now = new Date("2026-10-05T12:00:00.000Z");
+  const orders = createTimingOrders(now);
+  const waited = (order) =>
+    (now.getTime() - Date.parse(order.status === "cooking" ? order.acceptedAt : order.createdAt)) / 1000;
+  // The same limits as the ticket card: review 2 min amber, 3 min red; cooking 5 min amber, 15 min red.
+  const windows = { review: [120, 180], cooking: [300, 900] };
+  const colour = (order) => {
+    const [amber, red] = windows[order.status];
+    const seconds = waited(order);
+    return seconds > red ? "red" : seconds >= amber ? "amber" : "none";
+  };
+  const lane = (status) => orders.filter((order) => order.status === status);
+  assert.deepEqual(lane("cooking").map(colour), ["red", "amber"]);
+  assert.deepEqual(lane("review").map(colour), ["red", "none"]);
+  for (const status of ["cooking", "review"])
+    assert.deepEqual(
+      lane(status).map(waited),
+      [...lane(status).map(waited)].sort((a, b) => b - a),
+      `${status} lane must be oldest first, because the lesson spotlights the first button`,
+    );
+  // Nothing changes colour while someone reads the lesson: at least 90 s of margin on every boundary.
+  const margin = (order) => {
+    const [amber, red] = windows[order.status];
+    const seconds = waited(order);
+    return colour(order) === "red" ? Infinity : colour(order) === "amber" ? red - seconds : amber - seconds;
+  };
+  for (const order of orders) assert.ok(margin(order) >= 90, `${order.customerName} changes colour too soon`);
+  // No «SIN» tags, so accepting is not held behind the red-tag exercise.
+  assert.ok(orders.every((order) => !needsAcknowledgement(order)));
 });

@@ -21,6 +21,9 @@ const CATEGORIES = [
 
 export type NewDish = Commands["admin_add_menu_item"];
 
+/** What the practice form starts with. Never sent anywhere: practice reports the tap and stores nothing. */
+const PRACTICE_DISH = { name: "Huarache de Costilla", price: "120.50" } as const;
+
 export interface CustomDishModalProps {
   onClose: () => void;
   /** Resolves to an error message to show, or null when the dish was saved. */
@@ -51,9 +54,10 @@ export const CustomDishModal = memo(function CustomDishModal({
   modifiers,
   simulator = false,
 }: CustomDishModalProps) {
-  const [name, setName] = useState("");
+  // Practice opens with a believable dish already typed, so the lesson is about the form and not about typing.
+  const [name, setName] = useState(simulator ? PRACTICE_DISH.name : "");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
-  const [priceInput, setPriceInput] = useState("");
+  const [priceInput, setPriceInput] = useState(simulator ? PRACTICE_DISH.price : "");
   const [description, setDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -162,6 +166,7 @@ export const CustomDishModal = memo(function CustomDishModal({
         <div
           className="rounded-xl border border-stone-200 bg-stone-50 p-3.5 text-xs"
           data-testid="custom-dish-rules"
+          data-tour-target={simulator ? "custom-dish-rules" : undefined}
         >
           <p className="mb-2 font-black uppercase tracking-wider text-stone-500">
             Opciones que tendrá en «{category}»

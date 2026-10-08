@@ -20,6 +20,9 @@ import {
   needsAcknowledgement,
   payDemoOrder,
   createPracticeTables,
+  createSpeiDemoOrder,
+  createTagShowcaseOrder,
+  createTimingOrders,
   togglePracticeTable,
 } from "../simulator.js";
 import { useAcademy } from "./AcademyProvider";
@@ -172,6 +175,20 @@ export function usePracticeBoard({
         case "cocina":
           setOrders(createKitchenOrders());
           break;
+        case "etiquetas":
+          setOrders([createTagShowcaseOrder()]);
+          break;
+        case "tiempos":
+          setOrders(createTimingOrders());
+          break;
+        case "transferencia":
+          setOrders([createSpeiDemoOrder()]);
+          break;
+        case "mesas":
+        case "platillo":
+          // Nothing on the board: these lessons live on the tables tab and in the dish form.
+          setOrders([]);
+          break;
         case "historial":
         case "cierre":
           setOrders([]);
@@ -298,12 +315,17 @@ export function usePracticeBoard({
 
   const advanceOrder = useCallback(
     (order: Order) => {
+      // Read the red tag first: the gate applies before accepting, not only before marking ready.
       if (
-        order.status === "cooking" &&
+        (order.status === "review" || order.status === "cooking") &&
         needsAcknowledgement(order) &&
         !acknowledged.has(order.id)
-      )
+      ) {
+        academyRef.current.warn(
+          "Primero toca la etiqueta roja para confirmar que la leíste.",
+        );
         return;
+      }
       const next = advanceDemoOrder(order);
       setOrders((current) =>
         current.map((candidate) =>

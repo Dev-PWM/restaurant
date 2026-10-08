@@ -401,3 +401,79 @@ test("every button label and customer message quoted in the training text exists
     "training text quotes labels that no screen shows",
   );
 });
+
+/**
+ * Source a trainee interacts with: every app file, including the practice board and the practice screens, but
+ * never the three files that DEFINE the lessons (their `type: "…"` and ids would satisfy these checks trivially).
+ */
+function boardSource() {
+  const definitions = new Set(["curriculum.js", "engine.js", "glossary.js"]);
+  const chunks = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (/\.(tsx|ts|js)$/.test(entry.name) && !definitions.has(entry.name))
+        chunks.push(fs.readFileSync(full, "utf8"));
+    }
+  };
+  for (const entry of [
+    "apps/business-pos/src",
+    "apps/client-web/src",
+    "apps/analytics/src/content/realtime",
+    "shared/ui",
+  ])
+    walk(path.join(root, entry));
+  return chunks.join("\n");
+}
+
+test("every step spotlights a target the board really renders", async () => {
+  const lib = await load();
+  const source = boardSource();
+  const exact = new Set();
+  for (const [, value] of source.matchAll(/["'`]([a-z][a-z0-9-]*)["'`]/g))
+    exact.add(value);
+  // Targets built per item, like `tender-${preset}` or `table-card-${number}`.
+  const prefixes = [...source.matchAll(/`([a-z][a-z0-9-]*-)\$\{/g)].map(
+    (match) => match[1],
+  );
+  const missing = [];
+  for (const module of lib.MODULES)
+    for (const step of module.steps)
+      if (
+        !exact.has(step.target) &&
+        !prefixes.some((prefix) => step.target.startsWith(prefix))
+      )
+        missing.push(`${step.id} → ${step.target}`);
+  assert.deepEqual(
+    missing,
+    [],
+    "these steps would spotlight nothing and strand the trainee",
+  );
+});
+
+test("every event a step waits for is emitted somewhere in the app", async () => {
+  const lib = await load();
+  const source = boardSource();
+  const missing = [];
+  for (const module of lib.MODULES)
+    for (const step of module.steps)
+      if (
+        step.kind === "act" &&
+        // `type: "x"`, or a conditional such as `type: review ? "accept" : "ready"` (stops at the closing brace).
+        !new RegExp(`type:[^}]*?["']${step.expect.type}["']`).test(source)
+      )
+        missing.push(`${step.id} waits for «${step.expect.type}»`);
+  assert.deepEqual(missing, [], "these steps can never be completed");
+});
+
+test("every control marked data-help has a glossary entry, so explore mode can explain it", async () => {
+  const lib = await load();
+  const source = boardSource();
+  const missing = [
+    ...new Set(
+      [...source.matchAll(/data-help="([^"]+)"/g)].map((match) => match[1]),
+    ),
+  ].filter((id) => !lib.glossaryEntry(id));
+  assert.deepEqual(missing, [], "explore mode would show nothing for these");
+});

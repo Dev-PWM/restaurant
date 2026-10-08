@@ -105,9 +105,28 @@ export function PracticeAnalytics({
               {metrics.paidOrders} pedidos pagados · {metrics.noShows} No-Show
               excluidos
             </p>
-            <dl className="flex gap-8">
+            <dl className="flex flex-wrap gap-x-8 gap-y-3">
+              {/* Same rule as the live screen: the split appears with the first transfer. */}
+              {metrics.speiOrders > 0 && (
+                <>
+                  <div>
+                    <dt className="text-xs text-white/75">Ventas en efectivo</dt>
+                    <dd className="mt-1 text-lg font-semibold tabular-nums">
+                      {mxn(metrics.cashCents)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-white/75">
+                      Transferencias SPEI ({metrics.speiOrders})
+                    </dt>
+                    <dd className="mt-1 text-lg font-semibold tabular-nums">
+                      {mxn(metrics.speiCents)}
+                    </dd>
+                  </div>
+                </>
+              )}
               <div>
-                <dt className="text-xs text-white/75">Recibido</dt>
+                <dt className="text-xs text-white/75">Efectivo recibido</dt>
                 <dd className="mt-1 text-lg font-semibold tabular-nums">
                   {mxn(metrics.tenderedCents)}
                 </dd>

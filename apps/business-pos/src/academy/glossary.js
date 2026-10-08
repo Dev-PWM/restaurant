@@ -236,6 +236,69 @@ export const GLOSSARY = [
     why: "Es la pantalla de trabajo del turno.",
   },
   {
+    id: "tab-tables",
+    label: "Control de Mesas",
+    group: "Mesas",
+    purpose:
+      "Muestra las mesas del comedor y cuántas están ocupadas, por ejemplo 1/3.",
+    effect:
+      "Es la misma lista que ven los clientes: cuando eligen «Comer aquí» ven cuántas mesas hay libres, al instante.",
+    why: "Así nadie pide comer aquí cuando el comedor está lleno.",
+  },
+  {
+    id: "table-card",
+    label: "Mesa",
+    group: "Mesas",
+    purpose:
+      "Cada tarjeta es una mesa. Tócala cuando sientes a alguien y tócala otra vez cuando se desocupe.",
+    effect:
+      "Cambia entre «Disponible» y «Ocupada» y avisa a los teléfonos de los clientes. Un pedido «Comer aquí» no ocupa la mesa por sí solo.",
+    why: "Tú sabes cuándo se sentó alguien de verdad; el sistema solo lo muestra.",
+    watch: "Cerrar el turno libera todas las mesas.",
+  },
+  {
+    id: "custom-dish",
+    label: "Crear Platillo",
+    group: "Encabezado",
+    purpose: "Agrega un platillo nuevo al menú: nombre, sección, precio y una descripción opcional.",
+    effect:
+      "El platillo aparece de inmediato en el menú de los clientes, con las mismas opciones que los demás de su sección. Un huarache nuevo tiene el quesillo de $10 y la elección obligatoria «Al comal» o «Frito».",
+    why: "Puedes ofrecer un especial del día sin pedirle ayuda a nadie.",
+    watch: "No se puede borrar: para quitarlo del menú márcalo «Agotado» en Inventario.",
+  },
+  {
+    id: "spei-pay",
+    label: "Transferencia SPEI",
+    group: "Cobro",
+    purpose:
+      "Cobra un pedido que el cliente paga por transferencia bancaria en lugar de efectivo.",
+    effect:
+      "Abre los datos del banco y el monto exacto. Al confirmar, el pago se registra como transferencia: no suma efectivo en tu caja ni lleva cambio.",
+    why: "El dinero llega al banco, no al cajón; registrarlo bien mantiene tu caja cuadrada.",
+    watch:
+      "Confirma solo después de ver la transferencia en la app del banco. Si el cliente eligió SPEI al pedir, el botón se resalta.",
+  },
+  {
+    id: "spei-confirm",
+    label: "Confirmar Recepción SPEI",
+    group: "Cobro",
+    purpose: "Registra que la transferencia ya llegó y entrega el pedido.",
+    effect:
+      "Crea el pago por el total exacto como transferencia. Igual que el efectivo, tienes 5 segundos para «Deshacer».",
+    why: "Es el único aviso de que ya cobraste ese pedido.",
+    watch: "Tocarlo sin ver el dinero en el banco es regalar el pedido.",
+  },
+  {
+    id: "ticket-badges",
+    label: "Etiquetas del ticket",
+    group: "Tablero",
+    purpose:
+      "Las etiquetas de colores arriba del ticket resumen cómo se prepara y se paga: «SIN GRASA», «FRITO», «+ C/QUESILLO», «COMER AQUÍ» y «SPEI».",
+    effect:
+      "«SIN GRASA» y «FRITO» van seguidas del número de piezas (por ejemplo ×2), no de pedidos: un mismo ticket puede traer de las dos. Las etiquetas rojas dicen qué NO lleva y las verdes qué lleva de más.",
+    why: "El cocinero y quien entrega saben qué preparar sin leer línea por línea.",
+  },
+  {
     id: "tab-completed",
     label: "Pedidos Completados",
     group: "Tablero",
@@ -303,8 +366,8 @@ export const GLOSSARY = [
     group: "Encabezado",
     purpose: "Abre la pantalla de ventas del turno.",
     effect:
-      "Muestra Ventas cobradas, Recibido, Cambio, los platillos más vendidos y la tabla de transacciones. Desde ahí se cierra el turno.",
-    why: "Aquí revisas que lo cobrado coincide con el efectivo de la caja.",
+      "Muestra Ventas cobradas, el efectivo recibido y el cambio, las transferencias SPEI si hubo, los platillos más vendidos y la tabla de transacciones. Desde ahí se cierra el turno.",
+    why: "Aquí revisas que el efectivo de la caja coincide con lo cobrado en efectivo.",
   },
   {
     id: "sales-card",
@@ -312,8 +375,10 @@ export const GLOSSARY = [
     group: "Caja y ventas",
     purpose:
       "Es el total de los pedidos pagados en el turno. Los No-Show no suman.",
-    effect: "«Recibido» es el efectivo que entró y «Cambio» lo que devolviste.",
-    why: "Es la cifra que debe cuadrar con tu caja física.",
+    effect:
+      "Suma efectivo y transferencias SPEI. «Efectivo recibido» es el efectivo que entró y «Cambio» lo que devolviste. En cuanto hay una transferencia, la pantalla separa «Ventas en efectivo» y «Transferencias SPEI».",
+    why: "Tu caja física solo debe cuadrar con las ventas en efectivo: una transferencia es dinero en el banco, no en el cajón.",
+    watch: "Si hubo transferencias, no compares la caja con el total de «Ventas cobradas».",
   },
   {
     id: "close-shift",

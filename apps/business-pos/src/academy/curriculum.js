@@ -11,10 +11,10 @@ import { glossaryEntry } from "./glossary.js";
  * printed on each control, and keep every sentence short enough to read in a few
  * seconds with greasy hands.
  *
- * @typedef {"tablero"|"flujo"|"exigente"|"cobros"|"errores"|"cocina"|"historial"|"panico"|"cierre"} ModuleId
+ * @typedef {"tablero"|"flujo"|"exigente"|"cobros"|"errores"|"cocina"|"historial"|"panico"|"cierre"|"etiquetas"|"tiempos"|"mesas"|"transferencia"|"platillo"} ModuleId
  *
  * @typedef {Object} StepView
- * @property {"queue"|"completed"} [tab]
+ * @property {"queue"|"tables"|"completed"} [tab]
  * @property {"review"|"cooking"|"ready"} [lane]   Lane to show on phones, where only one lane is visible.
  * @property {boolean} [kitchenOnly]
  *
@@ -324,26 +324,26 @@ export const MODULES = [
       {
         id: "exigente-1",
         kind: "act",
-        target: "accept-demo-order",
-        control: "accept",
-        title: "1. Acepta el pedido",
+        target: "acknowledge-restriction",
+        title: "1. Lee la etiqueta roja",
         instruction:
-          "Este pedido trae una petición especial. Toca «Aceptar y empezar a cocinar».",
-        expect: { type: "accept" },
+          "Este pedido trae una petición especial. Toca el botón rojo para confirmar que leíste «SIN QUESO».",
+        consequence:
+          "Es un ejercicio de entrenamiento: en la caja real el ticket solo muestra la etiqueta y no te frena. Aquí practicas leerla antes de aceptar el pedido.",
+        why: "Quien cocina y quien entrega deben saber qué NO lleva el platillo.",
+        expect: { type: "ack-restriction" },
         view: { tab: "queue", lane: "review", kitchenOnly: false },
       },
       {
         id: "exigente-2",
         kind: "act",
-        target: "acknowledge-restriction",
-        title: "2. Lee la etiqueta roja",
+        target: "accept-demo-order",
+        control: "accept",
+        title: "2. Acepta el pedido",
         instruction:
-          "Toca el botón rojo para confirmar que leíste «SIN QUESO».",
-        consequence:
-          "Es un ejercicio de entrenamiento: en la caja real el ticket solo muestra la etiqueta y no te frena. Aquí practicas leerla en voz alta antes de continuar.",
-        why: "Quien cocina y quien entrega deben saber qué NO lleva el platillo.",
-        expect: { type: "ack-restriction" },
-        view: { lane: "cooking" },
+          "Ya leíste la etiqueta, así que se desbloqueó «Aceptar y empezar a cocinar». Tócalo.",
+        expect: { type: "accept" },
+        view: { lane: "review" },
       },
       {
         id: "exigente-3",
@@ -351,8 +351,9 @@ export const MODULES = [
         target: "mark-demo-ready",
         control: "ready",
         title: "3. Márcalo lista",
-        instruction: "Ya leíste la etiqueta. Toca «Marcar lista para recoger».",
+        instruction: "Toca «Marcar lista para recoger».",
         expect: { type: "ready" },
+        view: { lane: "cooking" },
       },
       {
         id: "exigente-4",
@@ -852,7 +853,7 @@ export const MODULES = [
     required: false,
     minutes: 3,
     takeaways: [
-      "«Ventas cobradas» debe cuadrar con el efectivo de tu caja.",
+      "El efectivo de tu caja debe cuadrar con lo cobrado en efectivo, no con las transferencias SPEI.",
       "«Archivar y cerrar» se apaga si todavía hay pedidos en fila.",
       "Al cerrar se guarda un archivo permanente y el nuevo turno empieza en cero.",
     ],
@@ -894,7 +895,7 @@ export const MODULES = [
         control: "sales-card",
         title: "Tus ventas del turno",
         instruction:
-          "Aquí ves lo cobrado en las prácticas, el efectivo recibido y el cambio entregado.",
+          "Aquí ves lo cobrado en las prácticas. Como hubo una transferencia, la pantalla separa «Ventas en efectivo» de «Transferencias SPEI».",
       },
       {
         id: "cierre-3",
@@ -902,7 +903,7 @@ export const MODULES = [
         target: "analytics-sales-card",
         title: "Hábito recomendado",
         instruction:
-          "Cuenta el efectivo físico de tu caja y compáralo con «Ventas cobradas».",
+          "Cuenta el efectivo físico de tu caja y compáralo con las ventas en efectivo. Si hubo transferencias, «Ventas en efectivo» las separa de «Ventas cobradas».",
         consequence:
           "El sistema no te pide contar el efectivo ni lo compara por ti: es un hábito tuyo.",
         why: "Si no cuadra, es más fácil encontrar el error el mismo día.",
@@ -938,12 +939,458 @@ export const MODULES = [
       },
     ],
   },
+
+  {
+    id: "etiquetas",
+    number: 10,
+    title: "Lee el Ticket",
+    subtitle: "Grasa, quesillo, mesa y pago",
+    description:
+      "Qué significa cada etiqueta de color arriba del ticket, para preparar y entregar sin errores.",
+    required: false,
+    minutes: 3,
+    takeaways: [
+      "«SIN GRASA» es comal seco y «FRITO» lleva grasa; el número que sigue es cuántas piezas.",
+      "«+ C/QUESILLO» es un extra de pago y «COMER AQUÍ» avisa que se entrega en el comedor.",
+      "«SPEI» significa que el cliente dijo que paga por transferencia; tú registras cómo pagó de verdad.",
+    ],
+    quiz: {
+      question:
+        "Un ticket trae las etiquetas «SIN GRASA» y «FRITO». ¿Qué significa?",
+      options: [
+        {
+          text: "Hay piezas para el comal sin grasa y piezas para freír",
+          correct: true,
+          explain:
+            "Correcto: cada etiqueta cuenta las piezas que llevan ese modo de cocinar.",
+        },
+        {
+          text: "El pedido está duplicado",
+          explain:
+            "No: es el mismo pedido, con platillos que se cocinan de dos maneras.",
+        },
+        {
+          text: "Hay que preguntarle al cliente cuál prefiere",
+          explain:
+            "No: el cliente ya eligió al pedir. Cada línea del ticket dice qué lleva.",
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "etiquetas-1",
+        kind: "info",
+        target: "badge-sin-grasa",
+        control: "ticket-badges",
+        title: "«SIN GRASA»",
+        instruction:
+          "Estas piezas van al comal sin grasa. El número es cuántas piezas son, no cuántos pedidos.",
+        view: { tab: "queue", lane: "review", kitchenOnly: false },
+      },
+      {
+        id: "etiquetas-2",
+        kind: "info",
+        target: "badge-frito",
+        control: "ticket-badges",
+        title: "«FRITO»",
+        instruction:
+          "Estas piezas se fríen. Un mismo ticket puede traer piezas de las dos clases.",
+      },
+      {
+        id: "etiquetas-3",
+        kind: "info",
+        target: "badge-quesillo",
+        control: "ticket-badges",
+        title: "«+ C/QUESILLO»",
+        instruction:
+          "Al menos un platillo lleva quesillo extra, que ya está sumado al total del ticket.",
+      },
+      {
+        id: "etiquetas-4",
+        kind: "info",
+        target: "badge-dine-in",
+        control: "ticket-badges",
+        title: "«COMER AQUÍ»",
+        instruction:
+          "El cliente come en el comedor. Si no trae esta etiqueta, el pedido es para llevar.",
+      },
+      {
+        id: "etiquetas-5",
+        kind: "info",
+        target: "badge-spei",
+        control: "ticket-badges",
+        title: "«SPEI»",
+        instruction:
+          "El cliente eligió pagar por transferencia. Al cobrar, el botón de transferencia estará resaltado.",
+      },
+      {
+        id: "etiquetas-6",
+        kind: "act",
+        target: "acknowledge-restriction",
+        title: "Lee la etiqueta roja",
+        instruction:
+          "Las etiquetas rojas dicen lo que NO lleva. Toca el botón rojo para confirmar que leíste «Sin cebolla».",
+        consequence:
+          "Es un ejercicio de entrenamiento: en la caja real el ticket solo muestra la etiqueta y no te frena.",
+        why: "Quien cocina debe saber qué quitarle al platillo antes de empezar.",
+        expect: { type: "ack-restriction" },
+      },
+    ],
+  },
+
+  {
+    id: "tiempos",
+    number: 11,
+    title: "Tiempos del Comal",
+    subtitle: "Ámbar, rojo y qué atender primero",
+    description:
+      "Cómo leer el reloj de cada ticket para atender primero a quien más lleva esperando.",
+    required: false,
+    minutes: 3,
+    takeaways: [
+      "En revisión el ticket se pone ámbar a los 2 minutos y rojo a los 3; cocinando, ámbar a los 5 y rojo a los 15.",
+      "Atiende primero el rojo: es el cliente que más lleva esperando.",
+      "El reloj corre solo: cuenta desde que llegó el pedido y, ya cocinando, desde que lo aceptaste.",
+    ],
+    quiz: {
+      question:
+        "Hay un ticket en rojo y otro en ámbar esperando. ¿Cuál atiendes primero?",
+      options: [
+        {
+          text: "El rojo: es el que más lleva esperando",
+          correct: true,
+          explain: "Correcto: el color te dice quién espera más.",
+        },
+        {
+          text: "El ámbar, porque es más fácil de cocinar",
+          explain: "No: el color decide el orden, no lo fácil del platillo.",
+        },
+        {
+          text: "El que tenga más platillos",
+          explain: "No: el reloj decide el orden, no el tamaño del pedido.",
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "tiempos-1",
+        kind: "info",
+        target: "ticket-timer",
+        control: "timer",
+        title: "El reloj de cada ticket",
+        instruction:
+          "Cada ticket cuenta cuánto lleva esperando. Este lleva 4 minutos en revisión: ya está en rojo.",
+        view: { tab: "queue", lane: "review", kitchenOnly: false },
+      },
+      {
+        id: "tiempos-2",
+        kind: "info",
+        target: "lane-cooking",
+        control: "timer",
+        title: "En el comal los tiempos son otros",
+        instruction:
+          "En «Cocinando» el ámbar empieza a los 5 minutos y el rojo a los 15. Aquí hay uno de 16 minutos y otro de 6.",
+        view: { lane: "cooking" },
+      },
+      {
+        id: "tiempos-3",
+        kind: "act",
+        target: "accept-demo-order",
+        control: "accept",
+        title: "1. Acepta primero el rojo",
+        instruction:
+          "Carlos lleva 4 minutos esperando. Toca «Aceptar y empezar a cocinar» en su ticket.",
+        expect: { type: "accept" },
+        view: { lane: "review" },
+      },
+      {
+        id: "tiempos-4",
+        kind: "act",
+        target: "mark-demo-ready",
+        control: "ready",
+        title: "2. Saca primero al que más lleva",
+        instruction:
+          "Luis lleva 16 minutos en el comal: es el más urgente. Toca «Marcar lista para recoger» en su ticket.",
+        expect: { type: "ready" },
+        view: { lane: "cooking" },
+      },
+    ],
+  },
+
+  {
+    id: "mesas",
+    number: 12,
+    title: "Mesas y Comedor",
+    subtitle: "Marca ocupada y libera",
+    description:
+      "Cómo marcar las mesas del comedor para que los clientes sepan si pueden comer aquí.",
+    required: false,
+    minutes: 2,
+    takeaways: [
+      "Toca una mesa cuando sientes a alguien y tócala otra vez cuando se desocupe.",
+      "Los clientes ven cuántas mesas hay libres cuando eligen «Comer aquí»; sin mesas, esa opción se apaga sola.",
+      "Un pedido «Comer aquí» no ocupa la mesa por sí solo, y cerrar el turno las libera todas.",
+    ],
+    quiz: {
+      question: "Entra un pedido «Comer aquí». ¿Qué pasa con las mesas?",
+      options: [
+        {
+          text: "Nada: yo marco la mesa cuando siento al cliente",
+          correct: true,
+          explain: "Correcto: el sistema solo muestra lo que tú marcas.",
+        },
+        {
+          text: "Se marca una mesa ocupada sola",
+          explain: "No: ningún pedido cambia una mesa; eso lo haces tú.",
+        },
+        {
+          text: "Se bloquean todas las mesas",
+          explain: "No: las mesas solo cambian cuando tú las tocas.",
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "mesas-1",
+        kind: "act",
+        target: "tab-tables",
+        control: "tab-tables",
+        title: "1. Abre el control de mesas",
+        instruction: "Toca la pestaña «Control de Mesas».",
+        expect: { type: "tab", tab: "tables" },
+        view: { tab: "queue", kitchenOnly: false },
+      },
+      {
+        id: "mesas-2",
+        kind: "act",
+        target: "table-card-1",
+        control: "table-card",
+        title: "2. Sienta a los clientes",
+        instruction:
+          "Llegó una familia. Toca la mesa 1 para marcarla «Ocupada».",
+        consequence:
+          "La mesa pasa a ocupada y los clientes ven una mesa libre menos.",
+        expect: { type: "table-toggle", tableNumber: 1, status: "occupied" },
+        view: { tab: "tables" },
+      },
+      {
+        id: "mesas-3",
+        kind: "act",
+        target: "table-card-2",
+        control: "table-card",
+        title: "3. Libera una mesa",
+        instruction:
+          "La mesa 2 ya se desocupó. Tócala para dejarla «Disponible».",
+        consequence:
+          "La mesa vuelve a estar libre y los clientes ven una más disponible.",
+        expect: { type: "table-toggle", tableNumber: 2, status: "available" },
+      },
+      {
+        id: "mesas-4",
+        kind: "info",
+        target: "table-map",
+        title: "Un pedido no ocupa mesas",
+        instruction:
+          "Aunque un cliente pida «Comer aquí», la mesa solo cambia cuando tú la tocas.",
+        consequence:
+          "El ticket lleva la etiqueta «COMER AQUÍ», pero las mesas siguen como las dejaste.",
+        why: "Tú ves cuándo se sentó alguien de verdad.",
+      },
+      {
+        id: "mesas-5",
+        kind: "info",
+        target: "table-map",
+        title: "Al cerrar el turno",
+        instruction:
+          "Cuando cierras el turno todas las mesas quedan libres para el siguiente.",
+        consequence:
+          "No tienes que liberarlas una por una antes de cerrar.",
+        why: "El nuevo turno empieza con el comedor vacío.",
+      },
+    ],
+  },
+
+  {
+    id: "transferencia",
+    number: 13,
+    title: "Pagar con Transferencia",
+    subtitle: "SPEI sin tocar la caja",
+    description:
+      "Qué hacer cuando el cliente paga por transferencia bancaria: verificar en el banco y registrar el pago.",
+    required: false,
+    minutes: 3,
+    takeaways: [
+      "Una transferencia SPEI es dinero en el banco: nunca entra a tu caja ni lleva cambio.",
+      "Confirma solo después de ver la transferencia en la app del banco, con el monto exacto.",
+      "Si el cliente eligió SPEI al pedir, el botón se resalta; aun así tú decides cómo cobrar.",
+    ],
+    quiz: {
+      question:
+        "El cliente dice que ya transfirió, pero no ves nada en la app del banco. ¿Qué haces?",
+      options: [
+        {
+          text: "No confirmo hasta ver la transferencia",
+          correct: true,
+          explain:
+            "Correcto: confirmar sin verla es entregar el pedido sin cobrarlo.",
+        },
+        {
+          text: "Confirmo, seguro llega en un rato",
+          explain:
+            "No: si no llega, ya entregaste y el sistema ya registró el cobro.",
+        },
+        {
+          text: "Cobro en efectivo y también confirmo la transferencia",
+          explain: "No: cobrarías dos veces el mismo pedido.",
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "transferencia-1",
+        kind: "info",
+        target: "badge-spei",
+        control: "ticket-badges",
+        title: "Mira la etiqueta «SPEI»",
+        instruction:
+          "Esta cliente eligió pagar por transferencia al hacer su pedido.",
+        view: { tab: "queue", lane: "ready", kitchenOnly: false },
+      },
+      {
+        id: "transferencia-2",
+        kind: "act",
+        target: "pay-demo-order",
+        control: "pay",
+        title: "1. Cobra al entregar",
+        instruction: "Toca «Cobrar al entregar».",
+        expect: { type: "open-pay" },
+      },
+      {
+        id: "transferencia-3",
+        kind: "act",
+        target: "btn-spei-tender",
+        control: "spei-pay",
+        title: "2. Elige transferencia",
+        instruction:
+          "Toca el botón de «Transferencia SPEI». Está resaltado porque la cliente lo eligió.",
+        expect: { type: "spei-open" },
+      },
+      {
+        id: "transferencia-4",
+        kind: "info",
+        target: "spei-modal",
+        title: "Los datos del banco",
+        instruction:
+          "Aquí ves el monto exacto, la CLABE y la referencia con el número de pedido. Abre la app del banco y busca esa transferencia.",
+        consequence: "Todavía no se registra nada: solo estás mirando los datos.",
+        why: "Verificar antes de confirmar evita entregar sin cobrar.",
+      },
+      {
+        id: "transferencia-5",
+        kind: "act",
+        target: "confirm-spei-payment",
+        control: "spei-confirm",
+        title: "3. Confirma la recepción",
+        instruction:
+          "En la práctica la transferencia ya llegó. Toca «Confirmar Recepción SPEI».",
+        expect: { type: "spei-pay" },
+      },
+    ],
+  },
+
+  {
+    id: "platillo",
+    number: 14,
+    title: "Platillos Nuevos",
+    subtitle: "Crear un especial del día",
+    description:
+      "Cómo agregar al menú un platillo que inventaste, sin esperar a nadie.",
+    required: false,
+    minutes: 2,
+    takeaways: [
+      "El platillo nuevo aparece en el menú de los clientes al instante.",
+      "Tiene las mismas opciones que los demás de su sección: un huarache nuevo lleva el quesillo de $10 y la elección «Al comal» o «Frito».",
+      "No se puede borrar: para quitarlo del menú márcalo «Agotado» en Inventario.",
+    ],
+    quiz: {
+      question: "Creaste un platillo por error. ¿Cómo lo quitas del menú?",
+      options: [
+        {
+          text: "Lo marco «Agotado» en Inventario",
+          correct: true,
+          explain: "Correcto: los clientes lo ven «Agotado» y ya no pueden pedirlo.",
+        },
+        {
+          text: "Lo borro desde Crear Platillo",
+          explain: "No: esa ventana solo agrega platillos.",
+        },
+        {
+          text: "Espero a que se cierre el turno",
+          explain: "No: el platillo se queda en el menú turno tras turno.",
+        },
+      ],
+    },
+    steps: [
+      {
+        id: "platillo-1",
+        kind: "act",
+        target: "btn-custom-dish",
+        control: "custom-dish",
+        title: "1. Abre «Crear Platillo»",
+        instruction: "Toca «Crear Platillo».",
+        expect: { type: "custom-dish-open" },
+        view: { tab: "queue", kitchenOnly: false },
+      },
+      {
+        id: "platillo-2",
+        kind: "info",
+        target: "custom-dish-name",
+        title: "El nombre",
+        instruction:
+          "En la práctica ya escribimos «Huarache de Costilla». Es el nombre que verán los clientes en el menú.",
+        consequence: "El nombre aparece igual en el menú y en los tickets.",
+        why: "Un nombre claro evita confusiones en la cocina.",
+      },
+      {
+        id: "platillo-3",
+        kind: "info",
+        target: "custom-dish-price",
+        title: "El precio",
+        instruction:
+          "Escribe el precio en pesos, por ejemplo 120.50. Es el precio base, sin extras.",
+        consequence: "Los extras como el quesillo se suman aparte, al armar el pedido.",
+        why: "Así el cliente ve el total correcto antes de pedir.",
+      },
+      {
+        id: "platillo-4",
+        kind: "info",
+        target: "custom-dish-rules",
+        title: "Las opciones se ponen solas",
+        instruction:
+          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», y los toppings gratis.",
+        consequence:
+          "Un huarache nuevo ofrece el quesillo de $10; una bebida no ofrece nada.",
+        why: "No hay que configurar nada más: el platillo queda listo para pedirse.",
+      },
+      {
+        id: "platillo-5",
+        kind: "act",
+        target: "save-custom-dish",
+        title: "2. Guarda el platillo",
+        instruction: "Toca «Guardar platillo».",
+        consequence:
+          "En la práctica no se guarda nada. En la caja real el platillo aparece de inmediato en el menú de los clientes.",
+        why: "Es el paso que publica el platillo.",
+        expect: { type: "custom-dish-saved" },
+      },
+    ],
+  },
 ];
 
 /** Tips shown before the timed challenge. */
 export const RUSH_TIPS = [
-  "Acepta todos los pedidos de «En revisión» primero.",
-  "Lee la etiqueta roja de cada ticket antes de marcarlo lista.",
+  "Toca la etiqueta roja de cada ticket y luego acéptalo: sin leerla no se desbloquea.",
+  "Acepta todos los pedidos de «En revisión» antes de empezar a cobrar.",
   "Cobra con «Efectivo exacto» para ir más rápido.",
   "Si te equivocas de billete, toca «Deshacer» de inmediato.",
 ];
