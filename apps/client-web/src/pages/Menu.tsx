@@ -2,12 +2,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   ChefHat,
-  Coins,
   Flame,
   Plus,
   Search,
   ShoppingBag,
-  Sparkles,
   Utensils,
   X,
 } from "lucide-react";
@@ -34,6 +32,8 @@ import {
 import { CartDrawer } from "./CartDrawer";
 import { CustomizeModal, itemAvailable } from "./CustomizeModal";
 import { OrderStatus } from "./OrderStatus";
+import huaracheHero from "../assets/huarache-hero.jpg";
+import "./customer-menu.css";
 
 export const activeKey = "masaflow.v3.orderId";
 export const pendingKey = "masaflow.v3.pending";
@@ -356,24 +356,24 @@ export function Menu() {
   ];
 
   return (
-    <>
+    <div className="customer-menu">
       {/* Top Customer Header */}
-      <header className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-x-2 gap-y-2 px-4 py-3.5 max-[374px]:flex-wrap sm:gap-x-3 sm:px-6">
-          <Brand />
-          <div className="flex items-center gap-2">
-            <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800">
-              <span className="h-2 w-2 rounded-full bg-emerald-600 animate-pulse" />
-              Comal Caliente
-            </span>
+      <header className="menu-header">
+        <div className="menu-header-inner">
+          <div className="menu-brand">
+            <img src={`${import.meta.env.BASE_URL}logo.png`} alt="" width="38" height="56" />
+            <span>Los Huaraches<br />de Zapata</span>
+          </div>
+          <div className="menu-header-actions">
             <SoundButton />
             <PWAInstallButton />
             {totalItemsCount > 0 && (
               <button
-                className="btn btn-primary text-xs font-bold transition-transform duration-200 active:scale-90 py-1.5 px-3 sm:hidden"
+                className="menu-header-cart"
                 onClick={() => setCheckout(true)}
+                aria-label={`Ver mi pedido, ${totalItemsCount} ${totalItemsCount === 1 ? "artículo" : "artículos"}`}
               >
-                <ShoppingBag size={14} />
+                <ShoppingBag size={18} />
                 <span
                   key={totalItemsCount}
                   className={cartBumped ? "animate-bump" : ""}
@@ -386,46 +386,16 @@ export function Menu() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-[90rem] px-4 pb-36 pt-6 sm:px-6 sm:pt-10 lg:pr-[22rem]">
-        {/* Hero & payment-at-pickup guidance */}
-        <div className="mb-8 grid items-stretch gap-6 md:grid-cols-[1.5fr_1fr]">
-          <div className="menu-hero flex flex-col justify-center rounded-3xl p-6 sm:p-8 shadow-xs">
-            <span className="menu-hero__eyebrow inline-block text-xs font-bold uppercase tracking-wider">
-              Los Huaraches de Zapata
-            </span>
-            <h1 className="display mt-2 text-4xl sm:text-5xl font-black leading-tight">
-              Sabor por
-              <br />
-              tradición.
-            </h1>
-            <p className="menu-hero__copy mt-3 text-sm sm:text-base max-w-md leading-relaxed">
-              Huaraches, sopes, quesadillas, gorditas y pambazos recién salidos
-              del comal. Envía tu pedido para revisión y paga al recogerlo, en
-              efectivo o por transferencia SPEI.
-            </p>
-          </div>
-
-          {/* Payment-at-pickup guidance: cash at the counter or a SPEI transfer */}
-          <div className="flex flex-col justify-between rounded-3xl border border-amber-300 bg-amber-50/80 p-6 shadow-2xs">
-            <div>
-              <div className="flex items-center gap-2 text-sm font-bold text-amber-950">
-                <Coins size={18} className="text-amber-700" />
-                <span>Paga al recoger tu pedido</span>
-              </div>
-              <p className="mt-2 text-sm leading-relaxed text-stone-800 font-medium">
-                El negocio revisará tu pedido y, si lo acepta, comenzará a
-                prepararlo. Al hacer tu pedido eliges cómo pagar: en efectivo
-                en el mostrador o por transferencia SPEI.
-              </p>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-amber-200/80 flex items-center justify-between text-xs text-amber-900">
-              <span className="font-semibold">✓ Cero comisiones</span>
-              <span className="font-semibold">✓ Efectivo o SPEI</span>
-              <span className="font-semibold">✓ Al momento</span>
-            </div>
-          </div>
+      <section className="menu-hero" aria-labelledby="menu-hero-title">
+        <img className="menu-hero-photo" src={huaracheHero} alt="Huarache de bistec servido en un plato de barro" fetchPriority="high" />
+        <div className="menu-hero-inner">
+          <h1 id="menu-hero-title">Sabor por<br className="menu-hero-break" /> tradición.</h1>
+          <p>Pide en línea. Revisamos y preparamos tu pedido. Paga en efectivo al recogerlo o por SPEI con los datos que recibirás al confirmarlo.</p>
         </div>
+      </section>
+
+      <main className="menu-content">
+        <div className="menu-browse">
 
         {/* Pending Order Notice if interrupted */}
         {pending && (
@@ -462,58 +432,6 @@ export function Menu() {
           </div>
         )}
 
-        <aside
-          className="fixed right-6 top-28 z-20 hidden max-h-[calc(100dvh-9rem)] w-80 flex-col overflow-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-lg lg:flex"
-          aria-label="Carrito"
-        >
-          <h2 className="flex items-center justify-between text-lg font-bold text-stone-900">
-            Tu pedido
-            <span
-              className="rounded-full bg-stone-100 px-2.5 py-1 text-sm tabular-nums"
-              aria-label={`${cartItemCount} artículos`}
-              data-testid="cart-item-count"
-            >
-              {cartItemCount}
-            </span>
-          </h2>
-          {cart.length === 0 ? (
-            <p className="py-6 text-sm text-stone-500">
-              Agrega un antojito para empezar.
-            </p>
-          ) : (
-            <ul className="my-4 space-y-3">
-              {cartLines.map(({ key, quantity, itemName, lineTotalCents }) => (
-                <li
-                  className="flex justify-between gap-3 border-b border-stone-100 pb-3 text-sm"
-                  key={key}
-                >
-                  <span>
-                    {quantity} × {itemName}
-                  </span>
-                  <strong className="tabular-nums">
-                    {mxn(lineTotalCents)}
-                  </strong>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="mt-auto border-t border-stone-200 pt-4">
-            <div className="flex justify-between text-sm">
-              <span>Total estimado</span>
-              <strong className="tabular-nums" data-testid="cart-total">
-                {mxn(estimatedTotalCents)} MXN
-              </strong>
-            </div>
-            <button
-              className="btn btn-primary mt-4 min-h-12 w-full transition-transform duration-200 active:scale-90"
-              disabled={cart.length === 0 || Boolean(pending)}
-              onClick={() => setCheckout(true)}
-            >
-              Ver mi pedido ({cartItemCount})
-            </button>
-          </div>
-        </aside>
-
         {localError && (
           <p
             role="alert"
@@ -524,60 +442,41 @@ export function Menu() {
         )}
 
         {/* Search & Filter Toolbar */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="menu-toolbar">
           {/* Categories bar */}
           <nav
-            className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none"
+            className="menu-categories"
             aria-label="Categorías del menú"
           >
             {categories.map((c) => {
-              const count =
-                c === "Todo"
-                  ? snapshot.menuItems.length
-                  : snapshot.menuItems.filter((m) => m.category === c).length;
-
               return (
                 <button
                   key={c}
-                  className={`btn text-xs font-bold shrink-0 transition-colors ${
-                    c === category
-                      ? "border-stone-900 bg-stone-900 text-white shadow-xs"
-                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
-                  }`}
+                  className="menu-category"
                   aria-pressed={c === category}
                   onClick={() => setCategory(c)}
                 >
-                  <span>{c}</span>
-                  <span
-                    className={`ml-1 rounded px-1.5 py-0.2 text-[10px] ${
-                      c === category
-                        ? "bg-stone-800 text-stone-200"
-                        : "bg-stone-100 text-stone-500"
-                    }`}
-                  >
-                    {count}
-                  </span>
+                  {c}
                 </button>
               );
             })}
           </nav>
 
           {/* Search Input */}
-          <div className="relative w-full sm:w-64 shrink-0">
+          <div className="menu-search">
             <Search
-              size={15}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+              size={20}
+              aria-hidden="true"
             />
             <input
               type="search"
               placeholder="Buscar antojito…"
-              className="field w-full pl-9 pr-11 text-xs font-medium"
+              aria-label="Buscar antojito"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
             {searchQuery && (
               <button
-                className="absolute right-0 top-1/2 flex size-11 -translate-y-1/2 items-center justify-center text-stone-400 hover:text-stone-700"
                 onClick={() => setSearchQuery("")}
                 aria-label="Borrar búsqueda"
               >
@@ -587,9 +486,9 @@ export function Menu() {
           </div>
         </div>
 
-        {/* Menu Items Grid */}
+        {/* Menu items remain server-supplied, including owner-created dishes and live stock. */}
         {filteredItems.length === 0 ? (
-          <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center">
+          <div className="menu-no-results">
             <Utensils className="mx-auto mb-3 text-stone-400" size={32} />
             <h3 className="font-bold text-stone-800">
               No encontramos antojitos con esa búsqueda.
@@ -599,61 +498,40 @@ export function Menu() {
             </p>
           </div>
         ) : (
-          <div className="space-y-10">
+          <div className="menu-groups">
             {groups.map(([groupName, groupItems]) => (
-              <section key={groupName} aria-label={groupName}>
-                <h2 className="display mb-4 border-b border-stone-200 pb-2 text-2xl font-bold text-stone-900">
+              <section key={groupName} className="menu-group" aria-label={groupName}>
+                <h2>
                   {groupName}
                 </h2>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="menu-items">
                   {groupItems.map((item) => {
                     const available = itemAvailable(item, snapshot.modifiers);
-                    const hasMasa = item.modifierIds.some(
-                      (id) =>
-                        snapshot.modifiers.find((m) => m.id === id)?.kind ===
-                        "masa",
-                    );
 
                     return (
                       <article
                         key={item.id}
-                        className={`panel flex flex-col justify-between border-stone-200 bg-white transition-all hover:border-stone-300 hover:shadow-xs ${
-                          !available ? "bg-stone-100/70 opacity-60" : ""
-                        }`}
+                        className="menu-item"
+                        data-available={available}
                       >
-                        <div>
-                          {hasMasa && (
-                            <span className="mb-3 inline-block rounded bg-clay-50 px-2 py-0.5 text-[11px] font-semibold text-clay-800 border border-clay-100">
-                              Masa Azul / Blanca
-                            </span>
-                          )}
-                          <h3 className="display text-2xl font-bold text-stone-900 leading-tight">
+                        <div className="menu-item-copy">
+                          <h3>
                             {item.name}
                           </h3>
-                          <p className="mt-2 text-xs leading-relaxed text-stone-600 line-clamp-3">
+                          <p>
                             {item.description}
                           </p>
                         </div>
-
-                        <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-3">
-                          <div>
-                            <span className="block text-[10px] font-semibold text-stone-400 uppercase">
-                              Precio
-                            </span>
-                            <strong className="text-xl font-bold tabular-nums text-stone-900">
-                              {mxn(item.priceCents)}
-                            </strong>
-                          </div>
-
+                        <div className="menu-item-action">
+                          <strong>{mxn(item.priceCents)}</strong>
                           <button
-                            className="btn btn-primary text-xs font-bold py-2 px-3.5"
                             disabled={!available || Boolean(pending)}
                             aria-label={`Agregar ${item.name}`}
                             onClick={() => setCustomizeId(item.id)}
                           >
                             {available ? (
                               <>
-                                <Plus size={15} />
+                                <Plus size={16} aria-hidden="true" />
                                 <span>Agregar</span>
                               </>
                             ) : (
@@ -680,6 +558,36 @@ export function Menu() {
             56 3214 9403
           </a>
         </p>
+        </div>
+
+        <aside className="menu-order-summary" aria-label="Carrito">
+          <h2>Tu pedido</h2>
+          {cart.length === 0 ? (
+            <div className="menu-order-empty">
+              <ShoppingBag size={46} strokeWidth={1.3} aria-hidden="true" />
+              <p>Agrega un antojito para empezar.</p>
+            </div>
+          ) : (
+            <ul className="menu-order-lines">
+              {cartLines.map(({ key, quantity, itemName, lineTotalCents }) => (
+                <li key={key}>
+                  <span>{quantity} × {itemName}</span>
+                  <strong>{mxn(lineTotalCents)}</strong>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="menu-order-footer">
+            <div className="menu-order-total">
+              <span>Total estimado</span>
+              <strong data-testid="cart-total">{mxn(estimatedTotalCents)} MXN</strong>
+            </div>
+            <button disabled={cart.length === 0 || Boolean(pending)} onClick={() => setCheckout(true)}>
+              Ver mi pedido ({cartItemCount})
+            </button>
+          </div>
+          <span className="sr-only" data-testid="cart-item-count">{cartItemCount} {cartItemCount === 1 ? "artículo" : "artículos"}</span>
+        </aside>
       </main>
 
       {/* Floating Sticky Cart Bar */}
@@ -738,6 +646,6 @@ export function Menu() {
           connected={connected}
         />
       )}
-    </>
+    </div>
   );
 }

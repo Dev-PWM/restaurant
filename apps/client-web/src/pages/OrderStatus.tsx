@@ -185,9 +185,9 @@ export function OrderStatus({
     >
       <div className="mx-auto max-w-lg space-y-6">
         {/* Header */}
-        <header className="flex items-center justify-between border-b border-stone-200/80 pb-4">
+        <header className="flex flex-col gap-3 border-b border-stone-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <Brand />
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {notificationPermission === "default" && (
                 <button
                   onClick={async () =>
