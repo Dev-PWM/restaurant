@@ -20,7 +20,7 @@ self.addEventListener("install", (event) => {
     (async () => {
       const cache = await caches.open(cacheName);
       const response = await fetch(appShell);
-      if (!response.ok) throw new Error("MasaFlow app shell could not be cached.");
+      if (!response.ok) throw new Error("App shell could not be cached.");
       await cache.put(appShell, response.clone());
       const html = await response.text();
       const assets = new Set(precache.slice(1));

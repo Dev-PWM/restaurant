@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "MasaFlow",
-  "short_name": "MasaFlow",
+  "name": "Los Huaraches de Zapata",
+  "short_name": "Los Huaraches",
   "description": "Pedidos y operación de restaurante en tiempo real.",
   "start_url": "./",
   "scope": "./",

@@ -16,6 +16,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { useAcademy } from "./AcademyProvider";
+import { RESTAURANT_NAME } from "../../../../shared/ui/brand";
 import { MODULES, getModule, RUSH_TIPS } from "./curriculum.js";
 import { isAvailable, nextModuleId, rushOffered } from "./engine.js";
 
@@ -126,7 +127,7 @@ export function ModuleMenu() {
       <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-stone-700 bg-stone-900 p-4">
         <div>
           <p className="text-xs font-black uppercase tracking-wide text-yellow-300">
-            Academia MasaFlow
+            Academia · {RESTAURANT_NAME}
           </p>
           <h2 className="text-xl font-black">Qué quieres practicar</h2>
           <p className="mt-1 text-xs text-stone-300">

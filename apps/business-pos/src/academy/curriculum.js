@@ -868,7 +868,7 @@ export const MODULES = [
         },
         {
           text: "Se acabó el papel",
-          explain: "No: MasaFlow no usa impresoras ni papel.",
+          explain: "No: la app no usa impresoras ni papel.",
         },
         {
           text: "El turno ya está cerrado",

@@ -359,7 +359,7 @@ export function Menu() {
     <>
       {/* Top Customer Header */}
       <header className="sticky top-0 z-20 border-b border-stone-200/90 bg-white/95 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3.5 sm:px-6">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-x-2 gap-y-2 px-4 py-3.5 max-[374px]:flex-wrap sm:gap-x-3 sm:px-6">
           <Brand />
           <div className="flex items-center gap-2">
             <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-800">

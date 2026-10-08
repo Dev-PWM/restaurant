@@ -151,3 +151,37 @@ test("the logo and every icon exist, are the size they claim, and are cached for
   assert.ok(fs.existsSync(path.join(repo, "docs/brand/mascot-source.jpg")));
   assert.ok(fs.existsSync(path.join(repo, "scripts/build-logo.swift")));
 });
+
+test("people read the restaurant's name, never the software's, on every screen", () => {
+  const read = (file) => fs.readFileSync(path.join(repo, file), "utf8");
+  // Folder names, env vars, storage keys and file names keep «masaflow» on purpose: renaming them would orphan
+  // saved data. Only text a person reads is checked, so those identifiers are stripped first.
+  const strip = (text) => text.replace(/masaflow[._-][\w.-]*/gi, "").replace(/MASAFLOW_\w+/g, "");
+  const files = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(path.join(repo, directory), { withFileTypes: true })) {
+      const relative = path.join(directory, entry.name);
+      if (entry.isDirectory()) walk(relative);
+      else if (/\.(tsx|ts|js)$/.test(entry.name)) files.push(relative);
+    }
+  };
+  for (const directory of ["apps/client-web/src", "apps/business-pos/src", "apps/analytics/src/content/realtime", "shared/ui"])
+    walk(directory);
+  // brand.ts is the one file that explains why the old name survives in identifiers, so it names it.
+  const offenders = files.filter(
+    (file) => file !== path.join("shared/ui", "brand.ts") && /masaflow/i.test(strip(read(file))),
+  );
+  assert.deepEqual(offenders, [], "these files still show the software's name instead of the restaurant's");
+
+  const manifest = JSON.parse(read("shared/pwa/manifest.webmanifest"));
+  assert.equal(manifest.name, "Los Huaraches de Zapata");
+  assert.ok(manifest.short_name.length <= 13, "a home-screen label longer than 13 characters gets cut off");
+  for (const [app, screen] of [["client-web", "Menú"], ["business-pos", "Cocina"], ["analytics", "Caja y ventas"]]) {
+    const head = read(`apps/${app}/realtime.html`).split("</head>")[0];
+    assert.ok(head.includes(`<title>Los Huaraches de Zapata · ${screen}</title>`), `${app} title`);
+    assert.match(head, /apple-mobile-web-app-title" content="Los Huaraches"/);
+    assert.doesNotMatch(head, /masaflow/i, `${app} head`);
+  }
+  assert.match(read("shared/ui/brand.ts"), /RESTAURANT_NAME = "Los Huaraches de Zapata"/);
+  assert.match(read("shared/ui/components.tsx"), /De Zapata/, "the header wordmark");
+});
