@@ -11,7 +11,11 @@ import {
   Utensils,
   X,
 } from "lucide-react";
-import type { MenuItem, OrderInput } from "../../../../shared/types/realtime";
+import type {
+  MenuItem,
+  OrderInput,
+  PaymentMethod,
+} from "../../../../shared/types/realtime";
 import {
   readStorage,
   useRealtime,
@@ -57,6 +61,7 @@ export function Menu() {
   const [customizeId, setCustomizeId] = useState<string | null>(null);
   const [checkout, setCheckout] = useState(false);
   const [name, setName] = useState("");
+  const [payment, setPayment] = useState<PaymentMethod>("cash");
   const [category, setCategory] = useState("Todo");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -241,6 +246,7 @@ export function Menu() {
       shiftId: snapshot.shiftId,
       customerName: name.trim(),
       items: cart,
+      paymentIntent: payment,
     };
     const quotedTotalCents = pending ? pendingTotalCents : estimatedTotalCents;
 
@@ -699,6 +705,8 @@ export function Menu() {
           onSubmit={() => void submit()}
           name={name}
           setName={setName}
+          payment={payment}
+          setPayment={setPayment}
           busy={busy}
           pending={pending}
           connected={connected}

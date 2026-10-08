@@ -1,6 +1,9 @@
-import { ArrowRight, Coins, Minus, Plus, Trash2, Utensils } from "lucide-react";
+import { ArrowRight, Building2, Coins, Minus, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
-import type { OrderInput } from "../../../../shared/types/realtime";
+import type {
+  OrderInput,
+  PaymentMethod,
+} from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
 import { Modal, mxn } from "../../../../shared/ui/components";
@@ -14,6 +17,8 @@ export function CartDrawer({
   onSubmit,
   name,
   setName,
+  payment,
+  setPayment,
   busy,
   pending,
   connected,
@@ -24,6 +29,8 @@ export function CartDrawer({
   onSubmit: () => void;
   name: string;
   setName: (name: string) => void;
+  payment: PaymentMethod;
+  setPayment: (payment: PaymentMethod) => void;
   busy: boolean;
   pending: OrderInput | null;
   connected: boolean;
@@ -201,17 +208,49 @@ export function CartDrawer({
         </p>
       )}
 
-      {/* Cash Warning Banner */}
-      <div className="my-4 rounded-xl border border-amber-300 bg-amber-50/80 p-3.5 text-xs text-amber-950">
-        <div className="flex items-center gap-2 font-bold text-amber-900">
-          <Coins size={16} />
-          <span>Pago 100% en Efectivo al Mostrador</span>
+      {/* Payment at pickup: the customer says how; the cashier records what really happens. */}
+      <fieldset
+        className="my-4"
+        disabled={busy || Boolean(pending)}
+        data-testid="payment-choice"
+      >
+        <legend className="mb-2 text-sm font-bold text-stone-800">
+          ¿Cómo vas a pagar al recoger?
+        </legend>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              { value: "cash", label: "Efectivo", Icon: Coins },
+              { value: "spei", label: "Transferencia SPEI", Icon: Building2 },
+            ] as const
+          ).map(({ value, label, Icon }) => (
+            <label
+              key={value}
+              className={`flex min-h-14 cursor-pointer items-center gap-2.5 rounded-xl border-2 p-3 text-sm font-bold transition-colors ${
+                payment === value
+                  ? "border-clay-600 bg-clay-50 text-clay-900"
+                  : "border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+              }`}
+            >
+              <input
+                type="radio"
+                name="payment"
+                value={value}
+                checked={payment === value}
+                onChange={() => setPayment(value)}
+                className="h-4 w-4 text-clay-600 focus:ring-0"
+              />
+              <Icon size={16} />
+              <span>{label}</span>
+            </label>
+          ))}
         </div>
-        <p className="mt-1 text-stone-700 leading-relaxed">
-          El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo.
-          Paga en efectivo en el mostrador al recogerlo.
+        <p className="mt-2.5 rounded-xl border border-amber-300 bg-amber-50/80 p-3 text-xs leading-relaxed text-stone-700">
+          {payment === "spei"
+            ? "Al enviar tu pedido verás los datos del banco, el monto exacto y tu referencia. Haz la transferencia y muestra el comprobante en el mostrador: el cajero la verifica antes de entregarte."
+            : "El negocio revisará tu pedido y, si lo acepta, comenzará a prepararlo. Paga en efectivo en el mostrador al recogerlo."}
         </p>
-      </div>
+      </fieldset>
 
       <button
         className="btn btn-primary w-full py-3.5 text-base font-bold shadow-sm"

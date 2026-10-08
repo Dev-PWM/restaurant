@@ -24,12 +24,25 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import type { Modifier, Order } from "../types/realtime";
+import type { Modifier, Order, Transaction } from "../types/realtime";
 import { useRealtime } from "./RealtimeProvider";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     cents / 100,
   );
+/** How a payment was made, in the words staff use. Receipts saved before transfers existed have no method: cash. */
+export const paymentMethodLabel = (transaction: Pick<Transaction, "method">) =>
+  transaction.method === "spei" ? "Transferencia SPEI" : "Efectivo";
+/** One line describing what came in: cash shows the tender and change, a transfer shows only the exact total. */
+export const paymentSummary = (
+  transaction: Pick<
+    Transaction,
+    "method" | "totalCents" | "tenderedCents" | "changeCents"
+  >,
+) =>
+  transaction.method === "spei"
+    ? `${paymentMethodLabel(transaction)} · ${mxn(transaction.totalCents)}`
+    : `Efectivo recibido: ${mxn(transaction.tenderedCents)} · Cambio: ${mxn(transaction.changeCents)}`;
 export const time = (at: string) =>
   new Intl.DateTimeFormat("es-MX", {
     hour: "2-digit",

@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import {
   Bell,
+  Building2,
   Check,
   ChefHat,
   Clock3,
+  Copy,
   Flame,
   Sparkles,
   UtensilsCrossed,
   Volume2,
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
+import { BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 import {
   Brand,
   chime,
@@ -22,6 +25,82 @@ import {
   time,
 } from "../../../../shared/ui/components";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
+
+/** Bank details for a customer who chose SPEI. The reference carries the real order number so the cashier can match it. */
+function SpeiInstructions({ order }: { order: Order }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const reference = `${BBVA_BANK_INFO.conceptPrefix}${String(order.number).padStart(3, "0")}`;
+  async function copyClabe() {
+    try {
+      await navigator.clipboard.writeText(BBVA_BANK_INFO.clabe);
+    } catch {
+      return; // Clipboard blocked: the CLABE stays on screen to type or long-press.
+    }
+    setCopied(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopied(false), 2500);
+  }
+  return (
+    <div
+      className="rounded-xl border-2 border-blue-300 bg-blue-50/70 p-4 text-left text-blue-950"
+      data-testid="spei-instructions"
+    >
+      <div className="flex items-center gap-2 text-sm font-black">
+        <Building2 size={16} />
+        Paga por transferencia SPEI
+      </div>
+      <dl className="mt-3 space-y-2.5 text-sm">
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-xs font-bold uppercase tracking-wide text-blue-900/70">
+            Monto exacto
+          </dt>
+          <dd className="text-xl font-black tabular-nums">
+            {mxn(order.totalCents)}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-bold uppercase tracking-wide text-blue-900/70">
+            Banco · Titular
+          </dt>
+          <dd className="font-bold">
+            {BBVA_BANK_INFO.bank} · {BBVA_BANK_INFO.beneficiary}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-bold uppercase tracking-wide text-blue-900/70">
+            CLABE (18 dígitos)
+          </dt>
+          <dd className="mt-1 flex items-center justify-between gap-2 rounded-lg border-2 border-blue-200 bg-white p-2">
+            <code className="font-mono text-sm font-black tracking-wider select-all">
+              {BBVA_BANK_INFO.clabe}
+            </code>
+            <button
+              type="button"
+              className="flex min-h-9 items-center gap-1.5 rounded-lg bg-blue-900 px-3 text-xs font-bold text-white"
+              onClick={() => void copyClabe()}
+            >
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? "¡Copiada!" : "Copiar"}
+            </button>
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs font-bold uppercase tracking-wide text-blue-900/70">
+            Referencia / concepto
+          </dt>
+          <dd className="font-mono font-black">{reference}</dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-xs leading-relaxed text-blue-900">
+        Haz la transferencia desde tu app del banco con el monto exacto y esta
+        referencia. Muestra el comprobante en el mostrador: el cajero verifica
+        que llegó antes de entregarte tu pedido.
+      </p>
+    </div>
+  );
+}
 
 export function OrderStatus({
   order,
@@ -218,7 +297,7 @@ export function OrderStatus({
                   </span>
                 </div>
                 <p className="text-xs text-orange-900 leading-relaxed">
-                  Tu pedido está en preparación. Puedes pagar en efectivo al recogerlo; deja esta pantalla abierta o activa los avisos para enterarte cuando esté listo.
+                  Tu pedido está en preparación. Puedes pagar {order.paymentIntent === "spei" ? "por transferencia" : "en efectivo"} al recogerlo; deja esta pantalla abierta o activa los avisos para enterarte cuando esté listo.
                 </p>
               </div>
             )}
@@ -229,8 +308,17 @@ export function OrderStatus({
                   ¡Pasa al mostrador a recoger tu charola!
                 </strong>
                 <p className="text-xs text-emerald-900">
-                  Muestra tu número <strong>{orderLabel(order)}</strong> ({order.customerName}) y paga{" "}
-                  <strong>{mxn(order.totalCents)} MXN</strong> en caja para recogerlo.
+                  Muestra tu número <strong>{orderLabel(order)}</strong> ({order.customerName}){" "}
+                  {order.paymentIntent === "spei" ? (
+                    <>
+                      y tu comprobante de transferencia por{" "}
+                      <strong>{mxn(order.totalCents)} MXN</strong> para recogerlo.
+                    </>
+                  ) : (
+                    <>
+                      y paga <strong>{mxn(order.totalCents)} MXN</strong> en caja para recogerlo.
+                    </>
+                  )}
                 </p>
               </div>
             )}
@@ -434,11 +522,22 @@ export function OrderStatus({
 
           {order.transaction ? (
             <div className="rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-900 flex justify-between">
-              <span>Pagado en efectivo al mostrador</span>
-              <span>
-                Cambio recibido: {mxn(order.transaction.changeCents)}
-              </span>
+              {order.transaction.method === "spei" ? (
+                <>
+                  <span>Pagado por transferencia SPEI</span>
+                  <span>Recibimos {mxn(order.transaction.totalCents)}</span>
+                </>
+              ) : (
+                <>
+                  <span>Pagado en efectivo al mostrador</span>
+                  <span>
+                    Cambio recibido: {mxn(order.transaction.changeCents)}
+                  </span>
+                </>
+              )}
             </div>
+          ) : order.paymentIntent === "spei" && order.status !== "no_show" ? (
+            <SpeiInstructions order={order} />
           ) : (
             <div className="rounded-lg bg-stone-50 p-2.5 text-xs text-stone-600 flex justify-between">
               <span>Pago al recoger</span>

@@ -14,6 +14,7 @@ import {
   Modal,
   mxn,
   orderLabel,
+  paymentMethodLabel,
   StaffHeader,
   time,
 } from "../../../../../shared/ui/components";
@@ -82,13 +83,14 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
         </div>
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px] text-left text-sm">
+        <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
             <tr className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
               {[
                 "Hora / Pedido",
                 "Cliente y platillos",
                 "Estado",
+                "Pago",
                 "Venta",
                 "Recibido",
                 "Cambio",
@@ -132,14 +134,30 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
                     {labels[o.status]}
                   </span>
                 </td>
+                <td className="px-3 py-4">
+                  {o.transaction ? (
+                    <span
+                      className={`whitespace-nowrap rounded-md px-2 py-1 text-xs font-bold ${o.transaction.method === "spei" ? "bg-blue-50 text-blue-900" : "bg-stone-100 text-stone-700"}`}
+                    >
+                      {o.transaction.method === "spei" ? "SPEI" : "Efectivo"}
+                    </span>
+                  ) : (
+                    "—"
+                  )}
+                </td>
                 <td className="px-3 py-4 text-right font-bold tabular-nums">
                   {mxn(o.transaction?.totalCents || 0)}
                 </td>
+                {/* Recibido and Cambio are drawer cash: a transfer has neither. */}
                 <td className="px-3 py-4 text-right tabular-nums">
-                  {o.transaction ? mxn(o.transaction.tenderedCents) : "—"}
+                  {o.transaction && o.transaction.method !== "spei"
+                    ? mxn(o.transaction.tenderedCents)
+                    : "—"}
                 </td>
                 <td className="px-3 py-4 text-right tabular-nums">
-                  {o.transaction ? mxn(o.transaction.changeCents) : "—"}
+                  {o.transaction && o.transaction.method !== "spei"
+                    ? mxn(o.transaction.changeCents)
+                    : "—"}
                 </td>
               </tr>
             ))}
@@ -185,9 +203,11 @@ function exportLedger(orders: Order[]) {
       "Estado",
       "Hora",
       "Platillos",
+      "Método",
       "Venta MXN",
-      "Recibido MXN",
+      "Efectivo recibido MXN",
       "Cambio MXN",
+      "Transferencia SPEI MXN",
     ],
   ];
   for (const o of orders)
@@ -202,9 +222,12 @@ function exportLedger(orders: Order[]) {
             `${l.quantity} × ${l.name} (${l.modifiers.map((m) => m.name).join(", ")})`,
         )
         .join("; "),
+      o.transaction ? paymentMethodLabel(o.transaction) : "",
       ((o.transaction?.totalCents || 0) / 100).toFixed(2),
-      ((o.transaction?.tenderedCents || 0) / 100).toFixed(2),
-      ((o.transaction?.changeCents || 0) / 100).toFixed(2),
+      // Cash columns stay empty for a transfer so the cash column adds up to the drawer.
+      ((o.transaction?.method === "spei" ? 0 : o.transaction?.tenderedCents || 0) / 100).toFixed(2),
+      ((o.transaction?.method === "spei" ? 0 : o.transaction?.changeCents || 0) / 100).toFixed(2),
+      ((o.transaction?.method === "spei" ? o.transaction.totalCents : 0) / 100).toFixed(2),
     ]);
   const url = URL.createObjectURL(
     new Blob(
@@ -291,9 +314,30 @@ export function Analytics() {
                 {metrics.paidOrders} pedidos pagados · {metrics.noShows} No-Show
                 excluidos
               </p>
-              <dl className="flex gap-8">
+              <dl className="flex flex-wrap gap-x-8 gap-y-3">
+                {/* With only cash sales, "sales in cash" would repeat the headline total, so the split appears with the first transfer. */}
+                {metrics.speiOrders > 0 && (
+                  <>
+                    <div data-testid="cash-sales">
+                      <dt className="text-xs text-white/75">
+                        Ventas en efectivo
+                      </dt>
+                      <dd className="mt-1 text-lg font-semibold tabular-nums">
+                        {mxn(metrics.cashCents)}
+                      </dd>
+                    </div>
+                    <div data-testid="spei-total">
+                      <dt className="text-xs text-white/75">
+                        Transferencias SPEI ({metrics.speiOrders})
+                      </dt>
+                      <dd className="mt-1 text-lg font-semibold tabular-nums">
+                        {mxn(metrics.speiCents)}
+                      </dd>
+                    </div>
+                  </>
+                )}
                 <div>
-                  <dt className="text-xs text-white/75">Recibido</dt>
+                  <dt className="text-xs text-white/75">Efectivo recibido</dt>
                   <dd className="mt-1 text-lg font-semibold tabular-nums">
                     {mxn(metrics.tenderedCents)}
                   </dd>
@@ -370,6 +414,18 @@ export function Analytics() {
               <dt>Ventas cobradas</dt>
               <dd className="font-bold">{mxn(metrics.revenueCents)}</dd>
             </div>
+            {metrics.speiOrders > 0 && (
+              <>
+                <div className="flex justify-between text-sm">
+                  <dt>De las cuales, en efectivo</dt>
+                  <dd className="tabular-nums">{mxn(metrics.cashCents)}</dd>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <dt>De las cuales, transferencias SPEI</dt>
+                  <dd className="tabular-nums">{mxn(metrics.speiCents)}</dd>
+                </div>
+              </>
+            )}
             <div className="flex justify-between gap-3">
               <dt>No-Show / anulaciones sin cobro</dt>
               <dd>{metrics.voidCount}</dd>

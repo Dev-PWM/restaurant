@@ -114,6 +114,110 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   ]);
   assert.equal(engine.getState().salesMetrics.revenueCents, 20000);
 });
+test("a SPEI transfer is recorded as a transfer: exact total, no change, never counted as drawer cash", (t) => {
+  const { engine } = fixture(t);
+  const cash = submit(engine);
+  const transfer = submit(engine);
+  prepareForPickup(engine, cash.orderId);
+  prepareForPickup(engine, transfer.orderId);
+  const spei = (tenderedCents, method = "spei") => () =>
+    engine.dispatch("pos_order_paid", {
+      orderId: transfer.orderId,
+      tenderedCents,
+      method,
+    });
+  assert.throws(spei(25000), /total exacto/);
+  assert.throws(spei(19999), /total exacto/);
+  assert.throws(spei(20000, "bitcoin"), /Método de pago/);
+  assert.equal(engine.getState().salesMetrics.revenueCents, 0);
+  spei(20000)();
+  engine.dispatch("pos_order_paid", {
+    orderId: cash.orderId,
+    tenderedCents: 25000,
+  });
+  const state = engine.getState();
+  const paid = (id) => state.completedOrders.find((o) => o.id === id).transaction;
+  assert.equal(paid(transfer.orderId).method, "spei");
+  assert.equal(paid(transfer.orderId).changeCents, 0);
+  assert.equal(paid(cash.orderId).method, "cash");
+  const m = state.salesMetrics;
+  assert.equal(m.revenueCents, 40000);
+  assert.equal(m.speiCents, 20000);
+  assert.equal(m.speiOrders, 1);
+  // The drawer only ever holds the cash sale: 25000 handed over minus 5000 change.
+  assert.equal(m.cashCents, 20000);
+  assert.equal(m.tenderedCents, 25000);
+  assert.equal(m.changeCents, 5000);
+  assert.equal(m.cashCents + m.speiCents, m.revenueCents);
+  assert.equal(m.paidOrders, 2);
+});
+test("retrying a payment must repeat the same method, so a transfer can never be re-booked as cash", (t) => {
+  const { engine } = fixture(t);
+  const order = submit(engine);
+  prepareForPickup(engine, order.orderId);
+  const pay = (method) =>
+    engine.dispatch("pos_order_paid", {
+      orderId: order.orderId,
+      tenderedCents: 20000,
+      ...(method ? { method } : {}),
+    });
+  pay("spei");
+  const revision = engine.getState().revision;
+  assert.deepEqual(pay("spei"), { ok: true });
+  assert.equal(engine.getState().revision, revision);
+  assert.throws(() => pay(), /otro importe o método/);
+  assert.throws(() => pay("cash"), /otro importe o método/);
+  assert.equal(engine.getState().salesMetrics.cashCents, 0);
+  assert.equal(engine.getState().salesMetrics.speiCents, 20000);
+});
+test("the customer's payment choice is stored as a hint, defaults to cash, and cannot change on a retry", (t) => {
+  const { engine } = fixture(t);
+  const legacyPhone = submit(engine);
+  const transfer = submit(engine, { paymentIntent: "spei" });
+  const [first, second] = engine.getState().activeOrders;
+  assert.equal(first.paymentIntent, "cash");
+  assert.equal(second.paymentIntent, "spei");
+  assert.throws(
+    () => submit(engine, { paymentIntent: "bitcoin" }),
+    /Método de pago/,
+  );
+  // The same order id and session with a different choice is a different request, not a retry.
+  assert.throws(
+    () =>
+      engine.dispatch("submit_client_order", {
+        ...transfer,
+        paymentIntent: "cash",
+      }),
+    /otros datos/,
+  );
+  // A hint never constrains the cashier: a customer who chose SPEI may still pay cash at the counter.
+  prepareForPickup(engine, transfer.orderId);
+  engine.dispatch("pos_order_paid", {
+    orderId: transfer.orderId,
+    tenderedCents: 25000,
+  });
+  const paid = engine.getState().completedOrders[0];
+  assert.equal(paid.paymentIntent, "spei");
+  assert.equal(paid.transaction.method, "cash");
+  assert.ok(legacyPhone.orderId);
+});
+test("receipts saved before transfers existed load as cash, and a corrupt method refuses to load", (t) => {
+  const { directory, engine } = fixture(t);
+  const order = submit(engine);
+  pay(engine, order.orderId, 25000);
+  const file = path.join(directory, "data.json");
+  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  delete saved.completedOrders[0].transaction.method;
+  delete saved.salesMetrics.cashCents;
+  fs.writeFileSync(file, JSON.stringify(saved));
+  const restored = createEngine({ directory }).getState();
+  assert.equal(restored.completedOrders[0].transaction.method, "cash");
+  assert.equal(restored.salesMetrics.cashCents, 20000);
+  assert.equal(restored.salesMetrics.speiCents, 0);
+  saved.completedOrders[0].transaction.method = "cheque";
+  fs.writeFileSync(file, JSON.stringify(saved));
+  assert.throws(() => createEngine({ directory }), /Método de pago/);
+});
 test("no-show leaves the queue, remains in history, never contributes to cash or performance", (t) => {
   const { engine } = fixture(t);
   const order = submit(engine);

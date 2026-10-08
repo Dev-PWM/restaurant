@@ -142,7 +142,8 @@ export function detectOrderBadges(
     item.modifiers?.some((m) => m.name.toLowerCase().includes('quesillo'))
   );
 
-  const isSPEI = Boolean(order.notes?.toLowerCase().includes('spei'));
+  // The customer's own choice at checkout. The cashier still records the real method when taking payment.
+  const isSPEI = order.paymentIntent === 'spei';
 
   const omissions = order.items.flatMap((item, itemIndex) =>
     (item.modifiers || [])

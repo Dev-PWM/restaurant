@@ -30,6 +30,9 @@ function metrics(orders) {
     voidCount: 0,
     tenderedCents: 0,
     changeCents: 0,
+    cashCents: 0,
+    speiCents: 0,
+    speiOrders: 0,
     paidOrders: 0,
     completedOrders: 0,
     noShows: 0,
@@ -45,8 +48,15 @@ function metrics(orders) {
     const payment = order.transaction;
     if (!payment) continue;
     result.revenueCents += payment.totalCents;
-    result.tenderedCents += payment.tenderedCents;
-    result.changeCents += payment.changeCents;
+    // Only cash passes through the drawer; a transfer is money in the bank, so it has no tender or change.
+    if (payment.method === "spei") {
+      result.speiCents += payment.totalCents;
+      result.speiOrders++;
+    } else {
+      result.tenderedCents += payment.tenderedCents;
+      result.changeCents += payment.changeCents;
+      result.cashCents += payment.tenderedCents - payment.changeCents;
+    }
     result.paidOrders++;
     // Performance uses fulfilled sales from the history ledger, while cash totals recognize payment immediately.
     if (order.status !== "completed") continue;
@@ -67,6 +77,8 @@ function metrics(orders) {
     result.revenueCents,
     result.tenderedCents,
     result.changeCents,
+    result.cashCents,
+    result.speiCents,
   ])
     ensure(
       Number.isSafeInteger(amount),
@@ -151,6 +163,12 @@ function validate(s) {
     ensure(Array.isArray(rows), "Colección de datos inválida.");
   for (const order of [...s.activeOrders, ...s.completedOrders]) {
     if (String(order.status) === "unpaid") order.status = "review";
+    // Orders from before customers could choose a payment method were all cash.
+    if (order.paymentIntent === undefined) order.paymentIntent = "cash";
+    ensure(
+      order.paymentIntent === "cash" || order.paymentIntent === "spei",
+      "Método de pago inválido.",
+    );
     if (!Object.hasOwn(order, "acceptedAt"))
       order.acceptedAt =
         order.status === "cooking" || order.status === "ready" ||
@@ -210,6 +228,9 @@ function validate(s) {
     );
     if (order.transaction) {
       const t = order.transaction;
+      // Receipts from before transfers existed carry no method; they were all cash.
+      if (t.method === undefined) t.method = "cash";
+      ensure(t.method === "cash" || t.method === "spei", "Método de pago inválido.");
       money(t.totalCents);
       money(t.tenderedCents);
       money(t.changeCents);
@@ -221,6 +242,10 @@ function validate(s) {
           t.tenderedCents - t.changeCents === t.totalCents + legacyTipCents &&
           Number.isFinite(Date.parse(t.paidAt)),
         "Recibo de efectivo inconsistente.",
+      );
+      ensure(
+        t.method !== "spei" || (t.changeCents === 0 && legacyTipCents === 0),
+        "Una transferencia SPEI no puede llevar cambio.",
       );
     }
   }
@@ -304,6 +329,12 @@ function createEngine({ directory, persist = writeAtomic }) {
           data.items.length > 0 &&
           data.items.length <= 40,
         "Agrega tu nombre y entre 1 y 40 platillos.",
+      );
+      const paymentIntent =
+        data.paymentIntent === undefined ? "cash" : data.paymentIntent;
+      ensure(
+        paymentIntent === "cash" || paymentIntent === "spei",
+        "Método de pago inválido.",
       );
       const fingerprint = createHash("sha256")
         .update(
@@ -392,6 +423,7 @@ function createEngine({ directory, persist = writeAtomic }) {
         number: next.nextOrderNumber++,
         customerName: data.customerName.trim(),
         status: "review",
+        paymentIntent,
         items,
         totalCents: money(
           items.reduce((sum, line) => sum + line.lineTotalCents, 0),
@@ -474,19 +506,33 @@ function createEngine({ directory, persist = writeAtomic }) {
           "Las propinas ya no están disponibles.",
         );
         money(data.tenderedCents);
+        // A missing method is cash, which is what every client sent before transfers existed.
+        const method = data.method === undefined ? "cash" : data.method;
+        ensure(
+          method === "cash" || method === "spei",
+          "Método de pago inválido.",
+        );
         if (order.transaction) {
+          // A retry must repeat the same payment. Cash after a transfer (or the reverse) is a different payment.
           ensure(
-            order.transaction.tenderedCents === data.tenderedCents,
-            "El pedido ya fue pagado con otro importe.",
+            order.transaction.tenderedCents === data.tenderedCents &&
+              order.transaction.method === method,
+            "El pedido ya fue pagado con otro importe o método.",
             "PAYMENT_CONFLICT",
           );
           return { ok: true };
         }
         ensure(order.status === "ready", "Solo puedes cobrar un pedido listo para entregar.");
-        ensure(
-          data.tenderedCents >= order.totalCents,
-          "El efectivo no cubre el total.",
-        );
+        if (method === "spei")
+          ensure(
+            data.tenderedCents === order.totalCents,
+            "Una transferencia SPEI debe ser por el total exacto.",
+          );
+        else
+          ensure(
+            data.tenderedCents >= order.totalCents,
+            "El efectivo no cubre el total.",
+          );
         order.transaction = {
           id: randomUUID(),
           orderId: order.id,
@@ -494,7 +540,7 @@ function createEngine({ directory, persist = writeAtomic }) {
           totalCents: order.totalCents,
           tenderedCents: data.tenderedCents,
           changeCents: data.tenderedCents - order.totalCents,
-          method: "cash",
+          method,
           currency: "MXN",
         };
         order.status = "completed";

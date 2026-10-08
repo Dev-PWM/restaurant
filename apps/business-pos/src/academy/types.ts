@@ -15,6 +15,9 @@ export interface GhostSalesMetrics {
   voidCount: number;
   tenderedCents: number;
   changeCents: number;
+  cashCents: number;
+  speiCents: number;
+  speiOrders: number;
   completedOrders: number;
   itemPerformance: Array<{
     id: string;

@@ -1,6 +1,6 @@
 # MasaFlow
 
-A local, cash-only restaurant suite built with **React, TypeScript, Tailwind CSS, Express and Socket.io**. Customers order on their phones; staff review and accept orders before cooking; the cashier records cash when the customer picks up. All prices and digital receipts use integer MXN centavos.
+A local restaurant suite for cash and SPEI bank transfers built with **React, TypeScript, Tailwind CSS, Express and Socket.io**. Customers order on their phones; staff review and accept orders before cooking; the cashier records the payment (cash, or a SPEI transfer they verify in the bank app) when the customer picks up. All prices and digital receipts use integer MXN centavos.
 
 ## Start on your Mac
 
@@ -48,13 +48,13 @@ Docker execution has not been verified on this workstation; the local Node runti
 ## Restaurant workflow
 
 - **En revisión:** phone orders arrive here without a payment. Staff inspect the digital ticket and accept it to start cooking.
-- **Cocinando:** accepting the order starts preparation and updates the customer's live tracking screen. Modifiers are explicit: red omissions, green extras, neutral masa choices. Tickets age to amber at five minutes and pulse red at ten.
-- **Lista para recoger:** tap **Marcar lista para recoger** to notify the customer in the app; customers can opt into browser notifications and hear the ready chime. At pickup, use **Cobrar al entregar** to calculate change and record cash; successful payment also records the handoff.
+- **Cocinando:** accepting the order starts preparation and updates the customer's live tracking screen. Modifiers are explicit: red omissions, green extras, neutral masa choices. Review tickets turn amber at 2 minutes and red («Demorado») at 3; cooking tickets turn amber at 5 minutes and red at 15.
+- **Lista para recoger:** tap **Marcar lista para recoger** to notify the customer in the app; customers can opt into browser notifications and hear the ready chime. At pickup, use **Cobrar al entregar** to calculate change and record cash, or **Transferencia SPEI** once the transfer shows in the bank app; successful payment also records the handoff. Customers choose cash or SPEI when they order, and a SPEI customer sees the CLABE, exact amount and reference on their order screen.
 - **Anular / No-Show:** an unpaid ticket can be voided while in review or after it is ready for pickup; its items remain in digital history, but it adds no revenue or sold-item totals. Cooking tickets must finish or be marked ready first.
 - **Sin impresora ni periféricos:** tickets, receipts, payment calculations, and shift records stay in the app; the workflow does not send print or cash-drawer commands.
 - **Inventario:** toggle dishes or modifiers. Every connected customer sees **Agotado** immediately. The server also rejects stale carts containing unavailable choices.
 - **Pausar Pedidos Web:** customers see “La cocina está a tope. Por favor, ordena directamente en el mostrador.” Existing orders remain trackable.
-- **Caja y ventas:** shows sales, expected cash held, gross cash received, change, paid count and delivered-item rankings. Search, filter, and export the ledger.
+- **Caja y ventas:** shows sales split into cash in the drawer and SPEI transfers, gross cash received, change, paid count and delivered-item rankings. Search, filter, and export the ledger.
 - **Cerrar Turno:** deliver and collect payment for ready orders, or cancel unpaid tickets first. Confirm to archive the final state and start an empty shift. Current menu availability is retained.
 
 `Sin Conexión` disables submissions and staff mutations. Reconnection requests fresh server state. The customer session, pending submission ID, and active order ID survive refresh/tab closure in the same browser; clearing browser storage removes that recovery capability. Unknown acknowledgement results must be checked before retrying; the existing request/payment IDs prevent duplicate orders or cash recognition.
@@ -65,7 +65,7 @@ Default live file: **`.masaflow-realtime/data.json`**. Set `MASAFLOW_DATA_DIR` t
 
 **Menu catalog:** a fresh install is seeded from `shared/realtime/catalog.js`: 33 dishes in six sections plus the two **C/QUESILLO** add-ons ($10 on huaraches and gorditas, $5 on sopes, quesadillas and pambazos). Bebidas are not seeded because the printed menu leaves their prices blank. An existing install that still holds the old four-dish placeholder menu (and nothing else) is switched to this catalog once, on the next start; `data.before-zapata-menu-r<revision>.json` is saved beside `data.json` first. Paid history keeps the names and prices it was sold at, and a menu that has been changed in any other way is never replaced.
 
-Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before resetting it. Archives contain complete order records and final revenue, expected cash held, and void counts. Here `voidCount` means unpaid No-Show cancellations; paid refunds are not part of this workflow. Copy the data directory to a separate disk regularly. To restore an archive, stop the service, keep a copy of the current file, copy the chosen archive to `data.json`, then restart. This reopens that archived shift; use the archive as read-only evidence if you do not intend to reopen it.
+Closeout saves **`archive_<date>_<shift-id>.json`** next to `data.json` before resetting it. Archives contain complete order records and final revenue (cash and SPEI shown separately), and void counts. Here `voidCount` means unpaid No-Show cancellations; paid refunds are not part of this workflow. Copy the data directory to a separate disk regularly. To restore an archive, stop the service, keep a copy of the current file, copy the chosen archive to `data.json`, then restart. This reopens that archived shift; use the archive as read-only evidence if you do not intend to reopen it.
 
 **Existing installations:** the earlier HTML/SSE app is preserved as `legacy-server.cjs`; its `.masaflow/state.json`, backup tools, source files, and tests remain intact. The new suite starts with a separate ledger and does **not** import old USD/MXN histories automatically. Finish and back up the old shift before switching. `npm run legacy:start` explicitly starts the historical runtime; its documentation is in [docs/LEGACY_README.md](docs/LEGACY_README.md). The new runtime does not serve the old pages or execute their printer/drawer code. Historical backup, restore and login-startup npm commands now use the `legacy:` prefix so they cannot be mistaken for tools for the new ledger.
 

@@ -89,16 +89,26 @@ export function advanceDemoOrder(order, now = new Date()) {
 }
 
 /**
+ * Mirrors the server: cash must cover the total and gives change; a SPEI transfer is the exact total, no change.
+ *
  * @param {Order} order
  * @param {number} tenderedCents
  * @param {Date} [now]
+ * @param {"cash" | "spei"} [method]
  * @returns {Order}
  */
-export function payDemoOrder(order, tenderedCents, now = new Date()) {
+export function payDemoOrder(
+  order,
+  tenderedCents,
+  now = new Date(),
+  method = "cash",
+) {
   if (order.status !== "ready")
     throw new Error("Only a ready demo order can be paid.");
   if (!Number.isSafeInteger(tenderedCents) || tenderedCents < order.totalCents)
     throw new Error("Demo tender must cover the order total.");
+  if (method === "spei" && tenderedCents !== order.totalCents)
+    throw new Error("A demo SPEI transfer must be the exact total.");
   const paidAt = now.toISOString();
   return {
     ...order,
@@ -112,7 +122,7 @@ export function payDemoOrder(order, tenderedCents, now = new Date()) {
       totalCents: order.totalCents,
       tenderedCents,
       changeCents: tenderedCents - order.totalCents,
-      method: "cash",
+      method,
       currency: "MXN",
     },
   };
@@ -180,6 +190,9 @@ export function createNoShowDemoOrder(now = new Date()) {
  *   voidCount: number,
  *   tenderedCents: number,
  *   changeCents: number,
+ *   cashCents: number,
+ *   speiCents: number,
+ *   speiOrders: number,
  *   completedOrders: number,
  *   itemPerformance: Array<{id: string, name: string, quantity: number, revenueCents: number}>
  * }}
@@ -190,6 +203,8 @@ export function calculatePracticeMetrics(completedOrders = []) {
   let noShows = 0;
   let tenderedCents = 0;
   let changeCents = 0;
+  let speiCents = 0;
+  let speiOrders = 0;
   /** @type {Map<string, {id: string, name: string, quantity: number, revenueCents: number}>} */
   const itemMap = new Map();
 
@@ -197,8 +212,14 @@ export function calculatePracticeMetrics(completedOrders = []) {
     if (order.status === "completed" && order.transaction) {
       paidOrders += 1;
       revenueCents += order.transaction.totalCents;
-      tenderedCents += order.transaction.tenderedCents;
-      changeCents += order.transaction.changeCents;
+      // Same split as the server: a transfer never counts as cash handed over or change given.
+      if (order.transaction.method === "spei") {
+        speiCents += order.transaction.totalCents;
+        speiOrders += 1;
+      } else {
+        tenderedCents += order.transaction.tenderedCents;
+        changeCents += order.transaction.changeCents;
+      }
       for (const item of order.items) {
         const existing = itemMap.get(item.menuItemId) || {
           id: item.menuItemId,
@@ -222,6 +243,9 @@ export function calculatePracticeMetrics(completedOrders = []) {
     voidCount: noShows,
     tenderedCents,
     changeCents,
+    cashCents: tenderedCents - changeCents,
+    speiCents,
+    speiOrders,
     completedOrders: paidOrders,
     itemPerformance: Array.from(itemMap.values()).sort(
       (a, b) => b.quantity - a.quantity,

@@ -358,7 +358,12 @@ export function usePracticeBoard({
       }
       let paid: Order;
       try {
-        paid = payDemoOrder(order, cents);
+        paid = payDemoOrder(
+          order,
+          cents,
+          new Date(),
+          via === "spei" ? "spei" : "cash",
+        );
       } catch {
         return;
       }
@@ -375,7 +380,9 @@ export function usePracticeBoard({
         academy.emit(
           via === "exact"
             ? { type: "exact-pay" }
-            : { type: "confirm-payment", cents },
+            : via === "spei"
+              ? { type: "spei-pay", cents }
+              : { type: "confirm-payment", cents },
         );
     },
     [orders, rush, academy, setPayId],

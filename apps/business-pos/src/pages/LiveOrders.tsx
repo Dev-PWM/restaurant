@@ -49,6 +49,7 @@ import {
   orderLabel,
   SoundButton,
   StaffHeader,
+  paymentSummary,
   time,
   useNow,
 } from "../../../../shared/ui/components";
@@ -177,11 +178,15 @@ export function CashTender({
           type="button"
           data-tour-target={simulator ? "btn-spei-tender" : undefined}
           disabled={!simulator && !connected}
-          className="btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 disabled:opacity-50"
+          data-help="spei-pay"
+          className={`btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 disabled:opacity-50 ${
+            order.paymentIntent === "spei" ? "ring-4 ring-blue-400 ring-offset-2" : ""
+          }`}
           onClick={() => setShowSpei(true)}
         >
           <Building2 size={16} />
           Transferencia SPEI · {BBVA_BANK_INFO.bank}
+          {order.paymentIntent === "spei" && " (eligió el cliente)"}
         </button>
         <p className="mt-4 text-center text-xs text-stone-500">
           Confirma solo después de recibir el efectivo o verificar la transferencia. Tendrás{" "}
@@ -803,10 +808,7 @@ export function CompletedOrdersSection({
                     </td>
                     <td className="px-4 py-3 text-[11px] text-stone-500">
                       {order.transaction ? (
-                        <span>
-                          Recibido: {mxn(order.transaction.tenderedCents)} ·
-                          Cambio: {mxn(order.transaction.changeCents)}
-                        </span>
+                        <span>{paymentSummary(order.transaction)}</span>
                       ) : (
                         "--"
                       )}
@@ -927,8 +929,7 @@ export function CompletedOrdersSection({
                   </div>
                   {order.transaction && (
                     <p className="mt-1 text-xs text-stone-500">
-                      Efectivo recibido: {mxn(order.transaction.tenderedCents)}{" "}
-                      · Cambio: {mxn(order.transaction.changeCents)}
+                      {paymentSummary(order.transaction)}
                     </p>
                   )}
                 </div>
@@ -1027,25 +1028,11 @@ function LiveBoard({
     [activeTab, setActiveTab] = useState<"queue" | "tables" | "completed">(
       "queue",
     ),
-    [tables, setTables] = useState<TableInfo[]>([
+    // Placeholder until the server owns table state: every table starts free, never invented guests.
+    [tables] = useState<TableInfo[]>([
       { number: 1, status: "available" },
       { number: 2, status: "available" },
-      {
-        number: 3,
-        status: "occupied",
-        customerName: "Carlos R.",
-        activeOrderTotalCents: 14500,
-      },
-      { number: 4, status: "available" },
-      {
-        number: 5,
-        status: "occupied",
-        customerName: "Ana M.",
-        activeOrderTotalCents: 22000,
-      },
-      { number: 6, status: "available" },
-      { number: 7, status: "available" },
-      { number: 8, status: "available" },
+      { number: 3, status: "available" },
     ]),
     [selectedTable, setSelectedTable] = useState<number | null>(null),
     [customDishModalOpen, setCustomDishModalOpen] = useState(false),

@@ -28,6 +28,8 @@ export interface OrderInput {
   shiftId: string;
   customerName: string;
   items: CartItem[];
+  /** How the customer says they will pay at pickup. Omitted (older phones) means cash. The cashier records the real method. */
+  paymentIntent?: PaymentMethod;
 }
 export interface OrderLine {
   menuItemId: string;
@@ -46,9 +48,14 @@ export interface Transaction {
   changeCents: number;
   /** Preserved only when reading older persisted receipts. New payments never record tips. */
   tipCents?: number;
-  method: "cash";
+  /**
+   * How the money arrived. A SPEI transfer is always the exact total with no change, and never
+   * enters the cash drawer. Receipts written before transfers existed have no method and load as cash.
+   */
+  method: PaymentMethod;
   currency: "MXN";
 }
+export type PaymentMethod = "cash" | "spei";
 export interface Order {
   id: string;
   sessionId: string;
@@ -57,6 +64,8 @@ export interface Order {
   number: number;
   customerName: string;
   status: OrderStatus;
+  /** What the customer chose when ordering. A hint for the cashier; the transaction holds what really happened. */
+  paymentIntent: PaymentMethod;
   items: OrderLine[];
   totalCents: number;
   notes?: string;
@@ -74,11 +83,20 @@ export interface ItemPerformance {
   revenueCents: number;
 }
 export interface SalesMetrics {
+  /** Every paid order, cash and SPEI together. Always equals `cashCents + speiCents`. */
   revenueCents: number;
   /** Unpaid cancellations (no_show), not paid refunds. */
   voidCount: number;
+  /** Cash only: what customers handed over before change. SPEI transfers are not counted here. */
   tenderedCents: number;
+  /** Cash only: change handed back. */
   changeCents: number;
+  /** Cash kept from sales (`tenderedCents - changeCents`): what the drawer should hold, before any opening float. */
+  cashCents: number;
+  /** Bank transfers received (SPEI). These never touch the drawer. */
+  speiCents: number;
+  /** Paid orders settled by SPEI. */
+  speiOrders: number;
   paidOrders: number;
   completedOrders: number;
   noShows: number;
@@ -117,7 +135,8 @@ export interface Commands {
   pos_order_paid: {
     orderId: string;
     tenderedCents: number;
-    method?: "cash" | "spei";
+    /** Omitted means cash. SPEI must tender exactly the order total. */
+    method?: PaymentMethod;
   };
   pos_update_status: { orderId: string; status: "cooking" | "ready" };
   pos_mark_noshow: { orderId: string };
