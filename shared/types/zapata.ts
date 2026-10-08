@@ -116,30 +116,34 @@ export const DEFAULT_VEGGIES = {
 import type { Modifier, Order } from './realtime';
 
 export interface DetectedOrderBadges {
+  /** At least one dish is cooked at the comal without grease. */
   hasSinGrasa: boolean;
+  /** Pieces to cook at the comal without grease / fried, so a mixed ticket reads "×2 · ×1", not a single flag. */
+  sinGrasaPieces: number;
+  fritoPieces: number;
   hasExtraQuesillo: boolean;
   isSPEI: boolean;
   omissions: Array<{ itemIndex: number; menuItemId: string; omission: Modifier }>;
 }
 
+/** Quesillo add-ons are the only modifiers named after cheese; their ids start with this prefix. */
+const QUESILLO_PREFIX = 'quesillo-';
+
 export function detectOrderBadges(
   order: Order,
   cookingStyle?: 'con_grasa' | 'sin_grasa'
 ): DetectedOrderBadges {
-  const hasSinGrasa =
-    cookingStyle === 'sin_grasa' ||
-    order.items.some(
-      (item) =>
-        item.name.toLowerCase().includes('sin grasa') ||
-        item.modifiers?.some(
-          (m) =>
-            m.name.toLowerCase().includes('sin grasa') ||
-            m.name.toLowerCase().includes('comal seco')
-        )
-    );
+  let sinGrasaPieces = 0;
+  let fritoPieces = 0;
+  for (const item of order.items) {
+    const ids = (item.modifiers || []).map((m) => m.id);
+    if (ids.includes('prep-comal')) sinGrasaPieces += item.quantity;
+    if (ids.includes('prep-frito')) fritoPieces += item.quantity;
+  }
+  const hasSinGrasa = cookingStyle === 'sin_grasa' || sinGrasaPieces > 0;
 
   const hasExtraQuesillo = order.items.some((item) =>
-    item.modifiers?.some((m) => m.name.toLowerCase().includes('quesillo'))
+    item.modifiers?.some((m) => m.id.startsWith(QUESILLO_PREFIX))
   );
 
   // The customer's own choice at checkout. The cashier still records the real method when taking payment.
@@ -151,5 +155,5 @@ export function detectOrderBadges(
       .map((omission) => ({ itemIndex, menuItemId: item.menuItemId, omission }))
   );
 
-  return { hasSinGrasa, hasExtraQuesillo, isSPEI, omissions };
+  return { hasSinGrasa, sinGrasaPieces, fritoPieces, hasExtraQuesillo, isSPEI, omissions };
 }

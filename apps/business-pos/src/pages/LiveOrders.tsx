@@ -269,8 +269,14 @@ export function TicketCard({
     100,
     Math.max(4, Math.round((elapsedSeconds / agingLimitSeconds) * 100)),
   );
-  const { hasSinGrasa, hasExtraQuesillo, isSPEI, omissions: detectedOmissions } =
-    detectOrderBadges(order);
+  const {
+    hasSinGrasa,
+    sinGrasaPieces,
+    fritoPieces,
+    hasExtraQuesillo,
+    isSPEI,
+    omissions: detectedOmissions,
+  } = detectOrderBadges(order);
   const omissions = detectedOmissions.map((d) => d.omission);
   const requiresAcknowledgement = simulator && needsAcknowledgement(order);
   async function advance() {
@@ -384,7 +390,7 @@ export function TicketCard({
               </span>
             </div>
           </div>
-          {(hasSinGrasa || hasExtraQuesillo || isSPEI) && (
+          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || isSPEI) && (
             <div className="mb-3 flex flex-wrap gap-1.5">
               {isSPEI && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs">
@@ -398,7 +404,15 @@ export function TicketCard({
                   className="inline-flex items-center gap-1 rounded-md bg-purple-700 px-2.5 py-1 text-xs font-black text-white shadow-xs"
                 >
                   <Flame size={13} />
-                  SIN GRASA (COMAL SECO)
+                  SIN GRASA ×{sinGrasaPieces}
+                </span>
+              )}
+              {fritoPieces > 0 && (
+                <span
+                  data-tour-target={simulator ? "badge-frito" : undefined}
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-black text-stone-950 shadow-xs"
+                >
+                  FRITO ×{fritoPieces}
                 </span>
               )}
               {hasExtraQuesillo && (

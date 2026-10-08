@@ -22,7 +22,7 @@ const input = (engine, extra = {}) => ({
     {
       menuItemId: "huarache-bistec",
       quantity: 2,
-      modifierIds: ["quesillo-10"],
+      modifierIds: ["quesillo-10", "prep-comal"],
     },
   ],
   ...extra,
@@ -347,13 +347,13 @@ test("sold-out modifiers, misplaced add-ons and malformed carts fail at the serv
   });
   for (const items of [
     [],
-    [{ menuItemId: "huarache-bistec", quantity: -1, modifierIds: [] }],
-    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-10", "quesillo-10"] }],
-    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["hacked"] }],
+    [{ menuItemId: "huarache-bistec", quantity: -1, modifierIds: ["prep-comal"] }],
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-10", "quesillo-10", "prep-comal"] }],
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["hacked", "prep-comal"] }],
     // The $5 quesillo belongs to sopes, quesadillas and pambazos, never huaraches.
-    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-5"] }],
-    [{ menuItemId: "sope-bistec", quantity: 1, modifierIds: ["quesillo-10"] }],
-    [{ menuItemId: "not-on-the-menu", quantity: 1, modifierIds: [] }],
+    [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["quesillo-5", "prep-comal"] }],
+    [{ menuItemId: "sope-bistec", quantity: 1, modifierIds: ["quesillo-10", "prep-comal"] }],
+    [{ menuItemId: "not-on-the-menu", quantity: 1, modifierIds: ["prep-comal"] }],
   ])
     assert.throws(() => submit(engine, { items }));
   engine.dispatch("admin_toggle_stock", {
@@ -885,7 +885,7 @@ test("lunch-rush concurrent retries reconcile 40 tickets without duplicate cash"
         {
           menuItemId: "huarache-longaniza",
           quantity: 1,
-          modifierIds: ["quesillo-10"],
+          modifierIds: ["quesillo-10", "prep-comal"],
         },
       ],
     }),

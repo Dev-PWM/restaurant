@@ -6,7 +6,11 @@ export interface Modifier {
   name: string;
   priceCents: number;
   available: boolean;
-  kind: "masa" | "extra" | "omit";
+  /**
+   * masa and prep are required single choices (exactly one when a dish offers them), extra is optional and may
+   * cost money, omit is a free request to leave something off.
+   */
+  kind: "masa" | "prep" | "extra" | "omit";
 }
 export interface MenuItem {
   id: string;

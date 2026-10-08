@@ -6,14 +6,23 @@ import { Modal, mxn, Quantity } from "../../../../shared/ui/components";
 
 type CartLine = OrderInput["items"][number];
 
+/** Choices where the customer must pick exactly one of the dish's options. Mirrors REQUIRED_CHOICE_KINDS on the server. */
+const REQUIRED_KINDS = ["masa", "prep"] as const;
+
 export function itemAvailable(
   item: MenuItem,
   modifiers: { id: string; kind: string; available: boolean }[],
 ) {
-  const masas = modifiers.filter(
-    (m) => item.modifierIds.includes(m.id) && m.kind === "masa",
+  return (
+    item.available &&
+    REQUIRED_KINDS.every((kind) => {
+      const options = modifiers.filter(
+        (m) => item.modifierIds.includes(m.id) && m.kind === kind,
+      );
+      // A dish with every comal/frito option sold out cannot be ordered at all.
+      return !options.length || options.some((m) => m.available);
+    })
   );
-  return item.available && (!masas.length || masas.some((m) => m.available));
 }
 
 export function CustomizeModal({
@@ -31,20 +40,24 @@ export function CustomizeModal({
     : [];
 
   const [selected, setSelected] = useState<string[]>(() => {
+    // Masa keeps its first-available default. Comal/frito never does: the customer must choose, so the
+    // kitchen never receives a ticket where nobody decided.
     const firstMasa = modifiers.find((m) => m.kind === "masa" && m.available);
     return firstMasa ? [firstMasa.id] : [];
   });
   const [quantity, setQuantity] = useState(1);
 
-  const hasMasa = modifiers.some((m) => m.kind === "masa");
-  const selectedMasaId = selected.find(
-    (id) => modifiers.find((v) => v.id === id)?.kind === "masa",
+  const kindOf = (id: string) => modifiers.find((v) => v.id === id)?.kind;
+  const missingChoice = REQUIRED_KINDS.some(
+    (kind) =>
+      modifiers.some((m) => m.kind === kind) &&
+      !selected.some((id) => kindOf(id) === kind),
   );
 
   const valid =
     itemAvailable(item, modifiers) &&
     selected.every((id) => modifiers.find((m) => m.id === id)?.available) &&
-    (!hasMasa || Boolean(selectedMasaId));
+    !missingChoice;
 
   const price =
     item.priceCents +
@@ -52,11 +65,13 @@ export function CustomizeModal({
       .filter((m) => selected.includes(m.id))
       .reduce((sum, m) => sum + m.priceCents, 0);
 
+  const prepModifiers = modifiers.filter((m) => m.kind === "prep");
   const masaModifiers = modifiers.filter((m) => m.kind === "masa");
   const extraModifiers = modifiers.filter((m) => m.kind === "extra");
   const omitModifiers = modifiers.filter((m) => m.kind === "omit");
   // A dish may offer only some of these groups, so the step numbers count the ones shown.
-  const extraStep = masaModifiers.length ? 2 : 1;
+  const masaStep = prepModifiers.length ? 2 : 1;
+  const extraStep = masaStep + (masaModifiers.length ? 1 : 0);
   const omitStep = extraStep + (extraModifiers.length ? 1 : 0);
 
   return (
@@ -65,11 +80,64 @@ export function CustomizeModal({
         {item.description}
       </p>
 
-      {/* 1. Masa Selection (Required) */}
+      {/* 1. Cooking style (Required, no default) */}
+      {prepModifiers.length > 0 && (
+        <fieldset className="mb-6" data-testid="prep-choice">
+          <legend className="eyebrow mb-2 flex items-center justify-between gap-3 text-clay-700">
+            <span>1. ¿Cómo lo quieres?</span>
+            <span className="text-[11px] font-bold text-clay-600 uppercase">
+              Obligatorio · 1 opción
+            </span>
+          </legend>
+          <div className="grid grid-cols-2 gap-2.5">
+            {prepModifiers.map((m) => {
+              const isSelected = selected.includes(m.id);
+              return (
+                <label
+                  key={m.id}
+                  className={`relative flex min-h-16 cursor-pointer items-center justify-between gap-2 rounded-xl border-2 p-3.5 transition-all has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-clay-600 ${
+                    isSelected
+                      ? "border-clay-600 bg-clay-50/60 shadow-2xs"
+                      : "border-stone-200 bg-white hover:border-stone-300"
+                  } ${!m.available ? "cursor-not-allowed bg-stone-100 opacity-40" : ""}`}
+                >
+                  <input
+                    type="radio"
+                    name="prep"
+                    className="sr-only"
+                    checked={isSelected}
+                    disabled={!m.available}
+                    onChange={() =>
+                      setSelected((prev) => [
+                        ...prev.filter((id) => kindOf(id) !== "prep"),
+                        m.id,
+                      ])
+                    }
+                  />
+                  <span className="text-sm font-black leading-tight text-stone-900">
+                    {m.name}
+                  </span>
+                  {!m.available ? (
+                    <span className="text-xs font-semibold text-stone-600">
+                      Agotado
+                    </span>
+                  ) : (
+                    isSelected && (
+                      <Check size={18} className="shrink-0 text-clay-700" />
+                    )
+                  )}
+                </label>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
+
+      {/* Masa Selection (Required) */}
       {masaModifiers.length > 0 && (
         <fieldset className="mb-6">
-          <legend className="eyebrow mb-2 flex items-center justify-between text-clay-700">
-            <span>1. Elige tu masa</span>
+          <legend className="eyebrow mb-2 flex items-center justify-between gap-3 text-clay-700">
+            <span>{masaStep}. Elige tu masa</span>
             <span className="text-[11px] font-bold text-clay-600 uppercase">
               Obligatorio · 1 opción
             </span>
@@ -134,7 +202,7 @@ export function CustomizeModal({
       {/* 2. Extras (Optional) */}
       {extraModifiers.length > 0 && (
         <fieldset className="mb-6">
-          <legend className="eyebrow mb-2 flex items-center justify-between text-stone-700">
+          <legend className="eyebrow mb-2 flex items-center justify-between gap-3 text-stone-700">
             <span>{extraStep}. Ingredientes extra</span>
             <span className="text-[11px] font-medium text-stone-400">
               Opcional
@@ -187,7 +255,7 @@ export function CustomizeModal({
       {/* 3. Omits (No Cebolla, No Cilantro) */}
       {omitModifiers.length > 0 && (
         <fieldset className="mb-6">
-          <legend className="eyebrow mb-2 flex items-center justify-between text-stone-700">
+          <legend className="eyebrow mb-2 flex items-center justify-between gap-3 text-stone-700">
             <span>{omitStep}. Preferencias de preparación</span>
             <span className="text-[11px] font-medium text-stone-400">
               Exclusiones
@@ -241,6 +309,17 @@ export function CustomizeModal({
           <Quantity value={quantity} onChange={setQuantity} />
         </div>
 
+        {missingChoice && (
+          <p
+            role="status"
+            className="mb-3 text-center text-xs font-semibold text-clay-800"
+          >
+            {prepModifiers.length > 0 &&
+            !selected.some((id) => kindOf(id) === "prep")
+              ? "Elige cómo lo quieres: al comal o frito."
+              : "Elige una opción obligatoria para continuar."}
+          </p>
+        )}
         <button
           className="btn btn-primary w-full text-base py-3"
           disabled={!valid}

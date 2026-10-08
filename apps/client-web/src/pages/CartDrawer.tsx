@@ -81,8 +81,12 @@ export function CartDrawer({
               .map((id) => snapshot.modifiers.find((m) => m.id === id))
               .filter(Boolean);
 
-            const masaMod = lineMods.find((m) => m?.kind === "masa");
-            const otherMods = lineMods.filter((m) => m?.kind !== "masa");
+            const chipMods = lineMods.filter(
+              (m) => m?.kind === "masa" || m?.kind === "prep",
+            );
+            const otherMods = lineMods.filter(
+              (m) => m?.kind !== "masa" && m?.kind !== "prep",
+            );
 
             return (
               <div
@@ -91,15 +95,18 @@ export function CartDrawer({
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <strong className="text-stone-900 font-bold">
                         {menuItem?.name || "Platillo"}
                       </strong>
-                      {masaMod && (
-                        <span className="rounded bg-white px-2 py-0.5 border border-stone-200 text-xs font-semibold text-stone-700">
-                          {masaMod.name}
+                      {chipMods.map((mod) => (
+                        <span
+                          key={mod?.id}
+                          className="rounded bg-white px-2 py-0.5 border border-stone-200 text-xs font-semibold text-stone-700"
+                        >
+                          {mod?.name}
                         </span>
-                      )}
+                      ))}
                     </div>
 
                     {otherMods.length > 0 && (
@@ -217,7 +224,7 @@ export function CartDrawer({
         <legend className="mb-2 text-sm font-bold text-stone-800">
           ¿Cómo vas a pagar al recoger?
         </legend>
-        <div className="grid grid-cols-2 gap-2.5">
+        <div className="grid grid-cols-1 gap-2.5 min-[420px]:grid-cols-2">
           {(
             [
               { value: "cash", label: "Efectivo", Icon: Coins },

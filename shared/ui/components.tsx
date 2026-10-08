@@ -604,9 +604,21 @@ export function StaffHeader({
   );
 }
 export function ModifierBadge({ modifier }: { modifier: Modifier }) {
+  // Red = leave it off, green = add it, purple/amber = how it is cooked (comal / frito), grey = anything else (masa).
+  const style =
+    modifier.kind === "omit"
+      ? "bg-red-600 text-white"
+      : modifier.kind === "extra"
+        ? "bg-green-600 text-white"
+        : modifier.kind === "prep"
+          ? modifier.id === "prep-comal"
+            ? "bg-purple-700 text-white"
+            : "bg-amber-500 text-stone-950"
+          : "bg-stone-100 text-stone-700";
   return (
     <span
-      className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${modifier.kind === "omit" ? "bg-red-600 text-white" : modifier.kind === "extra" ? "bg-green-600 text-white" : "bg-stone-100 text-stone-700"}`}
+      data-modifier-kind={modifier.kind}
+      className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${style}`}
     >
       {modifier.name}
     </span>

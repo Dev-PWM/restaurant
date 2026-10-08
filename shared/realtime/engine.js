@@ -3,7 +3,13 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID, createHash } = require("node:crypto");
-const { MENU_ITEMS, MODIFIERS, hasLegacyPlaceholderMenu } = require("./catalog");
+const {
+  MENU_ITEMS,
+  MODIFIERS,
+  REQUIRED_CHOICE_KINDS,
+  hasLegacyPlaceholderMenu,
+  reconcileCatalog,
+} = require("./catalog");
 /** @typedef {import('../types/realtime').State} State */
 /** @typedef {import('../types/realtime').Order} Order */
 /** @typedef {import('../types/realtime').SalesMetrics} SalesMetrics */
@@ -106,6 +112,11 @@ function initialState() {
     closedShifts: [],
   };
 }
+/** What a customer is told when a dish offers a required choice and they did not make exactly one. */
+const CHOICE_MESSAGES = {
+  masa: "Elige un tipo de masa.",
+  prep: "Elige cómo se prepara: al comal o frito.",
+};
 /** @param {string} file @param {unknown} value */
 function writeAtomic(file, value) {
   const temporary = `${file}.${randomUUID()}.tmp`;
@@ -294,6 +305,29 @@ function createEngine({ directory, persist = writeAtomic }) {
     save(file, validate(migrated));
     state = migrated;
   }
+  /**
+   * A ledger saved before comal/frito, toppings (or any later catalog addition) existed has none of those modifiers.
+   * Add what is missing, keep everything else (stock toggles, custom dishes), and keep the previous ledger beside it.
+   */
+  /** @type {string | null} */
+  let catalogBackup = null;
+  const missing = reconcileCatalog(state);
+  if (missing) {
+    // Named by revision for the same reason as the menu backup above: a retry rewrites the same bytes.
+    const backup = path.join(
+      directory,
+      `data.before-catalog-r${state.revision}.json`,
+    );
+    fs.copyFileSync(file, backup);
+    fs.chmodSync(backup, 0o600);
+    const migrated = structuredClone(state);
+    migrated.menuItems = missing.menuItems;
+    migrated.modifiers = missing.modifiers;
+    migrated.revision++;
+    save(file, validate(migrated));
+    state = migrated;
+    catalogBackup = backup;
+  }
   /** @param {Order} order @param {State} next */
   function finish(order, next) {
     next.activeOrders = next.activeOrders.filter((o) => o.id !== order.id);
@@ -395,14 +429,17 @@ function createEngine({ directory, persist = writeAtomic }) {
           );
           return modifier;
         });
-        const requiresMasa = menu.modifierIds.some(
-          (id) => next.modifiers.find((m) => m.id === id)?.kind === "masa",
-        );
-        ensure(
-          modifiers.filter((m) => m.kind === "masa").length ===
-            (requiresMasa ? 1 : 0),
-          "Elige un tipo de masa.",
-        );
+        // A dish that offers a required choice (masa, comal/frito) needs exactly one of it; a dish that does not, none.
+        for (const kind of REQUIRED_CHOICE_KINDS)
+          ensure(
+            modifiers.filter((m) => m.kind === kind).length ===
+              (menu.modifierIds.some(
+                (id) => next.modifiers.find((m) => m.id === id)?.kind === kind,
+              )
+                ? 1
+                : 0),
+            CHOICE_MESSAGES[/** @type {"masa" | "prep"} */ (kind)],
+          );
         const unitPriceCents = money(
           menu.priceCents + modifiers.reduce((sum, m) => sum + m.priceCents, 0),
         );
@@ -577,7 +614,13 @@ function createEngine({ directory, persist = writeAtomic }) {
     state = next;
     return reply;
   }
-  return { getState: () => structuredClone(state), dispatch, file, menuBackup };
+  return {
+    getState: () => structuredClone(state),
+    dispatch,
+    file,
+    menuBackup,
+    catalogBackup,
+  };
 }
 module.exports = {
   createEngine,
