@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Order, Snapshot } from "../../../../shared/types/realtime";
+import type { Order, Snapshot, Table } from "../../../../shared/types/realtime";
 import { chime, enableAudio } from "../../../../shared/ui/components";
 import {
   RUSH_LIMIT_SECONDS,
@@ -19,6 +19,8 @@ import {
   markDemoNoShow,
   needsAcknowledgement,
   payDemoOrder,
+  createPracticeTables,
+  togglePracticeTable,
 } from "../simulator.js";
 import { useAcademy } from "./AcademyProvider";
 import { playMistakeThud, triggerHaptic } from "./sound";
@@ -95,6 +97,8 @@ export function usePracticeBoard({
   const [rushPaid, setRushPaid] = useState(0);
   const [rushResolved, setRushResolved] = useState(0);
   const [rushNoShows, setRushNoShows] = useState(0);
+  // Practice tables live here, never on the server: a trainee tapping a table sends nothing anywhere.
+  const [tables, setTables] = useState<Table[]>(() => createPracticeTables());
 
   const { state } = academy;
   const phase = state.phase;
@@ -104,9 +108,9 @@ export function usePracticeBoard({
   const snapshot = useMemo<Snapshot | null>(
     () =>
       active && source
-        ? { ...source, activeOrders: orders, completedOrders: completed }
+        ? { ...source, tables, activeOrders: orders, completedOrders: completed }
         : liveSnapshot,
-    [active, source, orders, completed, liveSnapshot],
+    [active, source, tables, orders, completed, liveSnapshot],
   );
   const dish = practiceDish(source);
   const inventoryItems = useMemo<PracticeInventoryItem[]>(
@@ -132,6 +136,7 @@ export function usePracticeBoard({
     setPaused(false);
     setInventoryOpen(false);
     setAnalyticsOpen(false);
+    setTables(createPracticeTables());
   }, [setPayId]);
 
   /** Lays out the practice tickets a module starts with. */
@@ -459,6 +464,16 @@ export function usePracticeBoard({
         return next;
       });
       academy.emit({ type: "inventory-toggle", id, available });
+    },
+    toggleTable: (number: number) => {
+      const table = tables.find((candidate) => candidate.number === number);
+      if (!table) return;
+      setTables((current) => togglePracticeTable(current, number));
+      academy.emit({
+        type: "table-toggle",
+        tableNumber: number,
+        status: table.status === "occupied" ? "available" : "occupied",
+      });
     },
     analyticsOpen,
     openAnalytics: () => {

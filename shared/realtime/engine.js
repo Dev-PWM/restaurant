@@ -6,6 +6,8 @@ const { randomUUID, createHash } = require("node:crypto");
 const {
   MENU_ITEMS,
   MODIFIERS,
+  TABLE_COUNT,
+  defaultTables,
   REQUIRED_CHOICE_KINDS,
   hasLegacyPlaceholderMenu,
   reconcileCatalog,
@@ -106,6 +108,7 @@ function initialState() {
     acceptingOrders: true,
     menuItems: structuredClone(MENU_ITEMS),
     modifiers: structuredClone(MODIFIERS),
+    tables: defaultTables(),
     activeOrders: [],
     completedOrders: [],
     salesMetrics: metrics([]),
@@ -164,17 +167,40 @@ function validate(s) {
       typeof s.acceptingOrders === "boolean",
     "data.json inválido. Restaura un archivo verificado.",
   );
+  // A ledger saved before tables existed has none: start with every table free. Never removes a table.
+  if (s.tables === undefined) s.tables = [];
   for (const rows of [
     s.menuItems,
     s.modifiers,
+    s.tables,
     s.activeOrders,
     s.completedOrders,
     s.closedShifts,
   ])
     ensure(Array.isArray(rows), "Colección de datos inválida.");
+  for (const table of s.tables)
+    ensure(
+      Number.isInteger(table.number) &&
+        table.number > 0 &&
+        (table.status === "available" || table.status === "occupied") &&
+        (table.status === "available"
+          ? table.occupiedSince === null
+          : Number.isFinite(Date.parse(String(table.occupiedSince)))) &&
+        s.tables.filter((other) => other.number === table.number).length === 1,
+      "Mesa inválida.",
+    );
+  for (let number = 1; number <= TABLE_COUNT; number++)
+    if (!s.tables.some((table) => table.number === number))
+      s.tables.push({ number, status: "available", occupiedSince: null });
+  s.tables.sort((a, b) => a.number - b.number);
   for (const order of [...s.activeOrders, ...s.completedOrders]) {
     if (String(order.status) === "unpaid") order.status = "review";
-    // Orders from before customers could choose a payment method were all cash.
+    // Orders from before customers could choose a payment method were all cash, and all takeout.
+    if (order.orderType === undefined) order.orderType = "takeout";
+    ensure(
+      order.orderType === "takeout" || order.orderType === "dine_in",
+      "Tipo de pedido inválido.",
+    );
     if (order.paymentIntent === undefined) order.paymentIntent = "cash";
     ensure(
       order.paymentIntent === "cash" || order.paymentIntent === "spei",
@@ -370,6 +396,11 @@ function createEngine({ directory, persist = writeAtomic }) {
         paymentIntent === "cash" || paymentIntent === "spei",
         "Método de pago inválido.",
       );
+      const orderType = data.orderType === undefined ? "takeout" : data.orderType;
+      ensure(
+        orderType === "takeout" || orderType === "dine_in",
+        "Tipo de pedido inválido.",
+      );
       const fingerprint = createHash("sha256")
         .update(
           JSON.stringify({
@@ -409,6 +440,14 @@ function createEngine({ directory, persist = writeAtomic }) {
       ensure(
         next.activeOrders.length < 500,
         "La fila está llena. Ordena en el mostrador.",
+      );
+      // Checked only for a NEW order: a retry of an order already accepted returned above. Placing a dine-in
+      // order never seats anyone: staff mark the table when they do.
+      ensure(
+        orderType !== "dine_in" ||
+          next.tables.some((table) => table.status === "available"),
+        "No hay mesas disponibles. Pide para llevar o en el mostrador.",
+        "NO_TABLES",
       );
       const items = data.items.map((line) => {
         const menu = next.menuItems.find((m) => m.id === line.menuItemId);
@@ -461,6 +500,7 @@ function createEngine({ directory, persist = writeAtomic }) {
         customerName: data.customerName.trim(),
         status: "review",
         paymentIntent,
+        orderType,
         items,
         totalCents: money(
           items.reduce((sum, line) => sum + line.lineTotalCents, 0),
@@ -494,6 +534,19 @@ function createEngine({ directory, persist = writeAtomic }) {
         "Disponibilidad inválida.",
       );
       next.acceptingOrders = data.acceptingOrders;
+    } else if (event === "pos_set_table") {
+      const data = /** @type {Commands['pos_set_table']} */ (input);
+      ensure(
+        Number.isInteger(data.number) &&
+          (data.status === "available" || data.status === "occupied"),
+        "Mesa inválida.",
+      );
+      const table = next.tables.find((candidate) => candidate.number === data.number);
+      ensure(table, "Mesa no encontrada.");
+      // Tapping twice, or two cashiers at once, must not churn the ledger.
+      if (table.status === data.status) return { ok: true };
+      table.status = data.status;
+      table.occupiedSince = data.status === "occupied" ? at : null;
     } else if (event === "pos_close_shift") {
       const data = /** @type {Commands['pos_close_shift']} */ (input);
       const previous = state.closedShifts.find(
@@ -525,6 +578,8 @@ function createEngine({ directory, persist = writeAtomic }) {
       next.shiftOpenedAt = at;
       next.activeOrders = [];
       next.completedOrders = [];
+      // A new shift starts with an empty dining room.
+      next.tables = defaultTables();
       next.nextOrderNumber = 1;
       next.acceptingOrders = true;
       reply = { ok: true, archive };

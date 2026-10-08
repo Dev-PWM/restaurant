@@ -25,7 +25,6 @@ import {
   Utensils,
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
-import type { TableInfo, MenuItem } from "../../../../shared/types/zapata";
 import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
@@ -277,6 +276,7 @@ export function TicketCard({
     isSPEI,
     omissions: detectedOmissions,
   } = detectOrderBadges(order);
+  const isDineIn = order.orderType === "dine_in";
   const omissions = detectedOmissions.map((d) => d.omission);
   const requiresAcknowledgement = simulator && needsAcknowledgement(order);
   async function advance() {
@@ -390,8 +390,17 @@ export function TicketCard({
               </span>
             </div>
           </div>
-          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || isSPEI) && (
+          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || isSPEI || isDineIn) && (
             <div className="mb-3 flex flex-wrap gap-1.5">
+              {isDineIn && (
+                <span
+                  data-tour-target={simulator ? "badge-dine-in" : undefined}
+                  className="inline-flex items-center gap-1 rounded-md bg-[#2E94A5] px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                >
+                  <Utensils size={13} />
+                  COMER AQUÍ
+                </span>
+              )}
               {isSPEI && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs">
                   <Building2 size={13} />
@@ -1042,13 +1051,7 @@ function LiveBoard({
     [activeTab, setActiveTab] = useState<"queue" | "tables" | "completed">(
       "queue",
     ),
-    // Placeholder until the server owns table state: every table starts free, never invented guests.
-    [tables] = useState<TableInfo[]>([
-      { number: 1, status: "available" },
-      { number: 2, status: "available" },
-      { number: 3, status: "available" },
-    ]),
-    [selectedTable, setSelectedTable] = useState<number | null>(null),
+    [tableNotice, setTableNotice] = useState(""),
     [customDishModalOpen, setCustomDishModalOpen] = useState(false),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
@@ -1065,6 +1068,23 @@ function LiveBoard({
     setPayId,
   });
   const snapshot = practice.snapshot;
+  // Live: the server's tables, shared with every customer screen. Practice: local tables that send nothing.
+  const tables = snapshot?.tables ?? [];
+  async function toggleTable(number: number) {
+    const table = tables.find((candidate) => candidate.number === number);
+    if (!table) return;
+    report({ type: "select-table", tableNumber: number });
+    if (simulator) {
+      practice.toggleTable(number);
+      return;
+    }
+    setTableNotice("");
+    const reply = await command("pos_set_table", {
+      number,
+      status: table.status === "occupied" ? "available" : "occupied",
+    });
+    if (!reply.ok) setTableNotice(reply.error);
+  }
 
   // Real payments wait out the undo window here; the timers must outlive renders.
   const pendingTimers = useRef(
@@ -1693,12 +1713,9 @@ function LiveBoard({
         {activeTab === "tables" ? (
           <TableMap
             tables={tables}
-            selectedTableNumber={selectedTable}
             simulator={simulator}
-            onSelectTable={(tableNum) => {
-              setSelectedTable(tableNum);
-              report({ type: "select-table", tableNumber: tableNum });
-            }}
+            notice={tableNotice}
+            onToggleTable={(number) => void toggleTable(number)}
           />
         ) : activeTab === "completed" ? (
           <CompletedOrdersSection

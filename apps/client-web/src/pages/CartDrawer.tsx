@@ -1,7 +1,17 @@
-import { ArrowRight, Building2, Coins, Minus, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowRight,
+  Building2,
+  Coins,
+  Minus,
+  Plus,
+  ShoppingBag,
+  Trash2,
+  Utensils,
+} from "lucide-react";
 import { useState } from "react";
 import type {
   OrderInput,
+  OrderType,
   PaymentMethod,
 } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
@@ -19,6 +29,9 @@ export function CartDrawer({
   setName,
   payment,
   setPayment,
+  orderType,
+  setOrderType,
+  orderTypeNotice,
   busy,
   pending,
   connected,
@@ -31,6 +44,9 @@ export function CartDrawer({
   setName: (name: string) => void;
   payment: PaymentMethod;
   setPayment: (payment: PaymentMethod) => void;
+  orderType: OrderType;
+  setOrderType: (orderType: OrderType) => void;
+  orderTypeNotice: string;
   busy: boolean;
   pending: OrderInput | null;
   connected: boolean;
@@ -46,6 +62,10 @@ export function CartDrawer({
     snapshot.modifiers,
   );
   const totalCents = cartSummary.totalCents;
+  // Live: staff tapping tables on the POS changes this number on every open customer screen.
+  const tablesAvailable = (snapshot.tables ?? []).filter(
+    (table) => table.status === "available",
+  ).length;
 
   const updateQuantity = (index: number, newQty: number) => {
     if (newQty <= 0) {
@@ -214,6 +234,68 @@ export function CartDrawer({
           antes de enviar.
         </p>
       )}
+
+      {/* Where they eat. Dine-in switches itself off the moment the last table is taken. */}
+      <fieldset
+        className="my-4"
+        disabled={busy || Boolean(pending)}
+        data-testid="order-type"
+      >
+        <legend className="mb-2 text-sm font-bold text-stone-800">
+          ¿Dónde lo vas a comer?
+        </legend>
+        <div className="grid grid-cols-2 gap-2.5">
+          {(
+            [
+              { value: "takeout", label: "Para llevar", Icon: ShoppingBag },
+              { value: "dine_in", label: "Comer aquí", Icon: Utensils },
+            ] as const
+          ).map(({ value, label, Icon }) => {
+            const unavailable = value === "dine_in" && tablesAvailable === 0;
+            return (
+              <label
+                key={value}
+                className={`flex min-h-14 items-center gap-2.5 rounded-xl border-2 p-3 text-sm font-bold transition-colors ${
+                  unavailable
+                    ? "cursor-not-allowed border-stone-200 bg-stone-100 text-stone-400"
+                    : orderType === value
+                      ? "cursor-pointer border-clay-600 bg-clay-50 text-clay-900"
+                      : "cursor-pointer border-stone-200 bg-white text-stone-700 hover:border-stone-300"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="order-type"
+                  value={value}
+                  checked={orderType === value}
+                  disabled={unavailable}
+                  onChange={() => setOrderType(value)}
+                  className="h-4 w-4 text-clay-600 focus:ring-0"
+                />
+                <Icon size={16} />
+                <span>{label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <p
+          className={`mt-2 text-xs font-semibold ${tablesAvailable === 0 ? "text-red-800" : "text-stone-600"}`}
+          aria-live="polite"
+          data-testid="tables-available"
+        >
+          {tablesAvailable === 0
+            ? "Sin mesas disponibles"
+            : `${tablesAvailable} ${tablesAvailable === 1 ? "mesa disponible" : "mesas disponibles"}`}
+        </p>
+        {orderTypeNotice && (
+          <p
+            role="status"
+            className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs font-semibold text-amber-950"
+          >
+            {orderTypeNotice}
+          </p>
+        )}
+      </fieldset>
 
       {/* Payment at pickup: the customer says how; the cashier records what really happens. */}
       <fieldset

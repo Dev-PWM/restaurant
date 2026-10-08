@@ -1,22 +1,25 @@
 import React, { memo } from "react";
-import { Utensils, Users, CheckCircle2, AlertCircle, X } from "lucide-react";
-import type { TableInfo } from "../../../../shared/types/zapata";
-import { mxn } from "../../../../shared/ui/components";
+import { Utensils, CheckCircle2, AlertCircle, X } from "lucide-react";
+import type { Table } from "../../../../shared/types/realtime";
+import { time } from "../../../../shared/ui/components";
 
 export interface TableMapProps {
-  tables: TableInfo[];
-  onSelectTable: (tableNumber: number) => void;
+  tables: Table[];
+  /** Flips the table: free becomes occupied, occupied becomes free. */
+  onToggleTable: (tableNumber: number) => void;
   onClose?: () => void;
-  selectedTableNumber?: number | null;
+  /** Adds the tour targets used by the training; the live board carries none. */
   simulator?: boolean;
+  /** Shown above the tables when the last change could not be saved. */
+  notice?: string;
 }
 
 export const TableMap = memo(function TableMap({
   tables,
-  onSelectTable,
+  onToggleTable,
   onClose,
-  selectedTableNumber,
   simulator = false,
+  notice = "",
 }: TableMapProps) {
   const occupiedCount = tables.filter((t) => t.status === "occupied").length;
   const availableCount = tables.length - occupiedCount;
@@ -24,7 +27,7 @@ export const TableMap = memo(function TableMap({
   return (
     <div
       data-tour-target={simulator ? "table-map" : undefined}
-      className="rounded-2xl border-2 border-stone-200 bg-[#FDFBF7] p-5 shadow-sm transition-all"
+      className="rounded-2xl border-2 border-stone-200 bg-[#FDFBF7] p-5 shadow-sm"
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200/80 pb-3">
         <div className="flex items-center gap-2.5">
@@ -35,10 +38,17 @@ export const TableMap = memo(function TableMap({
             <h2 className="text-lg font-black tracking-tight text-stone-900">
               Control de Mesas · Comedor
             </h2>
-            <p className="text-xs font-semibold text-stone-500">
-              <span className="font-bold text-[#2E94A5]">{availableCount} disponibles</span>
+            <p
+              className="text-xs font-semibold text-stone-500"
+              data-testid="table-counts"
+            >
+              <span className="font-bold text-[#2E94A5]">
+                {availableCount} {availableCount === 1 ? "disponible" : "disponibles"}
+              </span>
               {" · "}
-              <span className="font-bold text-[#E03188]">{occupiedCount} ocupadas</span>
+              <span className="font-bold text-[#E03188]">
+                {occupiedCount} {occupiedCount === 1 ? "ocupada" : "ocupadas"}
+              </span>
             </p>
           </div>
         </div>
@@ -55,22 +65,34 @@ export const TableMap = memo(function TableMap({
         )}
       </div>
 
+      <p className="mb-4 text-xs leading-relaxed text-stone-600">
+        Toca una mesa cuando sientes a alguien, y tócala otra vez cuando se
+        desocupe. Los clientes ven cuántas mesas hay libres cuando eligen «Comer
+        aquí».
+      </p>
+      {notice && (
+        <p
+          role="alert"
+          className="mb-4 rounded-xl border border-red-300 bg-red-50 p-3 text-xs font-semibold text-red-900"
+        >
+          {notice}
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4">
         {tables.map((table) => {
           const isOccupied = table.status === "occupied";
-          const isSelected = selectedTableNumber === table.number;
 
           return (
             <button
               key={table.number}
               type="button"
+              data-help="table-card"
+              data-table-status={table.status}
               data-tour-target={simulator ? `table-card-${table.number}` : undefined}
-              onClick={() => onSelectTable(table.number)}
-              className={`group relative flex min-h-[120px] flex-col justify-between rounded-xl border-2 p-3.5 text-left transition-all ${
-                isSelected
-                  ? "ring-4 ring-[#2E94A5] ring-offset-2"
-                  : ""
-              } ${
+              aria-label={`Mesa ${table.number}, ${isOccupied ? "ocupada" : "disponible"}. Toca para ${isOccupied ? "liberarla" : "marcarla ocupada"}.`}
+              onClick={() => onToggleTable(table.number)}
+              className={`group relative flex min-h-[120px] flex-col justify-between rounded-xl border-2 p-3.5 text-left transition-colors ${
                 isOccupied
                   ? "border-[#E03188] bg-rose-50/70 text-[#E03188] hover:bg-rose-100/60"
                   : "border-[#2E94A5] bg-white text-[#2E94A5] hover:bg-cyan-50/40"
@@ -109,18 +131,18 @@ export const TableMap = memo(function TableMap({
               <div className="mt-2 border-t border-current/15 pt-2 text-xs">
                 {isOccupied ? (
                   <div className="space-y-0.5 font-medium text-stone-800">
-                    <p className="truncate font-bold">
-                      {table.customerName || "Cliente"}
-                    </p>
-                    {table.activeOrderTotalCents !== undefined && (
-                      <p className="font-black tabular-nums text-[#E03188]">
-                        Cuenta: {mxn(table.activeOrderTotalCents)}
+                    {table.occupiedSince && (
+                      <p className="font-bold">
+                        Desde las {time(table.occupiedSince)}
                       </p>
                     )}
+                    <p className="text-[11px] font-bold text-stone-500 group-hover:text-[#E03188]">
+                      Toca para liberar
+                    </p>
                   </div>
                 ) : (
                   <p className="text-[11px] font-bold text-stone-500 group-hover:text-[#2E94A5]">
-                    + Toca para abrir cuenta
+                    Toca para marcar ocupada
                   </p>
                 )}
               </div>

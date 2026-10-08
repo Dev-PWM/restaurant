@@ -513,6 +513,13 @@ export function OrderStatus({
 
           <OrderLines order={order} />
 
+          <div className="mt-3 flex items-center justify-between text-xs text-stone-600">
+            <span>Tipo de pedido</span>
+            <strong className="text-stone-800">
+              {order.orderType === "dine_in" ? "Comer aquí" : "Para llevar"}
+            </strong>
+          </div>
+
           <div className="mt-4 flex items-center justify-between border-t border-stone-200 pt-3 text-base font-bold">
             <span className="text-stone-800">Total</span>
             <span className="text-xl tabular-nums text-clay-950">

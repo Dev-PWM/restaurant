@@ -2,6 +2,7 @@
 
 /**
  * @typedef {import("../../../shared/types/realtime").Order} Order
+ * @typedef {import("../../../shared/types/realtime").Table} Table
  */
 
 /** Seconds a cashier can still tap «Deshacer» after confirming a payment. */
@@ -401,4 +402,39 @@ export function createHistoryOrders(now = new Date()) {
       customerName: "Roberto (No Llegó)",
     },
   ];
+}
+
+/**
+ * The dining room for the «Mesas» practice: three tables, one of them already seated 25 minutes ago so the
+ * trainee has something to free. Practice only: the real board never shows invented tables.
+ *
+ * @param {Date} [now]
+ * @returns {Table[]}
+ */
+export function createPracticeTables(now = new Date()) {
+  const seated = new Date(now.getTime() - 25 * 60_000).toISOString();
+  return [
+    { number: 1, status: "available", occupiedSince: null },
+    { number: 2, status: "occupied", occupiedSince: seated },
+    { number: 3, status: "available", occupiedSince: null },
+  ];
+}
+
+/**
+ * Flips one practice table. Returns the same array when the number does not exist.
+ *
+ * @param {Table[]} tables
+ * @param {number} number
+ * @param {Date} [now]
+ * @returns {Table[]}
+ */
+export function togglePracticeTable(tables, number, now = new Date()) {
+  if (!tables.some((table) => table.number === number)) return tables;
+  return tables.map((table) =>
+    table.number !== number
+      ? table
+      : table.status === "occupied"
+        ? { ...table, status: "available", occupiedSince: null }
+        : { ...table, status: "occupied", occupiedSince: now.toISOString() },
+  );
 }

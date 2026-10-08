@@ -201,6 +201,92 @@ test("the customer's payment choice is stored as a hint, defaults to cash, and c
   assert.equal(paid.transaction.method, "cash");
   assert.ok(legacyPhone.orderId);
 });
+test("staff mark tables occupied and free; repeats and bad input never churn the ledger", (t) => {
+  const { engine } = fixture(t);
+  const tables = () => engine.getState().tables;
+  assert.deepEqual(
+    tables().map(({ number, status, occupiedSince }) => [number, status, occupiedSince]),
+    [[1, "available", null], [2, "available", null], [3, "available", null]],
+  );
+  engine.dispatch("pos_set_table", { number: 2, status: "occupied" });
+  assert.equal(tables()[1].status, "occupied");
+  assert.ok(Number.isFinite(Date.parse(tables()[1].occupiedSince)));
+  const revision = engine.getState().revision;
+  assert.deepEqual(engine.dispatch("pos_set_table", { number: 2, status: "occupied" }), { ok: true });
+  assert.equal(engine.getState().revision, revision);
+  assert.equal(tables()[0].status, "available");
+  for (const bad of [
+    { number: 9, status: "occupied" },
+    { number: 1.5, status: "occupied" },
+    { number: "1", status: "occupied" },
+    { number: 1, status: "reserved" },
+    { number: 1 },
+  ])
+    assert.throws(() => engine.dispatch("pos_set_table", bad), /Mesa/);
+  engine.dispatch("pos_set_table", { number: 2, status: "available" });
+  assert.equal(tables()[1].occupiedSince, null);
+});
+test("dine-in needs a free table but never seats anyone; takeout is always accepted", (t) => {
+  const { engine } = fixture(t);
+  const orders = () => engine.getState().activeOrders;
+  const old = submit(engine, { orderType: "dine_in" });
+  assert.equal(orders()[0].orderType, "dine_in");
+  assert.equal(submit(engine).orderId && orders()[1].orderType, "takeout");
+  // Taking a dine-in order did not occupy a table: that is the staff's tap.
+  assert.ok(engine.getState().tables.every((table) => table.status === "available"));
+  for (const number of [1, 2, 3])
+    engine.dispatch("pos_set_table", { number, status: "occupied" });
+  assert.throws(
+    () => submit(engine, { orderType: "dine_in" }),
+    { code: "NO_TABLES", message: /No hay mesas disponibles/ },
+  );
+  assert.ok(submit(engine, { orderType: "takeout" }).orderId);
+  // A retry of an order that was already accepted still succeeds after the room fills up.
+  assert.deepEqual(engine.dispatch("submit_client_order", old), {
+    ok: true,
+    orderId: old.orderId,
+  });
+  assert.throws(() => submit(engine, { orderType: "patio" }), /Tipo de pedido/);
+  engine.dispatch("pos_set_table", { number: 3, status: "available" });
+  assert.ok(submit(engine, { orderType: "dine_in" }).orderId);
+});
+test("closing the shift frees every table", (t) => {
+  const { engine } = fixture(t);
+  engine.dispatch("pos_set_table", { number: 1, status: "occupied" });
+  engine.dispatch("pos_set_table", { number: 3, status: "occupied" });
+  const s = engine.getState();
+  engine.dispatch("pos_close_shift", { shiftId: s.shiftId, expectedRevision: s.revision });
+  assert.ok(engine.getState().tables.every((table) => table.status === "available" && table.occupiedSince === null));
+  assert.equal(engine.getState().tables.length, 3);
+});
+test("older ledgers without tables or order types load safely, and corrupt tables refuse to load", (t) => {
+  const { directory, engine } = fixture(t);
+  const order = submit(engine);
+  const file = path.join(directory, "data.json");
+  const saved = JSON.parse(fs.readFileSync(file, "utf8"));
+  delete saved.tables;
+  delete saved.activeOrders[0].orderType;
+  fs.writeFileSync(file, JSON.stringify(saved));
+  const restored = createEngine({ directory }).getState();
+  assert.equal(restored.tables.length, 3);
+  assert.ok(restored.tables.every((table) => table.status === "available"));
+  assert.equal(restored.activeOrders[0].orderType, "takeout");
+  assert.equal(restored.activeOrders[0].id, order.orderId);
+  // A ledger saved with fewer tables is topped up and keeps the one that was occupied.
+  saved.tables = [{ number: 2, status: "occupied", occupiedSince: new Date().toISOString() }];
+  fs.writeFileSync(file, JSON.stringify(saved));
+  const topped = createEngine({ directory }).getState().tables;
+  assert.deepEqual(topped.map((table) => [table.number, table.status]), [[1, "available"], [2, "occupied"], [3, "available"]]);
+  saved.tables = [
+    { number: 1, status: "available", occupiedSince: null },
+    { number: 1, status: "available", occupiedSince: null },
+  ];
+  fs.writeFileSync(file, JSON.stringify(saved));
+  assert.throws(() => createEngine({ directory }), /Mesa inválida/);
+  saved.tables = [{ number: 1, status: "occupied", occupiedSince: null }];
+  fs.writeFileSync(file, JSON.stringify(saved));
+  assert.throws(() => createEngine({ directory }), /Mesa inválida/);
+});
 test("receipts saved before transfers existed load as cash, and a corrupt method refuses to load", (t) => {
   const { directory, engine } = fixture(t);
   const order = submit(engine);
@@ -522,6 +608,7 @@ test("Socket.io PIN gates every staff event and protects other customers and fin
     "pos_mark_noshow",
     "admin_toggle_stock",
     "pos_toggle_accepting_orders",
+    "pos_set_table",
     "pos_close_shift",
   ])
     assert.equal((await ack(customer.socket, event, {})).code, "UNAUTHORIZED");

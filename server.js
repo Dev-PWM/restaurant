@@ -116,6 +116,7 @@ async function createService(options = {}) {
         acceptingOrders: s.acceptingOrders,
         menuItems: s.menuItems,
         modifiers: s.modifiers,
+        tables: s.tables,
         staff: authenticated,
         activeOrders: s.activeOrders.filter(
           (o) => authenticated || o.sessionId === socket.data.sessionId,
@@ -244,6 +245,7 @@ async function createService(options = {}) {
         "pos_mark_noshow",
         "admin_toggle_stock",
         "pos_toggle_accepting_orders",
+        "pos_set_table",
         "pos_close_shift",
       ];
       for (const event of events)

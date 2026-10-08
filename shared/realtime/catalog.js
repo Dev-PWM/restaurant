@@ -25,6 +25,17 @@ const SALSA_VERDE = "salsa-verde";
 /** Offered on every dish, after any quesillo add-on. */
 const EVERY_DISH = [PREP_COMAL, PREP_FRITO, OMIT_CEBOLLA, OMIT_CILANTRO, SALSA_ROJA, SALSA_VERDE];
 
+/** How many tables the dining room has. Change it here; a ledger saved with fewer tables is topped up on the next start. */
+const TABLE_COUNT = 3;
+/** @returns {import('../types/realtime').Table[]} Every table free. */
+function defaultTables() {
+  return Array.from({ length: TABLE_COUNT }, (_, index) => ({
+    number: index + 1,
+    status: "available",
+    occupiedSince: null,
+  }));
+}
+
 /** Modifier kinds where the customer must pick exactly one of the dish's options. */
 const REQUIRED_CHOICE_KINDS = ["masa", "prep"];
 
@@ -167,6 +178,8 @@ function reconcileCatalog(state) {
 module.exports = {
   MENU_ITEMS,
   MODIFIERS,
+  TABLE_COUNT,
+  defaultTables,
   REQUIRED_CHOICE_KINDS,
   hasLegacyPlaceholderMenu,
   reconcileCatalog,

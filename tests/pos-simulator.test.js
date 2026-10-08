@@ -154,3 +154,41 @@ test("history orders give the practice summary known numbers", async () => {
     ],
   );
 });
+
+test("practice tables start with one seated table and flip locally without touching the input", async () => {
+  const { createPracticeTables, togglePracticeTable } = await simulator;
+  const now = new Date("2026-10-05T12:00:00.000Z");
+  const tables = createPracticeTables(now);
+  assert.deepEqual(
+    tables.map(({ number, status }) => [number, status]),
+    [[1, "available"], [2, "occupied"], [3, "available"]],
+  );
+  assert.equal(tables[1].occupiedSince, "2026-10-05T11:35:00.000Z");
+  const snapshot = JSON.stringify(tables);
+
+  const seated = togglePracticeTable(tables, 1, now);
+  assert.equal(seated[0].status, "occupied");
+  assert.equal(seated[0].occupiedSince, now.toISOString());
+  const freed = togglePracticeTable(seated, 2, now);
+  assert.equal(freed[1].status, "available");
+  assert.equal(freed[1].occupiedSince, null);
+  // The original array is never mutated, and an unknown table changes nothing.
+  assert.equal(JSON.stringify(tables), snapshot);
+  assert.equal(togglePracticeTable(tables, 99, now), tables);
+});
+
+test("a practice SPEI transfer is the exact total with no change, and counts apart from cash", async () => {
+  const { createDemoOrder, payDemoOrder, calculatePracticeMetrics } = await simulator;
+  const ready = { ...createDemoOrder(), status: "ready" };
+  assert.throws(() => payDemoOrder(ready, ready.totalCents + 1000, new Date(), "spei"), /exact total/);
+  const transfer = payDemoOrder(ready, ready.totalCents, new Date(), "spei");
+  assert.equal(transfer.transaction.method, "spei");
+  assert.equal(transfer.transaction.changeCents, 0);
+  const cash = payDemoOrder({ ...ready, id: "demo-order-cash" }, 50000);
+  const metrics = calculatePracticeMetrics([transfer, cash]);
+  assert.equal(metrics.speiCents, ready.totalCents);
+  assert.equal(metrics.speiOrders, 1);
+  assert.equal(metrics.cashCents, ready.totalCents);
+  assert.equal(metrics.tenderedCents, 50000);
+  assert.equal(metrics.revenueCents, metrics.cashCents + metrics.speiCents);
+});

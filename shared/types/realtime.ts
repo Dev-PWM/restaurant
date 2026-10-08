@@ -34,6 +34,8 @@ export interface OrderInput {
   items: CartItem[];
   /** How the customer says they will pay at pickup. Omitted (older phones) means cash. The cashier records the real method. */
   paymentIntent?: PaymentMethod;
+  /** Omitted (older phones) means takeout. Dine-in is refused while every table is occupied. */
+  orderType?: OrderType;
 }
 export interface OrderLine {
   menuItemId: string;
@@ -60,6 +62,16 @@ export interface Transaction {
   currency: "MXN";
 }
 export type PaymentMethod = "cash" | "spei";
+/** Where the customer eats. Takeout is the default for older phones and orders. */
+export type OrderType = "takeout" | "dine_in";
+export type TableStatus = "available" | "occupied";
+/** A dining-room table. Staff mark it occupied when they seat someone; no order ever changes it by itself. */
+export interface Table {
+  number: number;
+  status: TableStatus;
+  /** When staff marked it occupied, or null while it is free. */
+  occupiedSince: string | null;
+}
 export interface Order {
   id: string;
   sessionId: string;
@@ -70,6 +82,7 @@ export interface Order {
   status: OrderStatus;
   /** What the customer chose when ordering. A hint for the cashier; the transaction holds what really happened. */
   paymentIntent: PaymentMethod;
+  orderType: OrderType;
   items: OrderLine[];
   totalCents: number;
   notes?: string;
@@ -115,6 +128,7 @@ export interface State {
   acceptingOrders: boolean;
   menuItems: MenuItem[];
   modifiers: Modifier[];
+  tables: Table[];
   activeOrders: Order[];
   completedOrders: Order[];
   salesMetrics: SalesMetrics;
@@ -129,6 +143,8 @@ export interface Snapshot {
   acceptingOrders: boolean;
   menuItems: MenuItem[];
   modifiers: Modifier[];
+  /** Table numbers and free/occupied only, so customers can see how many are free. No names or amounts. */
+  tables: Table[];
   activeOrders: Order[];
   completedOrders: Order[];
   salesMetrics: SalesMetrics | null;
@@ -150,6 +166,7 @@ export interface Commands {
     available: boolean;
   };
   pos_toggle_accepting_orders: { acceptingOrders: boolean };
+  pos_set_table: { number: number; status: TableStatus };
   pos_close_shift: { shiftId: string; expectedRevision: number };
 }
 export type Command = keyof Commands;

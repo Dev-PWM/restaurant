@@ -14,6 +14,7 @@ import {
 import type {
   MenuItem,
   OrderInput,
+  OrderType,
   PaymentMethod,
 } from "../../../../shared/types/realtime";
 import {
@@ -62,6 +63,8 @@ export function Menu() {
   const [checkout, setCheckout] = useState(false);
   const [name, setName] = useState("");
   const [payment, setPayment] = useState<PaymentMethod>("cash");
+  const [orderType, setOrderType] = useState<OrderType>("takeout");
+  const [orderTypeNotice, setOrderTypeNotice] = useState("");
   const [category, setCategory] = useState("Todo");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -112,6 +115,19 @@ export function Menu() {
       setCart([]);
     }
   }, [order?.id]);
+
+  // The last free table can fill while someone is deciding. Switch them to takeout and say so, rather than
+  // letting them submit a dine-in order the server would refuse.
+  const tablesAvailable = (snapshot?.tables ?? []).filter(
+    (table) => table.status === "available",
+  ).length;
+  useEffect(() => {
+    if (!snapshot || orderType !== "dine_in" || tablesAvailable > 0) return;
+    setOrderType("takeout");
+    setOrderTypeNotice(
+      "Se ocuparon todas las mesas. Cambiamos tu pedido a «Para llevar».",
+    );
+  }, [snapshot, orderType, tablesAvailable]);
 
   const filteredItems = useMemo(() => {
     if (!snapshot) return [];
@@ -247,6 +263,7 @@ export function Menu() {
       customerName: name.trim(),
       items: cart,
       paymentIntent: payment,
+      orderType,
     };
     const quotedTotalCents = pending ? pendingTotalCents : estimatedTotalCents;
 
@@ -707,6 +724,12 @@ export function Menu() {
           setName={setName}
           payment={payment}
           setPayment={setPayment}
+          orderType={orderType}
+          setOrderType={(next) => {
+            setOrderTypeNotice("");
+            setOrderType(next);
+          }}
+          orderTypeNotice={orderTypeNotice}
           busy={busy}
           pending={pending}
           connected={connected}
