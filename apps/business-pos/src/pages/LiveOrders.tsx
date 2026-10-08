@@ -8,6 +8,7 @@ import {
 } from "react";
 import {
   ArrowRight,
+  Building2,
   Check,
   ChefHat,
   Clock3,
@@ -16,11 +17,15 @@ import {
   LayoutGrid,
   Pause,
   Play,
+  PlusCircle,
   Search,
   SlidersHorizontal,
+  Sparkles,
   Table,
+  Utensils,
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
+import type { TableInfo, MenuItem } from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import { UNDO_WINDOW_SECONDS, needsAcknowledgement } from "../simulator.js";
@@ -29,6 +34,9 @@ import { AcademyLayer } from "../academy/AcademyLayer";
 import { AcademyProvider, useAcademy } from "../academy/AcademyProvider";
 import { practiceDish, usePracticeBoard } from "../academy/usePracticeBoard";
 import type { AcademyEvent } from "../academy/types";
+import { TableMap } from "../components/TableMap";
+import { TransferModal } from "../components/TransferModal";
+import { CustomDishModal } from "../components/CustomDishModal";
 import {
   chime,
   AudioUnlockButton,
@@ -71,102 +79,128 @@ export function CashTender({
 }) {
   const { connected } = useRealtime();
   const [value, setValue] = useState("");
+  const [showSpei, setShowSpei] = useState(false);
   const cents = centsOf(value);
   const valid = cents !== null;
   const change = (cents ?? 0) - order.totalCents;
   return (
-    <Modal
-      title={`Cobrar al entregar ${orderLabel(order)} · ${order.customerName}`}
-      onClose={onClose}
-      layer={simulator ? "inline" : "native"}
-    >
-      <OrderLines order={order} />
-      <div className="my-6 flex items-end justify-between border-t border-stone-200 pt-5">
-        <span>Total a cobrar</span>
-        <strong className="text-4xl tabular-nums">
-          {mxn(order.totalCents)}
-        </strong>
-      </div>
-      <label className="block text-sm font-semibold">
-        Efectivo recibido (MXN)
-        <input
-          autoFocus={!simulator || typing}
-          className="field mt-2 text-2xl tabular-nums"
-          inputMode="decimal"
-          value={value}
-          placeholder="0.00"
-          readOnly={simulator && !typing}
-          data-help="cash-input"
-          data-tour-target={simulator ? "cash-input" : undefined}
-          onChange={(event) => {
-            const next = event.target.value;
-            setValue(next);
-            const typed = centsOf(next);
-            if (simulator && typed !== null && typed > 0)
-              onAmountTyped?.(typed, typed >= order.totalCents);
-          }}
-        />
-      </label>
-      <div className="my-4 grid grid-cols-2 gap-3">
-        {[100, 200, 500].map((preset) => (
-          <button
-            className="btn min-h-16 text-xl tabular-nums"
-            key={preset}
-            data-help="tender-preset"
-            data-tour-target={simulator ? `tender-${preset}` : undefined}
-            disabled={!simulator && !connected}
-            onClick={() => {
-              setValue(String(preset));
-              if (simulator) onTender?.(preset * 100);
-            }}
-          >
-            {mxn(preset * 100)}
-          </button>
-        ))}
-        <button
-          className="btn min-h-16 text-lg tabular-nums"
-          data-help="exact"
-          onClick={() => setValue((order.totalCents / 100).toFixed(2))}
-        >
-          Exacto · {mxn(order.totalCents)}
-        </button>
-      </div>
-      <div
-        data-help="cash-change"
-        data-tour-target={simulator ? "cash-change" : undefined}
-        className={`my-5 rounded-xl p-4 ${change >= 0 && valid ? "bg-emerald-50 text-emerald-900" : "bg-stone-100"}`}
+    <>
+      <Modal
+        title={`Cobrar al entregar ${orderLabel(order)} · ${order.customerName}`}
+        onClose={onClose}
+        layer={simulator ? "inline" : "native"}
       >
-        <div className="flex justify-between">
-          <span>{change >= 0 ? "Cambio a entregar" : "Falta por recibir"}</span>
-          <strong className="text-2xl tabular-nums">
-            {mxn(Math.abs(change))}
+        <OrderLines order={order} />
+        <div className="my-6 flex items-end justify-between border-t border-stone-200 pt-5">
+          <span>Total a cobrar</span>
+          <strong className="text-4xl tabular-nums">
+            {mxn(order.totalCents)}
           </strong>
         </div>
-      </div>
-      <button
-        className="btn btn-primary w-full"
-        data-help="confirm-payment"
-        data-tour-target={simulator ? "confirm-demo-payment" : undefined}
-        disabled={(!simulator && !connected) || !valid || change < 0}
-        onClick={() => onConfirm(order.id, cents ?? 0)}
-      >
-        Confirmar pago y entregar
-        <ArrowRight size={18} />
-      </button>
-      <button
-        className="btn mt-3 w-full"
-        data-help="exact-pay"
-        data-tour-target={simulator ? "exact-cash-pay" : undefined}
-        disabled={!simulator && !connected}
-        onClick={() => onConfirm(order.id, order.totalCents, "exact")}
-      >
-        Efectivo exacto · Cobrar y entregar {mxn(order.totalCents)}
-      </button>
-      <p className="mt-4 text-center text-xs text-stone-500">
-        Confirma solo después de recibir el efectivo. Tendrás{" "}
-        {UNDO_WINDOW_SECONDS} segundos para deshacer.
-      </p>
-    </Modal>
+        <label className="block text-sm font-semibold">
+          Efectivo recibido (MXN)
+          <input
+            autoFocus={!simulator || typing}
+            className="field mt-2 text-2xl tabular-nums"
+            inputMode="decimal"
+            value={value}
+            placeholder="0.00"
+            readOnly={simulator && !typing}
+            data-help="cash-input"
+            data-tour-target={simulator ? "cash-input" : undefined}
+            onChange={(event) => {
+              const next = event.target.value;
+              setValue(next);
+              const typed = centsOf(next);
+              if (simulator && typed !== null && typed > 0)
+                onAmountTyped?.(typed, typed >= order.totalCents);
+            }}
+          />
+        </label>
+        <div className="my-4 grid grid-cols-2 gap-3">
+          {[100, 200, 500].map((preset) => (
+            <button
+              className="btn min-h-16 text-xl tabular-nums"
+              key={preset}
+              data-help="tender-preset"
+              data-tour-target={simulator ? `tender-${preset}` : undefined}
+              disabled={!simulator && !connected}
+              onClick={() => {
+                setValue(String(preset));
+                if (simulator) onTender?.(preset * 100);
+              }}
+            >
+              {mxn(preset * 100)}
+            </button>
+          ))}
+          <button
+            className="btn min-h-16 text-lg tabular-nums"
+            data-help="exact"
+            onClick={() => setValue((order.totalCents / 100).toFixed(2))}
+          >
+            Exacto · {mxn(order.totalCents)}
+          </button>
+        </div>
+        <div
+          data-help="cash-change"
+          data-tour-target={simulator ? "cash-change" : undefined}
+          className={`my-5 rounded-xl p-4 ${change >= 0 && valid ? "bg-emerald-50 text-emerald-900" : "bg-stone-100"}`}
+        >
+          <div className="flex justify-between">
+            <span>{change >= 0 ? "Cambio a entregar" : "Falta por recibir"}</span>
+            <strong className="text-2xl tabular-nums">
+              {mxn(Math.abs(change))}
+            </strong>
+          </div>
+        </div>
+        <button
+          className="btn btn-primary w-full"
+          data-help="confirm-payment"
+          data-tour-target={simulator ? "confirm-demo-payment" : undefined}
+          disabled={(!simulator && !connected) || !valid || change < 0}
+          onClick={() => onConfirm(order.id, cents ?? 0)}
+        >
+          Confirmar pago y entregar
+          <ArrowRight size={18} />
+        </button>
+        <button
+          className="btn mt-3 w-full"
+          data-help="exact-pay"
+          data-tour-target={simulator ? "exact-cash-pay" : undefined}
+          disabled={!simulator && !connected}
+          onClick={() => onConfirm(order.id, order.totalCents, "exact")}
+        >
+          Efectivo exacto · Cobrar y entregar {mxn(order.totalCents)}
+        </button>
+        <button
+          type="button"
+          data-tour-target={simulator ? "btn-spei-tender" : undefined}
+          className="btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100"
+          onClick={() => setShowSpei(true)}
+        >
+          <Building2 size={16} />
+          Transferencia SPEI · BBVA
+        </button>
+        <p className="mt-4 text-center text-xs text-stone-500">
+          Confirma solo después de recibir el efectivo o verificar la transferencia. Tendrás{" "}
+          {UNDO_WINDOW_SECONDS} segundos para deshacer.
+        </p>
+      </Modal>
+
+      {showSpei && (
+        <TransferModal
+          orderTotalCents={order.totalCents}
+          orderNumber={orderLabel(order)}
+          customerName={order.customerName}
+          simulator={simulator}
+          onClose={() => setShowSpei(false)}
+          onConfirmReceived={() => {
+            setShowSpei(false);
+            onConfirm(order.id, order.totalCents, "exact");
+          }}
+        />
+      )}
+    </>
   );
 }
 export function TicketCard({
@@ -231,6 +265,19 @@ export function TicketCard({
   const omissions = order.items.flatMap((item) =>
     item.modifiers.filter((modifier) => modifier.kind === "omit"),
   );
+  const hasSinGrasa = order.items.some(
+    (item) =>
+      item.name.toLowerCase().includes("sin grasa") ||
+      item.modifiers?.some(
+        (m) =>
+          m.name.toLowerCase().includes("sin grasa") ||
+          m.name.toLowerCase().includes("comal seco"),
+      ),
+  );
+  const hasExtraQuesillo = order.items.some((item) =>
+    item.modifiers?.some((m) => m.name.toLowerCase().includes("quesillo")),
+  );
+  const isSPEI = Boolean((order as any).notes?.toLowerCase().includes("spei"));
   const requiresAcknowledgement = simulator && needsAcknowledgement(order);
   async function advance() {
     if (performance.now() < actionLock.current) return;
@@ -343,6 +390,33 @@ export function TicketCard({
               </span>
             </div>
           </div>
+          {(hasSinGrasa || hasExtraQuesillo || isSPEI) && (
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {isSPEI && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs">
+                  <Building2 size={13} />
+                  SPEI BBVA
+                </span>
+              )}
+              {hasSinGrasa && (
+                <span
+                  data-tour-target={simulator ? "badge-sin-grasa" : undefined}
+                  className="inline-flex items-center gap-1 rounded-md bg-purple-700 px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                >
+                  <Flame size={13} />
+                  SIN GRASA (COMAL SECO)
+                </span>
+              )}
+              {hasExtraQuesillo && (
+                <span
+                  data-tour-target={simulator ? "badge-quesillo" : undefined}
+                  className="inline-flex items-center rounded-md bg-[#E03188] px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                >
+                  + C/QUESILLO
+                </span>
+              )}
+            </div>
+          )}
           <OrderLines order={order} />
           {requiresAcknowledgement && isCooking && (
             <button
@@ -961,7 +1035,31 @@ function LiveBoard({
       Record<string, PendingPayment>
     >({}),
     [paymentNotice, setPaymentNotice] = useState(""),
-    [activeTab, setActiveTab] = useState<"queue" | "completed">("queue"),
+    [activeTab, setActiveTab] = useState<"queue" | "tables" | "completed">(
+      "queue",
+    ),
+    [tables, setTables] = useState<TableInfo[]>([
+      { number: 1, status: "available" },
+      { number: 2, status: "available" },
+      {
+        number: 3,
+        status: "occupied",
+        customerName: "Carlos R.",
+        activeOrderTotalCents: 14500,
+      },
+      { number: 4, status: "available" },
+      {
+        number: 5,
+        status: "occupied",
+        customerName: "Ana M.",
+        activeOrderTotalCents: 22000,
+      },
+      { number: 6, status: "available" },
+      { number: 7, status: "available" },
+      { number: 8, status: "available" },
+    ]),
+    [selectedTable, setSelectedTable] = useState<number | null>(null),
+    [customDishModalOpen, setCustomDishModalOpen] = useState(false),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
@@ -1012,7 +1110,7 @@ function LiveBoard({
   const view = academy.step?.view;
   useEffect(() => {
     if (!simulator || !view) return;
-    if (view.tab) setActiveTab(view.tab);
+    if (view.tab) setActiveTab(view.tab as any);
     if (view.lane) setActiveLane(view.lane);
     if (view.kitchenOnly !== undefined) setKitchenOnly(view.kitchenOnly);
   }, [simulator, academy.step?.id, academy.state.runId]);
@@ -1023,18 +1121,8 @@ function LiveBoard({
     setKitchenOnly(false);
   }, [simulator, academy.state.phase, academy.state.runId]);
 
-  // A tablet that never trained opens straight into the Academy, but only if the till is
-  // idle: practising suspends the live feed, so it must never swallow a real order.
-  useEffect(() => {
-    if (autoBootedRef.current || !liveSnapshot) return;
-    autoBootedRef.current = true;
-    if (
-      academy.gateLocked &&
-      liveSnapshot.activeOrders.length === 0 &&
-      !hasPendingPayment
-    )
-      practice.start();
-  }, [liveSnapshot]);
+  // Non-intrusive onboarding: do not force-trap on login.
+  // The "Comenzar Entrenamiento" button pulses prominently if untrained.
 
   /** Live cash: hold the emission for the undo window, then send pos_order_paid once. */
   function queueLivePayment(orderId: string, tenderedCents: number) {
@@ -1442,7 +1530,11 @@ function LiveBoard({
           <div className="flex flex-wrap gap-2">
             {!simulator && (
               <button
-                className="btn border-yellow-600 bg-yellow-50 font-bold text-stone-900 hover:bg-yellow-100"
+                className={`btn transition-all ${
+                  !academy.state.trained
+                    ? "animate-pulse ring-4 ring-yellow-400 ring-offset-2 bg-yellow-400 hover:bg-yellow-300 font-black border-yellow-500 shadow-md text-stone-950"
+                    : "border-yellow-600 bg-yellow-50 font-bold text-stone-900 hover:bg-yellow-100"
+                }`}
                 onClick={() => practice.start()}
                 disabled={hasPendingPayment}
                 title={
@@ -1452,7 +1544,11 @@ function LiveBoard({
                 }
               >
                 <GraduationCap size={16} />
-                Entrenamiento
+                <span>
+                  {!academy.state.trained
+                    ? "Comenzar Entrenamiento"
+                    : "Entrenamiento"}
+                </span>
                 {pendingTraining > 0 && (
                   <span
                     className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-black tabular-nums text-white"
@@ -1463,6 +1559,14 @@ function LiveBoard({
                 )}
               </button>
             )}
+            <button
+              className="btn border-stone-300 bg-white font-bold text-stone-700 hover:bg-stone-50"
+              data-help="custom-dish"
+              onClick={() => setCustomDishModalOpen(true)}
+            >
+              <PlusCircle size={16} />
+              <span>Crear Platillo</span>
+            </button>
             {activeTab === "queue" && (
               <button
                 className={`btn transition-colors ${
@@ -1493,7 +1597,7 @@ function LiveBoard({
           </div>
         </div>
 
-        {/* Tab switcher: En Fila vs Completados */}
+        {/* Tab switcher: En Fila vs Mesas vs Completados */}
         <div className="mb-6 flex border-b border-stone-200" role="tablist">
           <button
             role="tab"
@@ -1519,6 +1623,33 @@ function LiveBoard({
               }`}
             >
               {snapshot.activeOrders.length}
+            </span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === "tables"}
+            data-help="tab-tables"
+            data-tour-target={simulator ? "tab-tables" : undefined}
+            className={`flex min-h-12 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors ${
+              activeTab === "tables"
+                ? "border-[#2E94A5] text-[#2E94A5]"
+                : "border-transparent text-stone-500 hover:text-stone-800"
+            }`}
+            onClick={() => {
+              setActiveTab("tables");
+              report({ type: "tab", tab: "tables" });
+            }}
+          >
+            <Utensils size={16} />
+            <span>Control de Mesas</span>
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-black ${
+                activeTab === "tables"
+                  ? "bg-cyan-100 text-[#2E94A5]"
+                  : "bg-stone-100 text-stone-600"
+              }`}
+            >
+              {tables.filter((t) => t.status === "occupied").length}/{tables.length}
             </span>
           </button>
           <button
@@ -1553,7 +1684,17 @@ function LiveBoard({
           </button>
         </div>
 
-        {activeTab === "completed" ? (
+        {activeTab === "tables" ? (
+          <TableMap
+            tables={tables}
+            selectedTableNumber={selectedTable}
+            simulator={simulator}
+            onSelectTable={(tableNum) => {
+              setSelectedTable(tableNum);
+              report({ type: "select-table", tableNumber: tableNum });
+            }}
+          />
+        ) : activeTab === "completed" ? (
           <CompletedOrdersSection
             orders={snapshot.completedOrders}
             onTourEvent={report}
@@ -1728,6 +1869,15 @@ function LiveBoard({
         </footer>
       </main>
       {inventory && <InventoryControl onClose={() => setInventory(false)} />}{" "}
+      {customDishModalOpen && (
+        <CustomDishModal
+          simulator={simulator}
+          onClose={() => setCustomDishModalOpen(false)}
+          onSave={() => {
+            setCustomDishModalOpen(false);
+          }}
+        />
+      )}
       {payOrder && (
         <CashTender
           order={payOrder}

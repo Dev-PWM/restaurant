@@ -145,27 +145,17 @@ export function AcademyBar({
               <span className="hidden lg:inline">Reiniciar</span>
             </button>
           )}
-          {academy.trainedOrSkipped ? (
-            <button
-              type="button"
-              data-tour-allow="exit"
-              className="btn min-h-11 min-w-11 gap-1.5 rounded-xl border-red-400 bg-red-950 px-2.5 py-2 text-xs font-bold text-red-100 hover:bg-red-900 sm:px-3"
-              onClick={onExit}
-              aria-label="Salir del entrenamiento"
-              title="Salir del entrenamiento e ir a la caja real"
-            >
-              <LogOut className="size-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Salir</span>
-            </button>
-          ) : (
-            <span
-              className="hidden items-center gap-1.5 rounded-xl border border-stone-600 bg-stone-800 px-3 py-2 text-xs font-bold text-stone-300 lg:inline-flex"
-              title="Completa los módulos obligatorios y el Reto Almuerzo para abrir la caja real"
-            >
-              <Lock className="size-3.5 text-yellow-400" aria-hidden="true" />
-              Caja real bloqueada
-            </span>
-          )}
+          <button
+            type="button"
+            data-tour-allow="exit"
+            className="btn min-h-11 min-w-11 gap-1.5 rounded-xl border-red-500 bg-red-950 px-2.5 py-2 text-xs font-bold text-red-100 hover:bg-red-900 sm:px-3 z-[100] shadow-md"
+            onClick={onExit}
+            aria-label="Salir del entrenamiento"
+            title="Salir del entrenamiento e ir a la caja"
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+            <span className="hidden sm:inline">Salir del Simulador</span>
+          </button>
         </div>
       </div>
       <div
