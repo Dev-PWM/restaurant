@@ -8,9 +8,12 @@ export interface Modifier {
   available: boolean;
   /**
    * masa and prep are required single choices (exactly one when a dish offers them), extra is optional and may
-   * cost money, omit is a free request to leave something off.
+   * cost money, omit is a free request to leave something off, special is an optional house style (¡Izquierdo!
+   * or ¡Derecho!) that adds the toppings listed in `detail`.
    */
-  kind: "masa" | "prep" | "extra" | "omit";
+  kind: "masa" | "prep" | "extra" | "omit" | "special";
+  /** For a special: the toppings it adds, written for the customer and printed on the ticket. */
+  detail?: string;
 }
 export interface MenuItem {
   id: string;

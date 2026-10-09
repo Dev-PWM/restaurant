@@ -10,9 +10,9 @@ const {
   TABLE_COUNT,
   defaultTables,
   REQUIRED_CHOICE_KINDS,
-  UNCONFIRMED_SPECIAL_IDS,
   hasLegacyPlaceholderMenu,
   reconcileCatalog,
+  retireCatalog,
 } = require("./catalog");
 /** @typedef {import('../types/realtime').State} State */
 /** @typedef {import('../types/realtime').Order} Order */
@@ -335,11 +335,14 @@ function createEngine({ directory, persist = writeAtomic }) {
   }
   /**
    * A ledger saved before comal/frito, toppings (or any later catalog addition) existed has none of those modifiers.
-   * Add what is missing, keep everything else (stock toggles, custom dishes), and keep the previous ledger beside it.
+   * Add what is missing, retire what the catalog dropped (the two placeholder specials) and rename what it renamed,
+   * keep everything else (stock toggles, custom dishes), and keep the previous ledger beside it.
    */
   /** @type {string | null} */
   let catalogBackup = null;
-  const missing = reconcileCatalog(state);
+  const added = reconcileCatalog(state);
+  const retired = retireCatalog(added ?? state);
+  const missing = retired ?? added;
   if (missing) {
     // Named by revision for the same reason as the menu backup above: a retry rewrites the same bytes.
     const backup = path.join(
@@ -454,11 +457,6 @@ function createEngine({ directory, persist = writeAtomic }) {
       const items = data.items.map((line) => {
         const menu = next.menuItems.find((m) => m.id === line.menuItemId);
         ensure(menu?.available, "Un platillo está agotado.", "SOLD_OUT");
-        ensure(
-          !UNCONFIRMED_SPECIAL_IDS.includes(menu.id),
-          "Consulta los especiales con la cocina antes de pedir.",
-          "SPECIAL_UNCONFIRMED",
-        );
         ensure(
           Number.isInteger(line.quantity) &&
             line.quantity >= 1 &&

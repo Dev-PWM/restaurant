@@ -41,6 +41,22 @@ const EVERY_DISH_MODIFIERS = [
   ["salsa-verde", "extra", 0],
 ];
 
+/**
+ * The two optional specials. ¡Izquierdo! (the left side of the printed menu) dresses huaraches and sopes;
+ * ¡Derecho! (the right side) dresses quesadillas, gorditas and pambazos. They add toppings at the dish's own price.
+ */
+const SPECIAL_MODIFIERS = [
+  ["estilo-izquierdo", "special", 0],
+  ["estilo-derecho", "special", 0],
+];
+const SPECIAL_OF = {
+  Huaraches: "estilo-izquierdo",
+  Sopes: "estilo-izquierdo",
+  Quesadillas: "estilo-derecho",
+  Gorditas: "estilo-derecho",
+  Pambazos: "estilo-derecho",
+};
+
 /** Typed from the printed "Los Huaraches de Zapata" menu, independently of shared/realtime/catalog.js. */
 const PRINTED_MENU = {
   Huaraches: {
@@ -84,10 +100,7 @@ const PRINTED_MENU = {
     "pambazo-papas-longaniza": 5000,
     "pambazo-guisado": 6000,
   },
-  "Especiales de Zapata": {
-    "especial-derecho": 13500,
-    "especial-izquierdo": 6000,
-  },
+  // ¡Derecho! ($135) and ¡Izquierdo! ($60) are printed as specials, but here they are options on the dishes above.
 };
 /** Add-on per section: "C/QUESILLO $X EXTRA". */
 const QUESILLO = {
@@ -96,7 +109,6 @@ const QUESILLO = {
   Sopes: ["quesillo-5", 500],
   Quesadillas: ["quesillo-5", 500],
   Pambazos: ["quesillo-5", 500],
-  "Especiales de Zapata": null,
 };
 
 test("a fresh install seeds exactly the printed menu, in menu order, with whole-peso centavo prices", () => {
@@ -116,8 +128,10 @@ test("a fresh install seeds exactly the printed menu, in menu order, with whole-
     })),
     expected,
   );
-  assert.equal(menuItems.length, 33);
-  assert.equal(new Set(menuItems.map((item) => item.id)).size, 33);
+  assert.equal(menuItems.length, 31);
+  assert.equal(new Set(menuItems.map((item) => item.id)).size, 31);
+  // The two specials are not dishes any more.
+  assert.equal(menuItems.some((item) => item.category === "Especiales de Zapata"), false);
   const known = new Set(modifiers.map((modifier) => modifier.id));
   for (const item of menuItems) {
     assert.ok(Number.isSafeInteger(item.priceCents) && item.priceCents > 0);
@@ -142,6 +156,7 @@ test("C/QUESILLO costs $10 on huaraches and gorditas and $5 elsewhere, and canno
       ["quesillo-10", "extra", 1000],
       ["quesillo-5", "extra", 500],
       ...EVERY_DISH_MODIFIERS,
+      ...SPECIAL_MODIFIERS,
     ],
   );
   for (const [category, addon] of Object.entries(QUESILLO)) {
@@ -149,7 +164,11 @@ test("C/QUESILLO costs $10 on huaraches and gorditas and $5 elsewhere, and canno
     for (const dish of dishes)
       assert.deepEqual(
         dish.modifierIds,
-        [...(addon ? [addon[0]] : []), ...EVERY_DISH_MODIFIERS.map(([id]) => id)],
+        [
+          ...(addon ? [addon[0]] : []),
+          ...(SPECIAL_OF[category] ? [SPECIAL_OF[category]] : []),
+          ...EVERY_DISH_MODIFIERS.map(([id]) => id),
+        ],
         `${dish.id} add-ons`,
       );
     if (!addon) continue;
@@ -172,18 +191,90 @@ test("C/QUESILLO costs $10 on huaraches and gorditas and $5 elsewhere, and canno
     assert.throws(() => quote(engine, [line]), /agotado/);
 });
 
-test("unconfirmed specials cannot be ordered until the owner confirms their recipe and price", (t) => {
+test("¡Izquierdo! and ¡Derecho! dress a dish at the dish's own price, each on its own side of the menu", (t) => {
   const engine = createEngine({ directory: directoryFixture(t) });
-  for (const menuItemId of ["especial-derecho", "especial-izquierdo"]) {
-    assert.throws(
-      () => quote(engine, [{ menuItemId, quantity: 1, modifierIds: ["prep-comal"] }]),
-      (error) => error.code === "SPECIAL_UNCONFIRMED",
-      menuItemId,
-    );
+  const { menuItems, modifiers } = engine.getState();
+  // Not dishes: nothing named Especial is on the menu, so nobody has to call the kitchen for a price.
+  assert.equal(menuItems.some((item) => /^especial-/.test(item.id)), false);
+  for (const id of ["estilo-izquierdo", "estilo-derecho"]) {
+    const special = modifiers.find((modifier) => modifier.id === id);
+    assert.equal(special.kind, "special");
+    assert.equal(special.priceCents, 0);
+    assert.ok(special.detail.length > 0, "the toppings it adds are written down for the ticket");
   }
+  assert.match(modifiers.find((m) => m.id === "estilo-izquierdo").detail, /nopal.*frijoles.*pico de gallo.*queso.*crema/i);
+  assert.match(modifiers.find((m) => m.id === "estilo-derecho").detail, /cecina.*longaniza.*nopal.*quesillo/i);
+
+  // A Huarache de Bistec stays $90 with Izquierdo, and $100 with the usual $10 for quesillo.
+  const izquierdo = quote(engine, [
+    { menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["estilo-izquierdo", "prep-comal"] },
+  ]);
+  assert.equal(izquierdo.totalCents, 9000);
+  assert.deepEqual(
+    izquierdo.items[0].modifiers.map((modifier) => modifier.id).sort(),
+    ["estilo-izquierdo", "prep-comal"],
+  );
+  assert.equal(
+    quote(engine, [
+      { menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["estilo-izquierdo", "quesillo-10", "prep-frito"] },
+    ]).totalCents,
+    10000,
+  );
+  // Derecho on a quesadilla: its own price; quesillo is still the normal $5 extra (shown as "doble quesillo").
+  assert.equal(
+    quote(engine, [
+      { menuItemId: "quesadilla-queso", quantity: 2, modifierIds: ["estilo-derecho", "prep-comal"] },
+    ]).totalCents,
+    8000,
+  );
+  assert.equal(
+    quote(engine, [
+      { menuItemId: "quesadilla-queso", quantity: 1, modifierIds: ["estilo-derecho", "quesillo-5", "prep-comal"] },
+    ]).totalCents,
+    4500,
+  );
+  // The special is optional: the plain dish is cooked as it is meant to be.
   assert.equal(
     quote(engine, [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["prep-comal"] }]).totalCents,
     9000,
+  );
+
+  // Each special is only on its own side of the menu.
+  for (const [menuItemId, special] of [
+    ["huarache-bistec", "estilo-derecho"],
+    ["sope-bistec", "estilo-derecho"],
+    ["quesadilla-queso", "estilo-izquierdo"],
+    ["gordita-suadero", "estilo-izquierdo"],
+    ["pambazo-guisado", "estilo-izquierdo"],
+  ])
+    assert.throws(
+      () => quote(engine, [{ menuItemId, quantity: 1, modifierIds: [special, "prep-comal"] }]),
+      /agotado/,
+      `${menuItemId} + ${special}`,
+    );
+  // The owner can still switch a special off (86) like any other modifier.
+  engine.dispatch("admin_toggle_stock", { kind: "modifier", id: "estilo-izquierdo", available: false });
+  assert.throws(
+    () => quote(engine, [{ menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["estilo-izquierdo", "prep-comal"] }]),
+    /agotado/,
+  );
+});
+
+test("a dish the owner creates in a section is dressed like the printed ones, specials included", (t) => {
+  const engine = createEngine({ directory: directoryFixture(t) });
+  const id = randomUUID();
+  engine.dispatch("admin_add_menu_item", {
+    id,
+    name: "Huarache de Costilla",
+    category: "Huaraches",
+    priceCents: 12000,
+  });
+  const dish = engine.getState().menuItems.find((item) => item.id === `custom-${id}`);
+  assert.ok(dish.modifierIds.includes("estilo-izquierdo"));
+  assert.equal(dish.modifierIds.includes("estilo-derecho"), false);
+  assert.equal(
+    quote(engine, [{ menuItemId: dish.id, quantity: 1, modifierIds: ["estilo-izquierdo", "prep-comal"] }]).totalCents,
+    12000,
   );
 });
 
@@ -305,10 +396,10 @@ test("an untouched placeholder menu is replaced once, keeping history and a byte
 
   const engine = createEngine({ directory });
   const state = engine.getState();
-  assert.equal(state.menuItems.length, 33);
+  assert.equal(state.menuItems.length, 31);
   assert.deepEqual(
     state.modifiers.map((modifier) => modifier.id),
-    ["quesillo-10", "quesillo-5", ...EVERY_DISH_MODIFIERS.map(([id]) => id)],
+    ["quesillo-10", "quesillo-5", ...EVERY_DISH_MODIFIERS.map(([id]) => id), ...SPECIAL_MODIFIERS.map(([id]) => id)],
   );
   assert.equal(state.menuItems.some((item) => item.id === "agua"), false);
   assert.equal(state.revision, 8);
@@ -352,11 +443,15 @@ test("a menu that is not the untouched placeholder is never overwritten", (t) =>
     engine.getState().menuItems.map((item) => item.id),
     ["huarache", "sope", "pambazo", "agua", "tamal"],
   );
-  // The owner's dishes are untouched. Only the missing catalog modifiers were added, and the old ledger was kept.
+  // The owner's dishes keep everything they had. Only the missing catalog modifiers were added, a dish in a printed
+  // section gains that section's optional special, and the old ledger was kept.
   assert.equal(engine.getState().revision, 8);
   assert.deepEqual(
     engine.getState().menuItems.map((item) => item.modifierIds),
-    edited.menuItems.map((item) => item.modifierIds),
+    edited.menuItems.map((item) => [
+      ...item.modifierIds,
+      ...(SPECIAL_OF[item.category] ? [SPECIAL_OF[item.category]] : []),
+    ]),
   );
   assert.equal(
     fs.readFileSync(engine.catalogBackup, "utf8"),
@@ -390,7 +485,7 @@ test("a failed menu swap leaves the ledger untouched and the next start retries 
     "stale leftover",
   );
   const retried = createEngine({ directory });
-  assert.equal(retried.getState().menuItems.length, 33);
+  assert.equal(retried.getState().menuItems.length, 31);
   assert.equal(fs.readFileSync(retried.menuBackup, "utf8"), original);
 });
 
@@ -443,6 +538,39 @@ function previousBuildLedger() {
   );
   for (const item of state.menuItems)
     item.modifierIds = item.modifierIds.filter((id) => id.startsWith("quesillo"));
+  // That build named the two quesillos after their sections and seeded the two placeholder specials as dishes.
+  state.modifiers.find((modifier) => modifier.id === "quesillo-10").name = "Con Quesillo (huaraches y gorditas)";
+  state.modifiers.find((modifier) => modifier.id === "quesillo-5").name = "Con Quesillo (sopes, quesadillas y pambazos)";
+  state.menuItems.push(
+    {
+      id: "especial-derecho",
+      name: "Especial Derecho",
+      description: "¡Derecho! Cecina, longaniza, nopal y quesillo.",
+      category: "Especiales de Zapata",
+      priceCents: 13500,
+      available: true,
+      modifierIds: [],
+    },
+    {
+      id: "especial-izquierdo",
+      name: "Especial Izquierdo",
+      description: "¡Izquierdo! Base de nopal, frijoles, pico de gallo, queso, crema, carne o guisado.",
+      category: "Especiales de Zapata",
+      priceCents: 6000,
+      available: true,
+      modifierIds: [],
+    },
+  );
+  // A huarache the owner added by hand before specials existed.
+  state.menuItems.push({
+    id: "custom-huarache-costilla",
+    name: "Huarache de Costilla",
+    description: "Added by the owner.",
+    category: "Huaraches",
+    priceCents: 12000,
+    available: true,
+    modifierIds: ["quesillo-10"],
+  });
   // Owner edits that must survive: a dish and a modifier switched off, and a dish added by hand.
   state.menuItems.find((item) => item.id === "sope-bistec").available = false;
   state.modifiers.find((modifier) => modifier.id === "quesillo-5").available = false;
@@ -531,15 +659,31 @@ test("a ledger from before comal/frito gains the new choices without losing owne
   assert.equal(engine.menuBackup, null);
 
   // Every printed dish now offers the new choices after its quesillo; the owner's own dish is left alone.
-  for (const item of state.menuItems.filter((candidate) => candidate.id !== "tamal-de-rajas"))
+  const owned = ["tamal-de-rajas", "custom-huarache-costilla"];
+  for (const item of state.menuItems.filter((candidate) => !owned.includes(candidate.id)))
     assert.deepEqual(
       item.modifierIds,
-      [...before.menuItems.find((saved) => saved.id === item.id).modifierIds, ...everyDish],
+      [
+        ...before.menuItems.find((saved) => saved.id === item.id).modifierIds,
+        ...(SPECIAL_OF[item.category] ? [SPECIAL_OF[item.category]] : []),
+        ...everyDish,
+      ],
       item.id,
     );
   assert.deepEqual(
     state.menuItems.find((item) => item.id === "tamal-de-rajas").modifierIds,
     ["quesillo-5"],
+  );
+  // A huarache the owner made gains only the optional special: comal/frito stay out, so it is ordered as before.
+  assert.deepEqual(
+    state.menuItems.find((item) => item.id === "custom-huarache-costilla").modifierIds,
+    ["quesillo-10", "estilo-izquierdo"],
+  );
+  // The two placeholder specials are gone, and the quesillos read "Con quesillo" without the section list.
+  assert.equal(state.menuItems.some((item) => item.id.startsWith("especial-")), false);
+  assert.deepEqual(
+    state.modifiers.filter((modifier) => modifier.id.startsWith("quesillo")).map((modifier) => [modifier.name, modifier.priceCents]),
+    [["Con quesillo", 1000], ["Con quesillo", 500]],
   );
 
   // Switches the owner flipped, and all money history, are exactly as they were.
@@ -547,7 +691,7 @@ test("a ledger from before comal/frito gains the new choices without losing owne
   assert.equal(state.modifiers.find((modifier) => modifier.id === "quesillo-5").available, false);
   assert.deepEqual(
     state.modifiers.map((modifier) => modifier.id),
-    ["quesillo-10", "quesillo-5", ...everyDish],
+    ["quesillo-10", "quesillo-5", ...everyDish, ...SPECIAL_MODIFIERS.map(([id]) => id)],
   );
   assert.deepEqual(
     state.completedOrders.map(({ transaction, totalCents, items }) => ({ transaction, totalCents, items })),
