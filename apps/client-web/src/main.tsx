@@ -4,12 +4,17 @@ import {
   ConnectionBanner,
   PWAServiceWorker,
 } from "../../../shared/ui/components";
+import { AppCrashBoundary } from "../../../shared/ui/AppCrashBoundary";
+import { installTranslationGuard } from "../../../shared/ui/translation-guard";
 import { Menu } from "./pages/Menu";
 import "../../../shared/ui/styles.css";
+installTranslationGuard();
 createRoot(document.getElementById("root")!).render(
   <RealtimeProvider>
     <PWAServiceWorker />
     <ConnectionBanner />
-    <Menu />
+    <AppCrashBoundary>
+      <Menu />
+    </AppCrashBoundary>
   </RealtimeProvider>,
 );
