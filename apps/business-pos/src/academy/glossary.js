@@ -181,16 +181,6 @@ export const GLOSSARY = [
     watch: "Son solo 5 segundos: si te equivocaste, tócalo de inmediato.",
   },
   {
-    id: "network",
-    label: "Red Local",
-    group: "Encabezado",
-    purpose:
-      "Muestra las direcciones locales y los códigos QR para conectar comandas, celulares y pantallas de cocina.",
-    effect:
-      "Abre el panel de red local con los enlaces directos y códigos QR para conectar dispositivos sin internet.",
-    why: "Permite que los clientes y el personal se conecten al servidor del restaurante usando nombres locales (.local) o escaneando el código QR.",
-  },
-  {
     id: "inventory",
     label: "Inventario",
     group: "Encabezado",
@@ -265,16 +255,6 @@ export const GLOSSARY = [
       "Cambia entre «Disponible» y «Ocupada» y avisa a los teléfonos de los clientes. Un pedido «Comer aquí» no ocupa la mesa por sí solo.",
     why: "Tú sabes cuándo se sentó alguien de verdad; el sistema solo lo muestra.",
     watch: "Cerrar el turno libera todas las mesas.",
-  },
-  {
-    id: "custom-dish",
-    label: "Crear Platillo",
-    group: "Encabezado",
-    purpose: "Agrega un platillo nuevo al menú: nombre, sección, precio y una descripción opcional.",
-    effect:
-      "El platillo aparece de inmediato en el menú de los clientes, con las mismas opciones que los demás de su sección. Un huarache nuevo tiene el quesillo de $10 y la elección obligatoria «Al comal» o «Frito».",
-    why: "Puedes ofrecer un especial del día sin pedirle ayuda a nadie.",
-    watch: "No se puede borrar: para quitarlo del menú márcalo «Agotado» en Inventario.",
   },
   {
     id: "spei-pay",

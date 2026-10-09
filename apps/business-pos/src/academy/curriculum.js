@@ -11,7 +11,7 @@ import { glossaryEntry } from "./glossary.js";
  * printed on each control, and keep every sentence short enough to read in a few
  * seconds with greasy hands.
  *
- * @typedef {"tablero"|"flujo"|"exigente"|"cobros"|"errores"|"cocina"|"historial"|"panico"|"cierre"|"etiquetas"|"tiempos"|"mesas"|"transferencia"|"platillo"} ModuleId
+ * @typedef {"tablero"|"flujo"|"exigente"|"cobros"|"errores"|"cocina"|"historial"|"panico"|"cierre"|"etiquetas"|"tiempos"|"mesas"|"transferencia"} ModuleId
  *
  * @typedef {Object} StepView
  * @property {"queue"|"tables"|"completed"} [tab]
@@ -1294,94 +1294,6 @@ export const MODULES = [
         instruction:
           "En la práctica la transferencia ya llegó. Toca «Confirmar transferencia recibida».",
         expect: { type: "spei-pay" },
-      },
-    ],
-  },
-
-  {
-    id: "platillo",
-    number: 14,
-    title: "Platillos Nuevos",
-    subtitle: "Crear un especial del día",
-    description:
-      "Cómo agregar al menú un platillo que inventaste, sin esperar a nadie.",
-    required: false,
-    minutes: 2,
-    takeaways: [
-      "El platillo nuevo aparece en el menú de los clientes al instante.",
-      "Tiene las mismas opciones que los demás de su sección: un huarache nuevo lleva el quesillo de $10 y la elección «Al comal» o «Frito».",
-      "No se puede borrar: para quitarlo del menú márcalo «Agotado» en Inventario.",
-    ],
-    quiz: {
-      question: "Creaste un platillo por error. ¿Cómo lo quitas del menú?",
-      options: [
-        {
-          text: "Lo marco «Agotado» en Inventario",
-          correct: true,
-          explain: "Correcto: los clientes lo ven «Agotado» y ya no pueden pedirlo.",
-        },
-        {
-          text: "Lo borro desde Crear Platillo",
-          explain: "No: esa ventana solo agrega platillos.",
-        },
-        {
-          text: "Espero a que se cierre el turno",
-          explain: "No: el platillo se queda en el menú turno tras turno.",
-        },
-      ],
-    },
-    steps: [
-      {
-        id: "platillo-1",
-        kind: "act",
-        target: "btn-custom-dish",
-        control: "custom-dish",
-        title: "1. Abre «Crear Platillo»",
-        instruction: "Toca «Crear Platillo».",
-        expect: { type: "custom-dish-open" },
-        view: { tab: "queue", kitchenOnly: false },
-      },
-      {
-        id: "platillo-2",
-        kind: "info",
-        target: "custom-dish-name",
-        title: "El nombre",
-        instruction:
-          "En la práctica ya escribimos «Huarache de Costilla». Es el nombre que verán los clientes en el menú.",
-        consequence: "El nombre aparece igual en el menú y en los tickets.",
-        why: "Un nombre claro evita confusiones en la cocina.",
-      },
-      {
-        id: "platillo-3",
-        kind: "info",
-        target: "custom-dish-price",
-        title: "El precio",
-        instruction:
-          "Escribe el precio en pesos, por ejemplo 120.50. Es el precio base, sin extras.",
-        consequence: "Los extras como el quesillo se suman aparte, al armar el pedido.",
-        why: "Así el cliente ve el total correcto antes de pedir.",
-      },
-      {
-        id: "platillo-4",
-        kind: "info",
-        target: "custom-dish-category",
-        title: "La sección define las opciones",
-        instruction:
-          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», su preparación de Especiales de Zapata y los ingredientes gratis.",
-        consequence:
-          "Un huarache nuevo ofrece el quesillo de $10; una bebida no ofrece nada.",
-        why: "No hay que configurar nada más: el platillo queda listo para pedirse.",
-      },
-      {
-        id: "platillo-5",
-        kind: "act",
-        target: "save-custom-dish",
-        title: "2. Guarda el platillo",
-        instruction: "Toca «Guardar platillo».",
-        consequence:
-          "En la práctica no se guarda nada. En la caja real el platillo aparece de inmediato en el menú de los clientes.",
-        why: "Es el paso que publica el platillo.",
-        expect: { type: "custom-dish-saved" },
       },
     ],
   },

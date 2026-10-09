@@ -37,7 +37,6 @@ Code: `apps/business-pos/src/academy/`. Scenario data: `apps/business-pos/src/si
 | 11  | `tiempos`   | Tiempos del Comal   | 4     | no       |
 | 12  | `mesas`     | Mesas y Comedor     | 5     | no       |
 | 13  | `transferencia` | Pagar con Transferencia | 5 | no   |
-| 14  | `platillo`  | Platillos Nuevos    | 5     | no       |
 
 Every module ends with a short quiz (wrong answers explain themselves) and a recap card («Lo que aprendiste»).
 Finishing the five required modules unlocks the **Reto Almuerzo**: five ghost tickets, 60 seconds, every ticket
@@ -46,8 +45,8 @@ must be _paid_ (a No-Show never counts toward passing, and finishing at exactly 
 
 Which modules are required is one flag (`required: true`) per module in `curriculum.js`; change the policy there.
 
-Modules 10-14 teach the features added after the first Academy: ticket tags, ticket timing, the dining-room tables, SPEI payments and
-creating a dish. They are optional on purpose. A tablet that already graduated is not locked out; the modules show as pending
+Modules 10-13 teach the features added after the first Academy: ticket tags, ticket timing, the dining-room tables and SPEI payments.
+They are optional on purpose. (A module 14, «Platillos Nuevos», taught the «Crear Platillo» screen; it was removed together with that screen.) A tablet that already graduated is not locked out; the modules show as pending
 reminders on the «Entrenamiento» button. Making one required is a one-line change (`required: true`), but it must stay after the
 current required ones (the curriculum test enforces that order).
 
@@ -60,8 +59,6 @@ Notes on how the newer lessons work:
   id, so a copy with another id would show no chip; a test pins every copy to `shared/realtime/catalog.js`.
 - **`tiempos` backdates its tickets** and orders them oldest first in each lane, because a step spotlights the first matching
   button. The tickets sit at least 90 s inside their colour window so nothing changes colour under the trainee.
-- **`platillo` opens with a dish already typed** («Huarache de Costilla», 120.50). The lesson is about the form, and saving in practice
-  stores nothing and sends nothing.
 - **Practice tables live in the practice board** (`createPracticeTables`), one of them already seated. Tapping them never sends a command.
 - **`transferencia` does not ask the trainee to tap «Copiar CLABE»:** copying can fail silently and belongs to the customer.
 

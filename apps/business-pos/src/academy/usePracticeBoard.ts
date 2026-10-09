@@ -185,8 +185,7 @@ export function usePracticeBoard({
           setOrders([createSpeiDemoOrder()]);
           break;
         case "mesas":
-        case "platillo":
-          // Nothing on the board: these lessons live on the tables tab and in the dish form.
+          // Nothing on the board: this lesson lives on the tables tab.
           setOrders([]);
           break;
         case "historial":

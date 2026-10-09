@@ -17,8 +17,6 @@ import {
   LayoutGrid,
   Pause,
   Play,
-  PlusCircle,
-  QrCode,
   Search,
   SlidersHorizontal,
   Star,
@@ -39,8 +37,6 @@ import { practiceDish, usePracticeBoard } from "../academy/usePracticeBoard";
 import type { AcademyEvent } from "../academy/types";
 import { TableMap } from "../components/TableMap";
 import { TransferModal } from "../components/TransferModal";
-import { CustomDishModal, type NewDish } from "../components/CustomDishModal";
-import { NetworkModal } from "../components/NetworkModal";
 import {
   chime,
   AudioUnlockButton,
@@ -1075,8 +1071,6 @@ function LiveBoard({
       "queue",
     ),
     [tableNotice, setTableNotice] = useState(""),
-    [customDishModalOpen, setCustomDishModalOpen] = useState(false),
-    [networkModalOpen, setNetworkModalOpen] = useState(false),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
@@ -1098,17 +1092,6 @@ function LiveBoard({
   const snapshot = practice.snapshot;
   // Live: the server's tables, shared with every customer screen. Practice: local tables that send nothing.
   const tables = snapshot?.tables ?? [];
-  /** Saves a dish the owner invented. Practice never reaches the server: it only reports the tap to the lesson. */
-  async function submitCustomDish(
-    dish: NewDish,
-  ): Promise<string | null> {
-    if (simulator) {
-      report({ type: "custom-dish-saved", name: dish.name, category: dish.category });
-      return null;
-    }
-    const reply = await command("admin_add_menu_item", dish);
-    return reply.ok ? null : reply.error;
-  }
   async function toggleTable(number: number) {
     const table = tables.find((candidate) => candidate.number === number);
     if (!table) return;
@@ -1473,16 +1456,6 @@ function LiveBoard({
           <>
             <button
               className="btn"
-              data-help="network"
-              data-tour-target="btn-network"
-              onClick={() => setNetworkModalOpen(true)}
-              title="Dispositivos y Red Local (mDNS / Bonjour / QR)"
-            >
-              <QrCode size={16} />
-              <span className="hidden sm:inline">Red Local</span>
-            </button>
-            <button
-              className="btn"
               data-help="inventory"
               data-tour-target="btn-inventory"
               onClick={practice.openInventory}
@@ -1506,15 +1479,6 @@ function LiveBoard({
           </>
         ) : (
           <>
-            <button
-              className="btn"
-              data-help="network"
-              onClick={() => setNetworkModalOpen(true)}
-              title="Dispositivos y Red Local (mDNS / Bonjour / QR)"
-            >
-              <QrCode size={16} />
-              <span className="hidden sm:inline">Red Local</span>
-            </button>
             <button
               className="btn"
               data-help="inventory"
@@ -1648,18 +1612,6 @@ function LiveBoard({
                 )}
               </button>
             )}
-            <button
-              className="btn border-stone-300 bg-white font-bold text-stone-700 hover:bg-stone-50"
-              data-help="custom-dish"
-              data-tour-target={simulator ? "btn-custom-dish" : undefined}
-              onClick={() => {
-                setCustomDishModalOpen(true);
-                report({ type: "custom-dish-open" });
-              }}
-            >
-              <PlusCircle size={16} />
-              <span>Crear Platillo</span>
-            </button>
             {activeTab === "queue" && (
               <button
                 className={`btn transition-colors ${
@@ -1957,19 +1909,6 @@ function LiveBoard({
         </footer>
       </main>
       {inventory && <InventoryControl onClose={() => setInventory(false)} />}
-      {networkModalOpen && (
-        <NetworkModal
-          simulator={simulator}
-          onClose={() => setNetworkModalOpen(false)}
-        />
-      )}
-      {customDishModalOpen && (
-        <CustomDishModal
-          simulator={simulator}
-          onClose={() => setCustomDishModalOpen(false)}
-          onSubmit={submitCustomDish}
-        />
-      )}
       {payOrder && (
         <CashTender
           order={payOrder}
