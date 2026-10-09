@@ -1938,8 +1938,6 @@ function LiveBoard({
       {customDishModalOpen && (
         <CustomDishModal
           simulator={simulator}
-          menuItems={snapshot.menuItems}
-          modifiers={snapshot.modifiers}
           onClose={() => setCustomDishModalOpen(false)}
           onSubmit={submitCustomDish}
         />

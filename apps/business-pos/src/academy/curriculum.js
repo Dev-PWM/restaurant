@@ -1364,8 +1364,8 @@ export const MODULES = [
       {
         id: "platillo-4",
         kind: "info",
-        target: "custom-dish-rules",
-        title: "Las opciones se ponen solas",
+        target: "custom-dish-category",
+        title: "La sección define las opciones",
         instruction:
           "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», su preparación de Especiales de Zapata y los ingredientes gratis.",
         consequence:

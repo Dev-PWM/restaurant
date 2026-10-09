@@ -118,9 +118,11 @@ export function LineChoices({
                 <X size={13} aria-hidden="true" />
               )}
               <span className="min-w-0 flex-1 capitalize">{choice.name}</span>
-              <span className="text-[10px] uppercase">
-                {choice.included ? "Sí" : "No"}
-              </span>
+              {choice.included ? (
+                <span className="sr-only">Sí</span>
+              ) : (
+                <span className="text-[10px] uppercase">No</span>
+              )}
             </span>
           ))}
         </div>

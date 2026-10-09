@@ -1,12 +1,8 @@
 import { memo, useState, type FormEvent } from "react";
 import { PlusCircle, Sparkles } from "lucide-react";
-import type {
-  Commands,
-  MenuItem,
-  Modifier,
-} from "../../../../shared/types/realtime";
+import type { Commands } from "../../../../shared/types/realtime";
 import { uuid } from "../../../../shared/ui/RealtimeProvider";
-import { Modal, centsOf, mxn } from "../../../../shared/ui/components";
+import { Modal, centsOf } from "../../../../shared/ui/components";
 
 /** Sections a dish can live in, in menu order. The server holds the same list and refuses anything else. */
 const CATEGORIES = [
@@ -28,31 +24,12 @@ export interface CustomDishModalProps {
   onClose: () => void;
   /** Resolves to an error message to show, or null when the dish was saved. */
   onSubmit: (dish: NewDish) => Promise<string | null>;
-  /** Today's menu, used only to show what a dish in the chosen section will offer. */
-  menuItems: MenuItem[];
-  modifiers: Modifier[];
   simulator?: boolean;
-}
-
-/** What a new dish in this section gets: the same as the dishes already there. */
-function rulesFor(category: string, menuItems: MenuItem[], modifiers: Modifier[]) {
-  const sample = menuItems.find((item) => item.category === category);
-  const offered = modifiers.filter((m) => sample?.modifierIds.includes(m.id));
-  return {
-    quesilloCents:
-      offered.find((m) => m.kind === "extra" && m.id.startsWith("quesillo-"))
-        ?.priceCents ?? 0,
-    cookingChoice: offered.some((m) => m.kind === "prep"),
-    special: offered.find((m) => m.kind === "special")?.name ?? null,
-    toppings: offered.some((m) => m.kind === "omit" || m.kind === "extra"),
-  };
 }
 
 export const CustomDishModal = memo(function CustomDishModal({
   onClose,
   onSubmit,
-  menuItems,
-  modifiers,
   simulator = false,
 }: CustomDishModalProps) {
   // Practice opens with a believable dish already typed, so the lesson is about the form and not about typing.
@@ -67,7 +44,6 @@ export const CustomDishModal = memo(function CustomDishModal({
 
   const priceCents = centsOf(priceInput.trim());
   const valid = name.trim().length > 0 && priceCents !== null && priceCents > 0;
-  const rules = rulesFor(category, menuItems, modifiers);
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -163,36 +139,6 @@ export const CustomDishModal = memo(function CustomDishModal({
             onChange={(event) => setDescription(event.target.value)}
           />
         </label>
-
-        <div
-          className="rounded-xl border border-stone-200 bg-stone-50 p-3.5 text-xs"
-          data-testid="custom-dish-rules"
-          data-tour-target={simulator ? "custom-dish-rules" : undefined}
-        >
-          <p className="mb-2 font-black uppercase tracking-wider text-stone-500">
-            Opciones que tendrá en «{category}»
-          </p>
-          <ul className="space-y-1.5 text-stone-700">
-            <li className="flex justify-between gap-3">
-              <span>Con quesillo</span>
-              <strong>
-                {rules.quesilloCents ? `+${mxn(rules.quesilloCents)}` : "No aplica"}
-              </strong>
-            </li>
-            <li className="flex justify-between gap-3">
-              <span>«Al comal» o «Frito» (obligatorio)</span>
-              <strong>{rules.cookingChoice ? "Sí" : "No aplica"}</strong>
-            </li>
-            <li className="flex justify-between gap-3">
-              <span>Especial (opcional)</span>
-              <strong>{rules.special ?? "No aplica"}</strong>
-            </li>
-            <li className="flex justify-between gap-3">
-              <span>Sin cebolla, sin cilantro, salsas</span>
-              <strong>{rules.toppings ? "Gratis" : "No aplica"}</strong>
-            </li>
-          </ul>
-        </div>
 
         {error && (
           <p
