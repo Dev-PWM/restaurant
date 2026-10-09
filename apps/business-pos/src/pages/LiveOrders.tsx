@@ -423,6 +423,7 @@ export function TicketCard({
               {specials.map((special) => (
                 <span
                   key={special.id}
+                  translate="no"
                   className="inline-flex items-center gap-1 rounded-md border-2 border-amber-400 bg-stone-900 px-2.5 py-0.5 text-xs font-black tracking-wide text-amber-300"
                 >
                   <Star size={13} fill="currentColor" />

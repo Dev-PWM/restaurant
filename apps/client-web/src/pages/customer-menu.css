@@ -255,6 +255,13 @@
   min-width: 0;
 }
 
+.menu-item-copy p {
+  margin-top: 4px;
+  color: #75645a;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
 .menu-item h3 {
   margin: 0;
   font: 700 19px/1.2 Georgia, "Times New Roman", serif;

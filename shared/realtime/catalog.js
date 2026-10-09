@@ -28,8 +28,10 @@ const EVERY_DISH = [PREP_COMAL, PREP_FRITO, OMIT_CEBOLLA, OMIT_CILANTRO, SALSA_R
 /**
  * The printed menu's two specials are not separate dishes: ¡Izquierdo! (the left side of the menu: huaraches and
  * sopes) and ¡Derecho! (the right side: quesadillas, gorditas and pambazos) are a way to dress a dish. Choosing one
- * adds its toppings to the order at the dish's own price, so SPECIAL_PRICE_CENTS is 0. Change that one number to
- * charge a surcharge for the special; the customer's total, the ticket and the ledger all follow it.
+ * adds its toppings to the order at the dish's own price, so SPECIAL_PRICE_CENTS is 0. To charge a surcharge,
+ * change that one number and restart the server: a saved ledger is brought to the catalog's price on start (see
+ * retireCatalog), because the app has no screen for editing a modifier's price. Orders already placed keep the
+ * price they were sold at.
  */
 const ESTILO_IZQUIERDO = "estilo-izquierdo";
 const ESTILO_DERECHO = "estilo-derecho";
@@ -243,12 +245,13 @@ function reconcileCatalog(state) {
 }
 
 /**
- * What a ledger saved by an older build still holds that today's catalog has retired or renamed, or null when
- * there is nothing to do: the two placeholder specials are removed, and the quesillo modifiers lose the section
- * list in their names. A modifier is renamed only while it still has its old catalog name. Orders are never
- * touched: paid history keeps the names that were true when it was written.
+ * What a ledger saved by an older build still holds that today's catalog has retired, renamed or re-priced, or
+ * null when there is nothing to do: the two placeholder specials are removed, the quesillo modifiers lose the
+ * section list in their names (only while they still have their old catalog name), and the two specials take the
+ * catalog's price. Orders are never touched: paid history keeps the names and prices that were true when it was
+ * written.
  * @param {{menuItems: MenuItem[], modifiers: Modifier[]}} state
- * @returns {{menuItems: MenuItem[], modifiers: Modifier[], removedItems: number, renamedModifiers: number} | null}
+ * @returns {{menuItems: MenuItem[], modifiers: Modifier[], removedItems: number, renamedModifiers: number, repricedModifiers: number} | null}
  */
 function retireCatalog(state) {
   const menuItems = structuredClone(state.menuItems).filter((item) => !RETIRED_ITEM_IDS.includes(item.id));
@@ -261,8 +264,19 @@ function retireCatalog(state) {
       renamedModifiers++;
     }
   }
+  let repricedModifiers = 0;
+  for (const id of SPECIAL_IDS) {
+    const saved = modifiers.find((modifier) => modifier.id === id);
+    const catalog = MODIFIERS.find((modifier) => modifier.id === id);
+    if (saved && catalog && saved.priceCents !== catalog.priceCents) {
+      saved.priceCents = catalog.priceCents;
+      repricedModifiers++;
+    }
+  }
   const removedItems = state.menuItems.length - menuItems.length;
-  return removedItems || renamedModifiers ? { menuItems, modifiers, removedItems, renamedModifiers } : null;
+  return removedItems || renamedModifiers || repricedModifiers
+    ? { menuItems, modifiers, removedItems, renamedModifiers, repricedModifiers }
+    : null;
 }
 
 module.exports = {

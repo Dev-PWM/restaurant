@@ -10,6 +10,7 @@ const {
   initialState,
   writeAtomic,
 } = require("../shared/realtime/engine");
+const { retireCatalog, SPECIAL_PRICE_CENTS } = require("../shared/realtime/catalog");
 
 function directoryFixture(t) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "masaflow-menu-"));
@@ -753,4 +754,37 @@ test("a failed catalog upgrade leaves the saved ledger untouched and the next st
     fs.readFileSync(path.join(directory, "data.before-catalog-r12.json"), "utf8"),
     original,
   );
+});
+
+test("a saved ledger follows the catalog's price for the specials, because the app cannot edit a modifier price", (t) => {
+  // Unit: a special saved at another price is brought to the catalog's, and nothing else changes.
+  const stale = initialState();
+  stale.modifiers.find((modifier) => modifier.id === "estilo-izquierdo").priceCents = 500;
+  const result = retireCatalog(stale);
+  assert.equal(result.repricedModifiers, 1);
+  assert.equal(
+    result.modifiers.find((modifier) => modifier.id === "estilo-izquierdo").priceCents,
+    SPECIAL_PRICE_CENTS,
+  );
+  assert.equal(retireCatalog(initialState()), null, "an up-to-date ledger needs no migration");
+
+  // Engine: starting on such a ledger rewrites it once, with a backup, and new orders use the catalog price.
+  const directory = directoryFixture(t);
+  const file = path.join(directory, "data.json");
+  writeAtomic(file, stale);
+  const original = fs.readFileSync(file, "utf8");
+  const engine = createEngine({ directory });
+  assert.equal(
+    engine.getState().modifiers.find((modifier) => modifier.id === "estilo-izquierdo").priceCents,
+    SPECIAL_PRICE_CENTS,
+  );
+  assert.equal(fs.readFileSync(engine.catalogBackup, "utf8"), original);
+  assert.equal(
+    quote(engine, [
+      { menuItemId: "huarache-bistec", quantity: 1, modifierIds: ["estilo-izquierdo", "prep-comal"] },
+    ]).totalCents,
+    9000 + SPECIAL_PRICE_CENTS,
+  );
+  const restarted = createEngine({ directory });
+  assert.equal(restarted.catalogBackup, null, "a second start does not migrate again");
 });

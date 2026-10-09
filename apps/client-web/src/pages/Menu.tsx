@@ -22,6 +22,7 @@ import {
   writeStorage,
 } from "../../../../shared/ui/RealtimeProvider";
 import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
+import { ownerDescription } from "../../../../shared/ui/dish-description.js";
 import {
   Brand,
   enableAudio,
@@ -137,7 +138,7 @@ export function Menu() {
       const query = searchQuery.trim().toLowerCase();
       const matchesSearch =
         !query ||
-        [item.name, item.category].some((text) =>
+        [item.name, item.category, ownerDescription(item)].some((text) =>
           text?.toLowerCase().includes(query),
         );
       return matchesCategory && matchesSearch;
@@ -511,6 +512,7 @@ export function Menu() {
                 <div className="menu-items">
                   {groupItems.map((item) => {
                     const available = itemAvailable(item, snapshot.modifiers);
+                    const description = ownerDescription(item);
 
                     return (
                       <article
@@ -520,6 +522,7 @@ export function Menu() {
                       >
                         <div className="menu-item-copy">
                           <h3>{item.name}</h3>
+                          {description && <p>{description}</p>}
                         </div>
                         <div className="menu-item-action">
                           <strong>{mxn(item.priceCents)}</strong>

@@ -91,7 +91,7 @@ export function LineChoices({
             className={`flex items-center gap-1.5 font-black uppercase tracking-wide ${kitchen ? "text-sm" : "text-xs"}`}
           >
             <Star size={kitchen ? 15 : 13} fill="currentColor" aria-hidden="true" />
-            Especial {special.name}
+            Especial <span translate="no">{special.name}</span>
           </p>
           {special.detail && (
             <p className={`mt-0.5 font-medium text-stone-100 ${kitchen ? "text-sm" : "text-xs"}`}>

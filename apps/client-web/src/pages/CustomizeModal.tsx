@@ -5,6 +5,7 @@ import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { Modal, mxn, Quantity } from "../../../../shared/ui/components";
 import { LineChoices } from "../../../../shared/ui/line-choices";
 import { toppingName } from "../../../../shared/ui/choice-groups.js";
+import { ownerDescription } from "../../../../shared/ui/dish-description.js";
 
 type CartLine = OrderInput["items"][number];
 
@@ -168,6 +169,12 @@ export function CustomizeModal({
 
   return (
     <Modal title={item.name} onClose={onClose}>
+      {ownerDescription(item) && (
+        <p className="mb-5 text-sm leading-relaxed text-stone-600">
+          {ownerDescription(item)}
+        </p>
+      )}
+
       {/* 1. Cooking style (Required, no default) */}
       {prepModifiers.length > 0 && (
         <fieldset className="mb-6" data-testid="prep-choice">
@@ -318,7 +325,10 @@ export function CustomizeModal({
                     <Star size={18} fill={isSelected ? "currentColor" : "none"} />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-base font-black leading-tight text-stone-900">
+                    <span
+                      translate="no"
+                      className="block text-base font-black leading-tight text-stone-900"
+                    >
                       {m.name}
                     </span>
                     {m.detail && (
