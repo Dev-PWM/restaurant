@@ -21,6 +21,7 @@ import {
   Search,
   SlidersHorizontal,
   Sparkles,
+  Star,
   Table,
   Utensils,
 } from "lucide-react";
@@ -274,6 +275,7 @@ export function TicketCard({
     sinGrasaPieces,
     fritoPieces,
     hasExtraQuesillo,
+    specials,
     isSPEI,
     omissions: detectedOmissions,
   } = detectOrderBadges(order);
@@ -334,19 +336,19 @@ export function TicketCard({
       )}
       <div className="p-4">
         <div className={paymentPending ? "opacity-60 grayscale" : undefined}>
-          <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <strong className="text-xl tracking-tight">
+              <strong className="block text-3xl font-black leading-none tracking-tight tabular-nums">
                 {orderLabel(order)}
               </strong>
-              <p className="font-semibold text-stone-900">
+              <p className="mt-1.5 truncate text-base font-bold text-stone-800">
                 {order.customerName}
               </p>
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1">
               {tracksElapsedTime && (
                 <span
-                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-mono font-bold tabular-nums shadow-xs ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-sm font-mono font-bold tabular-nums shadow-xs ${
                     aging
                       ? "border-red-400 bg-red-100 text-red-800 ring-2 ring-red-400/40"
                       : isWarning
@@ -358,7 +360,7 @@ export function TicketCard({
                   aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
                 >
                   <Clock3
-                    size={13}
+                    size={14}
                     className={`shrink-0 ${
                       aging
                         ? "text-red-600 animate-bounce"
@@ -371,12 +373,12 @@ export function TicketCard({
                 </span>
               )}
               <span
-                className={`text-[10px] font-semibold uppercase tracking-wider ${
+                className={`text-[11px] font-bold uppercase tracking-wider ${
                   aging
-                    ? "font-bold text-red-700"
+                    ? "font-black text-red-700"
                     : isWarning
-                      ? "font-bold text-amber-800"
-                      : "text-stone-400"
+                      ? "font-black text-amber-800"
+                      : "text-stone-500"
                 }`}
               >
                 {aging
@@ -391,30 +393,47 @@ export function TicketCard({
               </span>
             </div>
           </div>
-          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || isSPEI || isDineIn) && (
-            <div className="mb-3 flex flex-wrap gap-1.5">
+          {(isDineIn || isSPEI) && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
               {isDineIn && (
                 <span
                   data-tour-target={simulator ? "badge-dine-in" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-[#2E94A5] px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[#2E94A5] px-2.5 py-1 text-xs font-black tracking-wide text-white"
                 >
-                  <Utensils size={13} />
+                  <Utensils size={14} />
                   COMER AQUÍ
                 </span>
               )}
               {isSPEI && (
                 <span
                   data-tour-target={simulator ? "badge-spei" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2 py-0.5 text-xs font-black text-white shadow-xs"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-black tracking-wide text-white"
                 >
-                  <Building2 size={13} />
+                  <Building2 size={14} />
                   SPEI {BBVA_BANK_INFO.bank}
                 </span>
               )}
+            </div>
+          )}
+          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || specials.length > 0) && (
+            <div
+              className="mb-3 flex flex-wrap items-center gap-1.5 border-y border-dashed border-stone-300 py-2"
+              aria-label="Resumen del ticket"
+            >
+              {specials.map((special) => (
+                <span
+                  key={special.id}
+                  data-tour-target={simulator ? "badge-special" : undefined}
+                  className="inline-flex items-center gap-1 rounded-md border-2 border-amber-400 bg-stone-900 px-2.5 py-0.5 text-xs font-black tracking-wide text-amber-300"
+                >
+                  <Star size={13} fill="currentColor" />
+                  {special.name.replace(/[¡!]/g, "").toUpperCase()} ×{special.pieces}
+                </span>
+              ))}
               {hasSinGrasa && (
                 <span
                   data-tour-target={simulator ? "badge-sin-grasa" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-purple-700 px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                  className="inline-flex items-center gap-1 rounded-md bg-purple-700 px-2.5 py-1 text-xs font-black tracking-wide text-white"
                 >
                   <Flame size={13} />
                   SIN GRASA ×{sinGrasaPieces}
@@ -423,7 +442,7 @@ export function TicketCard({
               {fritoPieces > 0 && (
                 <span
                   data-tour-target={simulator ? "badge-frito" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-black text-stone-950 shadow-xs"
+                  className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-black tracking-wide text-stone-950"
                 >
                   FRITO ×{fritoPieces}
                 </span>
@@ -431,7 +450,7 @@ export function TicketCard({
               {hasExtraQuesillo && (
                 <span
                   data-tour-target={simulator ? "badge-quesillo" : undefined}
-                  className="inline-flex items-center rounded-md bg-[#E03188] px-2.5 py-1 text-xs font-black text-white shadow-xs"
+                  className="inline-flex items-center rounded-md bg-[#E03188] px-2.5 py-1 text-xs font-black tracking-wide text-white"
                 >
                   + C/QUESILLO
                 </span>
@@ -453,9 +472,9 @@ export function TicketCard({
           )}
           <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-stone-500">{time(order.createdAt)}</span>
+              <span className="font-medium text-stone-500">{time(order.createdAt)}</span>
             </div>
-            <strong>{mxn(order.totalCents)}</strong>
+            <strong className="text-xl font-black tabular-nums">{mxn(order.totalCents)}</strong>
           </div>
         </div>
         {order.status === "review" ? (

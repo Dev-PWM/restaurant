@@ -1367,7 +1367,7 @@ export const MODULES = [
         target: "custom-dish-rules",
         title: "Las opciones se ponen solas",
         instruction:
-          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», y los toppings gratis.",
+          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», el especial de su lado del menú (¡Izquierdo! o ¡Derecho!) y los toppings gratis.",
         consequence:
           "Un huarache nuevo ofrece el quesillo de $10; una bebida no ofrece nada.",
         why: "No hay que configurar nada más: el platillo queda listo para pedirse.",

@@ -237,13 +237,6 @@
   letter-spacing: -0.045em;
 }
 
-.menu-specials-intro {
-  margin: 12px 0 18px;
-  color: #655146;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
 .menu-item {
   display: flex;
   align-items: center;
@@ -258,15 +251,6 @@
   opacity: 0.55;
 }
 
-.menu-item-special {
-  min-height: 124px;
-  margin-top: 12px;
-  padding: 20px 22px;
-  border: 1px solid #dec5b5;
-  border-radius: 9px;
-  background: #fffdfa;
-}
-
 .menu-item-copy {
   min-width: 0;
 }
@@ -275,27 +259,6 @@
   margin: 0;
   font: 700 19px/1.2 Georgia, "Times New Roman", serif;
   letter-spacing: -0.02em;
-}
-
-.menu-item p {
-  margin-top: 4px;
-  color: #75645a;
-  font-size: 13px;
-  line-height: 1.35;
-}
-
-.menu-item-special .menu-special-included {
-  margin-top: 10px;
-  color: #453029;
-  font-size: 14px;
-  line-height: 1.45;
-}
-
-.menu-item-special .menu-special-note {
-  margin-top: 6px;
-  color: #795f52;
-  font-size: 13px;
-  line-height: 1.45;
 }
 
 .menu-item-action {
@@ -314,7 +277,6 @@
 }
 
 .menu-item-action button,
-.menu-special-contact,
 .menu-order-footer button {
   display: inline-flex;
   align-items: center;
@@ -332,28 +294,6 @@
 .menu-item-action button {
   min-width: 111px;
   padding: 8px 14px;
-}
-
-.menu-item-action .menu-special-price {
-  max-width: 115px;
-  color: #795f52;
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.menu-special-contact {
-  min-width: 111px;
-  padding: 8px 14px;
-  text-decoration: none;
-}
-
-.menu-special-contact:hover {
-  background: #98301f;
-}
-
-.menu-special-contact:focus-visible {
-  outline: 2px solid #98301f;
-  outline-offset: 3px;
 }
 
 .menu-item-action button:not(:disabled):hover,
@@ -573,12 +513,8 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
-    min-height: 118px;
+    min-height: 96px;
     gap: 12px;
-  }
-
-  .menu-item-special {
-    padding: 18px;
   }
 
   .menu-item h3 {
@@ -592,8 +528,7 @@
     gap: 12px;
   }
 
-  .menu-item-action button,
-  .menu-special-contact {
+  .menu-item-action button {
     min-width: 97px;
     min-height: 42px;
     padding: 8px;
@@ -603,4 +538,99 @@
   .menu-item-action button svg {
     display: none;
   }
+}
+
+/* Dining room: every table with its live state. Teal is free, pink is taken (the logo's two colours). */
+.dining-room {
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border: 1px solid #e0d6cf;
+  border-radius: 12px;
+  background: #fffdfa;
+}
+
+.dining-room-inline {
+  margin: 0;
+  background: #f7faf9;
+  border-color: #cfe3e5;
+}
+
+.dining-room-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dining-room-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #3f2c25;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.dining-room-head strong {
+  color: #2b1711;
+  font-size: 15px;
+}
+
+.dining-room[data-free="0"] .dining-room-head strong {
+  color: #be1f73;
+}
+
+.dining-room-tables {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dining-room-tables li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 2px solid #2e94a5;
+  border-radius: 10px;
+  background: #eef8f9;
+  color: #17606d;
+}
+
+.dining-room-tables li[data-status="occupied"] {
+  border-color: #e03188;
+  background: #fdeef6;
+  color: #a21a5c;
+}
+
+.dining-room-tables li span {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.dining-room-tables li b {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.dining-room-tables li[data-status="occupied"] b::before {
+  content: "✕ ";
+}
+
+.dining-room-tables li[data-status="available"] b::before {
+  content: "✓ ";
+}
+
+.dining-room-note {
+  margin: 10px 0 0;
+  color: #5e6b6d;
+  font-size: 12px;
 }

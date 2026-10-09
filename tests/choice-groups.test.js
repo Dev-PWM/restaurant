@@ -2,7 +2,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { MODIFIERS } = require("../shared/realtime/catalog");
-const { groupChoices, toppingName } = require("../shared/ui/line-choices");
+const { groupChoices, toppingName } = require("../shared/ui/choice-groups");
 
 const modifier = (id) => MODIFIERS.find((candidate) => candidate.id === id);
 const pick = (...ids) => ids.map(modifier);

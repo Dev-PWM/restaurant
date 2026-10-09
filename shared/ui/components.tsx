@@ -27,6 +27,7 @@ import {
 import type { Modifier, Order, Transaction } from "../types/realtime";
 import { RESTAURANT_NAME } from "./brand";
 import { useRealtime } from "./RealtimeProvider";
+import { LineChoices, type ChoicesVariant } from "./line-choices";
 export const mxn = (cents: number) =>
   new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(
     cents / 100,
@@ -327,6 +328,34 @@ export function ToggleSwitch({
     </button>
   );
 }
+/**
+ * Two modifiers can share a name ("Con quesillo" is +$10 on huaraches and gorditas, +$5 elsewhere), so the
+ * stock list says where each one applies and what it costs.
+ */
+function StockHint({
+  modifier,
+  dishes,
+}: {
+  modifier: Modifier;
+  dishes: { category: string; modifierIds: string[] }[];
+}) {
+  if (modifier.kind !== "special" && !(modifier.kind === "extra" && modifier.priceCents > 0))
+    return null;
+  const sections = [
+    ...new Set(
+      dishes
+        .filter((dish) => dish.modifierIds.includes(modifier.id))
+        .map((dish) => dish.category),
+    ),
+  ];
+  const parts = [
+    ...(sections.length ? [sections.join(" · ")] : []),
+    ...(modifier.priceCents > 0 ? [`+${mxn(modifier.priceCents)}`] : []),
+  ];
+  return parts.length ? (
+    <span className="block text-xs text-stone-500">{parts.join(" · ")}</span>
+  ) : null;
+}
 export function InventoryControl({ onClose }: { onClose: () => void }) {
   const { snapshot, command, connected } = useRealtime();
   const [pending, setPending] = useState(false);
@@ -347,7 +376,15 @@ export function InventoryControl({ onClose }: { onClose: () => void }) {
                 key={item.id}
                 className="flex items-center justify-between gap-3 border-b border-stone-200 py-3"
               >
-                <span className="font-medium">{item.name}</span>
+                <span className="min-w-0">
+                  <span className="font-medium">{item.name}</span>
+                  {kind === "modifier" && (
+                    <StockHint
+                      modifier={item as Modifier}
+                      dishes={snapshot.menuItems}
+                    />
+                  )}
+                </span>
                 <ToggleSwitch
                   checked={item.available}
                   label={`Disponibilidad de ${item.name}`}
@@ -624,47 +661,59 @@ export function StaffHeader({
     </header>
   );
 }
-export function ModifierBadge({ modifier }: { modifier: Modifier }) {
-  // Red = leave it off, green = add it, purple/amber = how it is cooked (comal / frito), grey = anything else (masa).
-  const style =
-    modifier.kind === "omit"
-      ? "bg-red-600 text-white"
-      : modifier.kind === "extra"
-        ? "bg-green-600 text-white"
-        : modifier.kind === "prep"
-          ? modifier.id === "prep-comal"
-            ? "bg-purple-700 text-white"
-            : "bg-amber-500 text-stone-950"
-          : "bg-stone-100 text-stone-700";
+/**
+ * The dishes on an order. «kitchen» (the POS ticket, the cashier's pay dialog and history) leads with a big
+ * quantity and dish name and a coloured edge for how it is cooked, so a cook can read it at a glance.
+ * «soft» is the same content for the customer's own order screen.
+ */
+export function OrderLines({
+  order,
+  variant = "kitchen",
+}: {
+  order: Order;
+  variant?: ChoicesVariant;
+}) {
+  const kitchen = variant === "kitchen";
   return (
-    <span
-      data-modifier-kind={modifier.kind}
-      className={`inline-block rounded-md px-2 py-1 text-xs font-bold ${style}`}
-    >
-      {modifier.name}
-    </span>
-  );
-}
-export function OrderLines({ order }: { order: Order }) {
-  return (
-    <ul className="space-y-4">
-      {order.items.map((line, index) => (
-        <li key={index}>
-          <div className="flex items-start justify-between gap-3">
-            <span className="font-semibold">
-              {line.quantity} × {line.name}
-            </span>
-            <span className="text-sm tabular-nums text-stone-500">
-              {mxn(line.lineTotalCents)}
-            </span>
-          </div>
-          <div className="mt-1 flex flex-wrap gap-1">
-            {line.modifiers.map((m) => (
-              <ModifierBadge key={m.id} modifier={m} />
-            ))}
-          </div>
-        </li>
-      ))}
+    <ul className={kitchen ? "space-y-2.5" : "space-y-3"}>
+      {order.items.map((line, index) => {
+        const prep = line.modifiers.find((m) => m.kind === "prep");
+        // Only the left edge carries the colour, so the cook sees how it is cooked before reading a word.
+        const edge =
+          prep?.id === "prep-comal"
+            ? "border-l-purple-700"
+            : prep?.id === "prep-frito"
+              ? "border-l-amber-500"
+              : "border-l-stone-300";
+        return (
+          <li
+            key={index}
+            data-order-line
+            className={`rounded-lg border border-stone-200 bg-white p-3 ${kitchen ? `border-l-[6px] ${edge}` : ""}`}
+          >
+            <div className="flex items-start gap-2.5">
+              <span
+                className={`inline-flex shrink-0 items-center justify-center rounded-md bg-stone-900 px-2 font-black tabular-nums text-white ${
+                  kitchen ? "min-h-9 min-w-10 text-lg" : "min-h-7 min-w-8 text-sm"
+                }`}
+              >
+                {line.quantity}×
+              </span>
+              <span
+                className={`min-w-0 flex-1 font-black leading-tight text-stone-950 ${
+                  kitchen ? "pt-1 text-lg" : "pt-0.5 text-base"
+                }`}
+              >
+                {line.name}
+              </span>
+              <span className="shrink-0 pt-1 text-sm tabular-nums text-stone-500">
+                {mxn(line.lineTotalCents)}
+              </span>
+            </div>
+            <LineChoices modifiers={line.modifiers} variant={variant} />
+          </li>
+        );
+      })}
     </ul>
   );
 }

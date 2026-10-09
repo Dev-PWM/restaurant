@@ -451,7 +451,7 @@ export function togglePracticeTable(tables, number, now = new Date()) {
 export const PRACTICE_MODIFIERS = Object.freeze({
   comal: { id: "prep-comal", name: "Al comal (sin grasa)", priceCents: 0, available: true, kind: "prep" },
   frito: { id: "prep-frito", name: "Frito (con grasa)", priceCents: 0, available: true, kind: "prep" },
-  quesillo: { id: "quesillo-10", name: "Con Quesillo (huaraches y gorditas)", priceCents: 1000, available: true, kind: "extra" },
+  quesillo: { id: "quesillo-10", name: "Con quesillo", priceCents: 1000, available: true, kind: "extra" },
   sinCebolla: { id: "omit-cebolla", name: "Sin cebolla", priceCents: 0, available: true, kind: "omit" },
   salsaRoja: { id: "salsa-roja", name: "Con salsa roja", priceCents: 0, available: true, kind: "extra" },
 });

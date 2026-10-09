@@ -43,6 +43,7 @@ function rulesFor(category: string, menuItems: MenuItem[], modifiers: Modifier[]
       offered.find((m) => m.kind === "extra" && m.id.startsWith("quesillo-"))
         ?.priceCents ?? 0,
     cookingChoice: offered.some((m) => m.kind === "prep"),
+    special: offered.find((m) => m.kind === "special")?.name ?? null,
     toppings: offered.some((m) => m.kind === "omit" || m.kind === "extra"),
   };
 }
@@ -181,6 +182,10 @@ export const CustomDishModal = memo(function CustomDishModal({
             <li className="flex justify-between gap-3">
               <span>«Al comal» o «Frito» (obligatorio)</span>
               <strong>{rules.cookingChoice ? "Sí" : "No aplica"}</strong>
+            </li>
+            <li className="flex justify-between gap-3">
+              <span>Especial (opcional)</span>
+              <strong>{rules.special ?? "No aplica"}</strong>
             </li>
             <li className="flex justify-between gap-3">
               <span>Sin cebolla, sin cilantro, salsas</span>

@@ -511,7 +511,7 @@ export function OrderStatus({
             </span>
           </div>
 
-          <OrderLines order={order} />
+          <OrderLines order={order} variant="soft" />
 
           <div className="mt-3 flex items-center justify-between text-xs text-stone-600">
             <span>Tipo de pedido</span>

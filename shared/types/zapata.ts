@@ -46,6 +46,8 @@ export interface DetectedOrderBadges {
   sinGrasaPieces: number;
   fritoPieces: number;
   hasExtraQuesillo: boolean;
+  /** Pieces ordered with ¡Izquierdo! or ¡Derecho!, one entry per special, so the ticket can flag them. */
+  specials: Array<{ id: string; name: string; pieces: number }>;
   isSPEI: boolean;
   omissions: Array<{ itemIndex: number; menuItemId: string; omission: Modifier }>;
 }
@@ -66,6 +68,15 @@ export function detectOrderBadges(
   }
   const hasSinGrasa = cookingStyle === 'sin_grasa' || sinGrasaPieces > 0;
 
+  const specials: DetectedOrderBadges['specials'] = [];
+  for (const item of order.items)
+    for (const m of item.modifiers || []) {
+      if (m.kind !== 'special') continue;
+      const known = specials.find((s) => s.id === m.id);
+      if (known) known.pieces += item.quantity;
+      else specials.push({ id: m.id, name: m.name, pieces: item.quantity });
+    }
+
   const hasExtraQuesillo = order.items.some((item) =>
     item.modifiers?.some((m) => m.id.startsWith(QUESILLO_PREFIX))
   );
@@ -79,5 +90,5 @@ export function detectOrderBadges(
       .map((omission) => ({ itemIndex, menuItemId: item.menuItemId, omission }))
   );
 
-  return { hasSinGrasa, sinGrasaPieces, fritoPieces, hasExtraQuesillo, isSPEI, omissions };
+  return { hasSinGrasa, sinGrasaPieces, fritoPieces, hasExtraQuesillo, specials, isSPEI, omissions };
 }

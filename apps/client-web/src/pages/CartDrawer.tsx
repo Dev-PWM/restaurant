@@ -17,6 +17,8 @@ import type {
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
 import { Modal, mxn } from "../../../../shared/ui/components";
+import { LineChoices } from "../../../../shared/ui/line-choices";
+import { DiningRoom } from "./DiningRoom";
 
 type CartLine = OrderInput["items"][number];
 
@@ -99,14 +101,7 @@ export function CartDrawer({
           ({ line, item: menuItem, key, index, lineTotalCents }) => {
             const lineMods = line.modifierIds
               .map((id) => snapshot.modifiers.find((m) => m.id === id))
-              .filter(Boolean);
-
-            const chipMods = lineMods.filter(
-              (m) => m?.kind === "masa" || m?.kind === "prep",
-            );
-            const otherMods = lineMods.filter(
-              (m) => m?.kind !== "masa" && m?.kind !== "prep",
-            );
+              .filter((m): m is NonNullable<typeof m> => Boolean(m));
 
             return (
               <div
@@ -114,26 +109,11 @@ export function CartDrawer({
                 className="rounded-xl border border-stone-200 bg-stone-50/70 p-3.5"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <strong className="text-stone-900 font-bold">
-                        {menuItem?.name || "Platillo"}
-                      </strong>
-                      {chipMods.map((mod) => (
-                        <span
-                          key={mod?.id}
-                          className="rounded bg-white px-2 py-0.5 border border-stone-200 text-xs font-semibold text-stone-700"
-                        >
-                          {mod?.name}
-                        </span>
-                      ))}
-                    </div>
-
-                    {otherMods.length > 0 && (
-                      <p className="mt-1 text-xs text-stone-500">
-                        {otherMods.map((m) => m?.name).join(" · ")}
-                      </p>
-                    )}
+                  <div className="min-w-0 flex-1">
+                    <strong className="block text-base font-black leading-tight text-stone-900">
+                      {menuItem?.name || "Platillo"}
+                    </strong>
+                    <LineChoices modifiers={lineMods} variant="soft" />
                   </div>
 
                   <button
@@ -274,19 +254,22 @@ export function CartDrawer({
                 />
                 <Icon size={16} />
                 <span>{label}</span>
+                {value === "dine_in" && (
+                  <span
+                    className={`ml-auto text-xs font-bold ${unavailable ? "text-red-700" : "text-teal-700"}`}
+                  >
+                    {unavailable
+                      ? "Sin mesas"
+                      : `${tablesAvailable} ${tablesAvailable === 1 ? "libre" : "libres"}`}
+                  </span>
+                )}
               </label>
             );
           })}
         </div>
-        <p
-          className={`mt-2 text-xs font-semibold ${tablesAvailable === 0 ? "text-red-800" : "text-stone-600"}`}
-          aria-live="polite"
-          data-testid="tables-available"
-        >
-          {tablesAvailable === 0
-            ? "Sin mesas disponibles"
-            : `${tablesAvailable} ${tablesAvailable === 1 ? "mesa disponible" : "mesas disponibles"}`}
-        </p>
+        <div className="mt-3">
+          <DiningRoom variant="inline" />
+        </div>
         {orderTypeNotice && (
           <p
             role="status"
