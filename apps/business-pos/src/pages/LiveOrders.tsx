@@ -707,7 +707,7 @@ export function CompletedOrdersSection({
           {/* View mode toggle */}
           <div className="flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 p-1">
             <button
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+              className={`flex min-h-10 items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition-colors ${
                 viewMode === "cards"
                   ? "bg-white text-stone-900 shadow-xs"
                   : "text-stone-500 hover:text-stone-900"
@@ -719,7 +719,7 @@ export function CompletedOrdersSection({
               <span>Tarjetas</span>
             </button>
             <button
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold transition-colors ${
+              className={`flex min-h-10 items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold transition-colors ${
                 viewMode === "table"
                   ? "bg-white text-stone-900 shadow-xs"
                   : "text-stone-500 hover:text-stone-900"
@@ -1076,6 +1076,10 @@ function LiveBoard({
       "review",
     );
   const hasPendingPayment = Object.keys(pendingPayments).length > 0;
+  // "Sin conexión" about a table tap is stale the moment the connection returns.
+  useEffect(() => {
+    if (connected) setTableNotice("");
+  }, [connected]);
   const simulator = practiceActive;
   const practice = usePracticeBoard({
     active: practiceActive,

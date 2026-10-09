@@ -148,6 +148,11 @@ export interface Snapshot {
   modifiers: Modifier[];
   /** Table numbers and free/occupied only, so customers can see how many are free. No names or amounts. */
   tables: Table[];
+  /**
+   * Numbers of the orders still waiting or cooking, for everyone, so a customer can see how many are ahead of
+   * theirs. Numbers only: no names, items or amounts. Omitted by servers older than this field.
+   */
+  queueNumbers?: number[];
   activeOrders: Order[];
   completedOrders: Order[];
   salesMetrics: SalesMetrics | null;

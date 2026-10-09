@@ -99,6 +99,35 @@ function SpeiInstructions({ order }: { order: Order }) {
   );
 }
 
+/**
+ * "Your order is ready" outside the page. Android Chrome refuses `new Notification()` ("Illegal constructor") and
+ * wants the service worker to show it, so that goes first; a failure here must never break the screen.
+ */
+async function showReadyNotification(order: Order) {
+  const title = `Pedido ${orderLabel(order)} listo`;
+  const options = {
+    body: "Pasa al mostrador para recoger tu pedido.",
+    tag: order.id,
+  };
+  try {
+    const registration = await navigator.serviceWorker?.getRegistration();
+    if (registration) {
+      await registration.showNotification(title, options);
+      return;
+    }
+  } catch {
+    // Fall back to the page notification below.
+  }
+  try {
+    new Notification(title, options);
+  } catch {
+    // This browser cannot show notifications from the page either.
+  }
+}
+
+/** How long the full-screen "ready" moment stays up; a tap dismisses it sooner. */
+const READY_REVEAL_MS = 3000;
+
 export function OrderStatus({
   order,
   onNewOrder,
@@ -122,7 +151,7 @@ export function OrderStatus({
     if (order.status === "ready" && previous.current !== "ready") {
       chime(true);
       setReadyReveal(true);
-      revealTimer = setTimeout(() => setReadyReveal(false), 300);
+      revealTimer = setTimeout(() => setReadyReveal(false), READY_REVEAL_MS);
       try {
         if ("vibrate" in navigator) {
           navigator.vibrate([250, 100, 250, 100, 400]);
@@ -130,18 +159,14 @@ export function OrderStatus({
       } catch {
         // Ignore vibration restrictions
       }
-      if (notificationPermission === "granted") {
-        new Notification(`Pedido ${orderLabel(order)} listo`, {
-          body: "Pasa al mostrador para recoger tu pedido.",
-          tag: order.id,
-        });
-      }
+      if (notificationPermission === "granted") void showReadyNotification(order);
     } else if (order.status !== "ready") {
       setReadyReveal(false);
     }
     previous.current = order.status;
     return () => clearTimeout(revealTimer);
-  }, [order.status, notificationPermission, order]);
+    // The order object is rebuilt on every update; only its status decides whether to announce.
+  }, [order.status, notificationPermission]);
 
   const ready = order.status === "ready";
   const done = ["completed", "no_show"].includes(order.status);
@@ -152,17 +177,15 @@ export function OrderStatus({
   let estimatedMinutes = 0;
   let queuePosition = 0;
   if (snapshot && !done && !ready) {
-    const queue = snapshot.activeOrders.filter(
-      (o) => o.status === "review" || o.status === "cooking",
-    );
-    const orderIndex = queue.findIndex((o) => o.id === order.id);
-    if (orderIndex >= 0) {
-      queuePosition = orderIndex + 1;
-      estimatedMinutes = Math.max(3, queuePosition * 4);
-    } else {
-      queuePosition = queue.length + 1;
-      estimatedMinutes = Math.max(5, queuePosition * 4);
-    }
+    // A customer's snapshot holds only their own orders, so the line comes from the shared order numbers.
+    // Older servers do not send them: fall back to the customer's own orders.
+    const waiting =
+      snapshot.queueNumbers ??
+      snapshot.activeOrders
+        .filter((o) => o.status === "review" || o.status === "cooking")
+        .map((o) => o.number);
+    queuePosition = waiting.filter((number) => number < order.number).length + 1;
+    estimatedMinutes = Math.max(3, queuePosition * 4);
   }
 
   const testAudioChime = async () => {
@@ -192,7 +215,7 @@ export function OrderStatus({
                       await Notification.requestPermission(),
                     )
                   }
-                  className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50"
+                  className="flex min-h-10 items-center gap-1 rounded-full border border-stone-200 bg-white px-3.5 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50"
                 >
                   <Bell size={13} className="text-clay-600" />
                   <span>Avisarme al estar listo</span>
@@ -200,7 +223,7 @@ export function OrderStatus({
               )}
             <button
               onClick={testAudioChime}
-              className="flex items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50"
+              className="flex min-h-10 items-center gap-1 rounded-full border border-stone-200 bg-white px-3.5 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50"
               title="Probar sonido de campana"
             >
               <Volume2 size={13} className="text-clay-600" />
@@ -569,9 +592,10 @@ export function OrderStatus({
       </div>
       {readyReveal && (
         <div
-          className="animate-ready-rise pointer-events-none fixed inset-0 z-50 flex flex-col items-center justify-center bg-emerald-800 px-6 text-center text-white"
+          className="animate-ready-rise fixed inset-0 z-50 flex cursor-pointer flex-col items-center justify-center bg-emerald-800 px-6 text-center text-white"
           role="status"
           aria-live="assertive"
+          onClick={() => setReadyReveal(false)}
         >
           <Check size={64} />
           <p className="display mt-5 text-4xl font-bold">
@@ -580,6 +604,7 @@ export function OrderStatus({
           <p className="mt-3 text-lg">
             Pasa al mostrador por tu pedido {orderLabel(order)}.
           </p>
+          <p className="mt-8 text-sm text-emerald-100">Toca para continuar</p>
         </div>
       )}
     </div>

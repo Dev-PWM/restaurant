@@ -1184,3 +1184,48 @@ test("writer lock recovers a recycled current PID but rejects a second live writ
   await assert.rejects(acquireLock(directory), { code: "DATA_IN_USE" });
   await releaseAgain();
 });
+
+test("a customer sees how many orders are ahead of theirs, and nothing else about other customers", async (t) => {
+  const { connect } = await serviceFixture(t);
+  const first = await connect();
+  const second = await connect();
+  const staff = await connect();
+  assert.equal((await ack(staff.socket, "staff_login", "2468")).ok, true);
+  assert.deepEqual(second.initial.queueNumbers, []);
+
+  const order = (who) => ({
+    orderId: randomUUID(),
+    sessionId: who.sessionId,
+    shiftId: who.initial.shiftId,
+    customerName: who === first ? "Primera Clienta" : "Segundo Cliente",
+    items: [{ menuItemId: "sope-bistec", quantity: 1, modifierIds: ["prep-comal"] }],
+  });
+  const a = order(first);
+  const b = order(second);
+  // Broadcasts can arrive after the acknowledgement, so wait for the snapshot that holds both orders.
+  const bothQueued = new Promise((resolve) =>
+    second.socket.on("state_updated", (state) => {
+      if (state.queueNumbers?.length === 2) resolve(state);
+    }),
+  );
+  assert.equal((await ack(first.socket, "submit_client_order", a)).ok, true);
+  assert.equal((await ack(second.socket, "submit_client_order", b)).ok, true);
+  const snapshot = await bothQueued;
+
+  // The second customer knows one order (#1) is ahead, so theirs (#2) is second in line…
+  assert.deepEqual(snapshot.queueNumbers, [1, 2]);
+  const ahead = snapshot.queueNumbers.filter((number) => number < snapshot.activeOrders[0].number);
+  assert.equal(ahead.length, 1);
+  // …and learns nothing else: only their own order is in the snapshot, and the first customer's data is absent.
+  assert.equal(snapshot.activeOrders.length, 1);
+  assert.equal(snapshot.activeOrders[0].id, b.orderId);
+  const wire = JSON.stringify(snapshot);
+  assert.equal(wire.includes("Primera Clienta"), false);
+  assert.equal(wire.includes(a.orderId), false);
+
+  // Once the first order is ready it is no longer ahead of anyone.
+  for (const status of ["cooking", "ready"])
+    assert.equal((await ack(staff.socket, "pos_update_status", { orderId: a.orderId, status })).ok, true);
+  const later = await connect(second.sessionId);
+  assert.deepEqual(later.initial.queueNumbers, [2]);
+});

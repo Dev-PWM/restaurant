@@ -102,6 +102,11 @@ export function CartDrawer({
             const lineMods = line.modifierIds
               .map((id) => snapshot.modifiers.find((m) => m.id === id))
               .filter((m): m is NonNullable<typeof m> => Boolean(m));
+            // What ran out since this was added, so the customer knows which line to fix.
+            const soldOut = [
+              ...(menuItem && !menuItem.available ? [menuItem.name] : []),
+              ...lineMods.filter((m) => !m.available).map((m) => m.name),
+            ];
 
             return (
               <div
@@ -114,10 +119,19 @@ export function CartDrawer({
                       {menuItem?.name || "Platillo"}
                     </strong>
                     <LineChoices modifiers={lineMods} variant="soft" />
+                    {soldOut.length > 0 && (
+                      <p
+                        role="alert"
+                        className="mt-2 rounded-md bg-red-50 px-2.5 py-1.5 text-xs font-bold leading-snug text-red-800"
+                      >
+                        Agotado hoy: {soldOut.join(", ")}. Quita este platillo y
+                        vuelve a pedirlo sin eso.
+                      </p>
+                    )}
                   </div>
 
                   <button
-                    className="rounded-lg p-1.5 text-stone-400 transition-colors hover:bg-stone-200 hover:text-stone-700"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-stone-400 transition-colors hover:bg-stone-200 hover:text-stone-700"
                     disabled={busy || Boolean(pending)}
                     aria-label={`Quitar platillo ${index + 1}`}
                     onClick={() =>
@@ -132,19 +146,19 @@ export function CartDrawer({
                   <div className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white p-0.5">
                     <button
                       type="button"
-                      className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
+                      className="flex h-10 w-10 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
                       disabled={busy}
                       onClick={() => updateQuantity(index, line.quantity - 1)}
                       aria-label="Disminuir cantidad"
                     >
                       <Minus size={13} />
                     </button>
-                    <span className="w-6 text-center text-xs font-bold tabular-nums">
+                    <span className="w-7 text-center text-sm font-bold tabular-nums">
                       {line.quantity}
                     </span>
                     <button
                       type="button"
-                      className="flex h-7 w-7 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
+                      className="flex h-10 w-10 items-center justify-center rounded text-stone-600 hover:bg-stone-100 disabled:opacity-30"
                       disabled={busy}
                       onClick={() => updateQuantity(index, line.quantity + 1)}
                       aria-label="Aumentar cantidad"
@@ -210,8 +224,8 @@ export function CartDrawer({
           role="alert"
           className="my-3 rounded-lg bg-red-50 p-3 text-xs font-semibold text-red-800"
         >
-          Un producto de tu carrito se encuentra agotado. Por favor ajústalo
-          antes de enviar.
+          Algo de tu carrito se agotó. Revisa el aviso en rojo del platillo y
+          ajústalo antes de enviar.
         </p>
       )}
 

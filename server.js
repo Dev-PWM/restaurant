@@ -117,6 +117,9 @@ async function createService(options = {}) {
         menuItems: s.menuItems,
         modifiers: s.modifiers,
         tables: s.tables,
+        queueNumbers: s.activeOrders
+          .filter((o) => o.status === "review" || o.status === "cooking")
+          .map((o) => o.number),
         staff: authenticated,
         activeOrders: s.activeOrders.filter(
           (o) => authenticated || o.sessionId === socket.data.sessionId,

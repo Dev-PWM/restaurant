@@ -555,7 +555,7 @@ export function Menu() {
         </p>
         <p className="mt-2 text-center text-xs font-semibold text-stone-600">
           Lunes a sábado · 9:30 a.m. – 5:00 p.m. · Tel.{" "}
-          <a className="underline" href="tel:+525632149403">
+          <a className="inline-block py-2 underline" href="tel:+525632149403">
             56 3214 9403
           </a>
         </p>
