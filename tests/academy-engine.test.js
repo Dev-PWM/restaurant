@@ -329,6 +329,7 @@ function sourceText() {
     "apps/client-web/src",
     "apps/analytics/src/content/realtime",
     "shared/ui",
+    "shared/types",
   ];
   const chunks = [];
   const walk = (directory) => {

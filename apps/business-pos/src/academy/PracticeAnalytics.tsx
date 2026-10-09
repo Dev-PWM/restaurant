@@ -117,7 +117,7 @@ export function PracticeAnalytics({
                   </div>
                   <div>
                     <dt className="text-xs text-white/75">
-                      Transferencias SPEI ({metrics.speiOrders})
+                      Transferencias ({metrics.speiOrders})
                     </dt>
                     <dd className="mt-1 text-lg font-semibold tabular-nums">
                       {mxn(metrics.speiCents)}

@@ -9,6 +9,7 @@ import {
 import type { Order } from "../../../../../shared/types/realtime";
 import { useRealtime } from "../../../../../shared/ui/RealtimeProvider";
 import { plural } from "../../../../../shared/ui/text-format.js";
+import { specialLabel } from "../../../../../shared/ui/choice-groups.js";
 import {
   EmptyState,
   InventoryControl,
@@ -26,6 +27,10 @@ const labels: Record<string, string> = {
   completed: "Entregado",
   no_show: "No-Show",
 };
+const modifierLabel = (modifier: Order["items"][number]["modifiers"][number]) =>
+  modifier.kind === "special"
+    ? `Especial de Zapata: ${specialLabel(modifier)}`
+    : modifier.name;
 export function TransactionTable({ orders }: { orders: Order[] }) {
   const [filter, setFilter] = useState(""),
     [status, setStatus] = useState("all");
@@ -47,14 +52,16 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
     );
   const [page, setPage] = useState(0),
     pageCount = Math.max(1, Math.ceil(rows.length / 50)),
-    current = Math.min(page, pageCount - 1);
+    current = Math.min(page, pageCount - 1),
+    visibleRows = rows.slice(current * 50, current * 50 + 50);
   return (
     <section className="panel mt-6">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold">Historial del turno</h2>
           <p className="mt-1 text-sm text-stone-500">
-            Pagos registrados y pedidos No-Show · {plural(rows.length, "registro")}
+            Pagos registrados y pedidos No-Show ·{" "}
+            {plural(rows.length, "registro")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -83,7 +90,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
           </select>
         </div>
       </div>
-      <div className="overflow-x-auto">
+      <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] text-left text-sm">
           <thead>
             <tr className="border-b border-stone-200 text-xs uppercase tracking-wide text-stone-500">
@@ -106,7 +113,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
             </tr>
           </thead>
           <tbody>
-            {rows.slice(current * 50, current * 50 + 50).map((o) => (
+            {visibleRows.map((o) => (
               <tr key={o.id} className="border-b border-stone-100 align-top">
                 <td className="px-3 py-4">
                   <strong>{orderLabel(o)}</strong>
@@ -123,7 +130,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
                       <li key={i}>
                         {line.quantity} × {line.name}
                         {line.modifiers.length > 0 &&
-                          ` · ${line.modifiers.map((m) => m.name).join(", ")}`}
+                          ` · ${line.modifiers.map(modifierLabel).join(", ")}`}
                       </li>
                     ))}
                   </ul>
@@ -140,14 +147,14 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
                     <span
                       className={`whitespace-nowrap rounded-md px-2 py-1 text-xs font-bold ${o.transaction.method === "spei" ? "bg-blue-50 text-blue-900" : "bg-stone-100 text-stone-700"}`}
                     >
-                      {o.transaction.method === "spei" ? "SPEI" : "Efectivo"}
+                      {o.transaction.method === "spei" ? "Transferencia" : "Efectivo"}
                     </span>
                   ) : (
                     "—"
                   )}
                 </td>
                 <td className="px-3 py-4 text-right font-bold tabular-nums">
-                  {mxn(o.transaction?.totalCents || 0)}
+                  {o.transaction ? mxn(o.transaction.totalCents) : "—"}
                 </td>
                 {/* Recibido and Cambio are drawer cash: a transfer has neither. */}
                 <td className="px-3 py-4 text-right tabular-nums">
@@ -165,6 +172,65 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
           </tbody>
         </table>
       </div>
+      <ol className="space-y-3 md:hidden" aria-label="Historial del turno">
+        {visibleRows.map((o) => (
+          <li key={o.id} className="rounded-xl border border-stone-200 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <strong>{orderLabel(o)}</strong>
+                <span className="ml-2 text-xs text-stone-500">
+                  {time(o.transaction?.paidAt || o.completedAt || o.createdAt)}
+                </span>
+              </div>
+              <span
+                className={`whitespace-nowrap rounded-md px-2 py-1 text-xs font-bold ${o.status === "no_show" ? "bg-stone-100 text-stone-600" : "bg-emerald-50 text-emerald-800"}`}
+              >
+                {labels[o.status]}
+              </span>
+            </div>
+            <strong className="mt-3 block">{o.customerName}</strong>
+            <ul className="mt-1 space-y-1 text-xs text-stone-500">
+              {o.items.map((line, index) => (
+                <li key={index}>
+                  {line.quantity} × {line.name}
+                  {line.modifiers.length > 0 &&
+                    ` · ${line.modifiers.map(modifierLabel).join(", ")}`}
+                </li>
+              ))}
+            </ul>
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-stone-100 pt-3 text-sm">
+              <div>
+                <dt className="text-xs text-stone-500">Pago</dt>
+                <dd className="font-medium">
+                  {o.transaction ? paymentMethodLabel(o.transaction) : "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-stone-500">Venta</dt>
+                <dd className="font-semibold tabular-nums">
+                  {o.transaction ? mxn(o.transaction.totalCents) : "—"}
+                </dd>
+              </div>
+              {o.transaction?.method !== "spei" && o.transaction && (
+                <>
+                  <div>
+                    <dt className="text-xs text-stone-500">Recibido</dt>
+                    <dd className="tabular-nums">
+                      {mxn(o.transaction.tenderedCents)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-stone-500">Cambio</dt>
+                    <dd className="tabular-nums">
+                      {mxn(o.transaction.changeCents)}
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </li>
+        ))}
+      </ol>
       {!rows.length && (
         <EmptyState>Aquí aparecerán los pagos y pedidos cerrados.</EmptyState>
       )}
@@ -208,7 +274,7 @@ function exportLedger(orders: Order[]) {
       "Venta MXN",
       "Efectivo recibido MXN",
       "Cambio MXN",
-      "Transferencia SPEI MXN",
+      "Transferencia MXN",
     ],
   ];
   for (const o of orders)
@@ -224,11 +290,17 @@ function exportLedger(orders: Order[]) {
         )
         .join("; "),
       o.transaction ? paymentMethodLabel(o.transaction) : "",
-      ((o.transaction?.totalCents || 0) / 100).toFixed(2),
-      // Cash columns stay empty for a transfer so the cash column adds up to the drawer.
-      ((o.transaction?.method === "spei" ? 0 : o.transaction?.tenderedCents || 0) / 100).toFixed(2),
-      ((o.transaction?.method === "spei" ? 0 : o.transaction?.changeCents || 0) / 100).toFixed(2),
-      ((o.transaction?.method === "spei" ? o.transaction.totalCents : 0) / 100).toFixed(2),
+      o.transaction ? (o.transaction.totalCents / 100).toFixed(2) : "",
+      // Empty means no transaction for that method; a recorded zero remains 0.00.
+      o.transaction?.method === "cash"
+        ? (o.transaction.tenderedCents / 100).toFixed(2)
+        : "",
+      o.transaction?.method === "cash"
+        ? (o.transaction.changeCents / 100).toFixed(2)
+        : "",
+      o.transaction?.method === "spei"
+        ? (o.transaction.totalCents / 100).toFixed(2)
+        : "",
     ]);
   const url = URL.createObjectURL(
     new Blob(
@@ -312,8 +384,8 @@ export function Analytics() {
             </p>
             <div className="flex flex-wrap items-end justify-between gap-5 border-t border-white/25 pt-4">
               <p className="text-sm text-white/90">
-                {plural(metrics.paidOrders, "pedido pagado", "pedidos pagados")} · {metrics.noShows} No-Show
-                excluidos
+                {plural(metrics.paidOrders, "pedido pagado", "pedidos pagados")}{" "}
+                · {metrics.noShows} No-Show excluidos
               </p>
               <dl className="flex flex-wrap gap-x-8 gap-y-3">
                 {/* With only cash sales, "sales in cash" would repeat the headline total, so the split appears with the first transfer. */}
@@ -329,7 +401,7 @@ export function Analytics() {
                     </div>
                     <div data-testid="spei-total">
                       <dt className="text-xs text-white/75">
-                        Transferencias SPEI ({metrics.speiOrders})
+                        Transferencias ({metrics.speiOrders})
                       </dt>
                       <dd className="mt-1 text-lg font-semibold tabular-nums">
                         {mxn(metrics.speiCents)}
@@ -357,7 +429,8 @@ export function Analytics() {
           <section className="panel">
             <h2 className="text-xl font-bold">Los más vendidos</h2>
             <p className="mb-6 mt-1 text-sm text-stone-500">
-              Unidades de pedidos entregados · {plural(metrics.completedOrders, "pedido")}
+              Unidades de pedidos entregados ·{" "}
+              {plural(metrics.completedOrders, "pedido")}
             </p>
             {metrics.itemPerformance.length ? (
               <ol className="space-y-5">
@@ -422,7 +495,7 @@ export function Analytics() {
                   <dd className="tabular-nums">{mxn(metrics.cashCents)}</dd>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <dt>De las cuales, transferencias SPEI</dt>
+                  <dt>De las cuales, transferencias</dt>
                   <dd className="tabular-nums">{mxn(metrics.speiCents)}</dd>
                 </div>
               </>

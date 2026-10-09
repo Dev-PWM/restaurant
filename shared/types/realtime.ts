@@ -45,6 +45,8 @@ export interface OrderLine {
   name: string;
   quantity: number;
   modifiers: Modifier[];
+  /** Offered onion, cilantro and sauce choices frozen when this order was placed. Older orders omit it. */
+  toppingChoices?: { id: string; name: string; included: boolean }[];
   unitPriceCents: number;
   lineTotalCents: number;
 }

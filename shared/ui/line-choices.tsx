@@ -1,18 +1,12 @@
-import { Flame, Star } from "lucide-react";
-import type { Modifier } from "../types/realtime";
-import { groupChoices, toppingName } from "./choice-groups.js";
+import { Check, X } from "lucide-react";
+import type { Modifier, OrderLine } from "../types/realtime";
+import { groupChoices, specialLabel, toppingName } from "./choice-groups.js";
 
 /**
  * «kitchen» is for the cook: big, high-contrast, one colour per meaning. «soft» is the same structure in a
  * quieter voice for the customer's cart and order screen, so both read the same words in the same places.
  */
 export type ChoicesVariant = "kitchen" | "soft";
-
-/** Red = leave it off, green = add it, purple/amber = how it is cooked, dark gold = the house special. */
-const PREP_STYLE: Record<string, string> = {
-  "prep-comal": "bg-purple-700 text-white",
-  "prep-frito": "bg-amber-500 text-stone-950",
-};
 
 function ToppingRow({
   label,
@@ -26,10 +20,14 @@ function ToppingRow({
   kitchen: boolean;
 }) {
   if (!items.length) return null;
-  const chip = tone === "red" ? "bg-red-600 text-white" : "bg-green-600 text-white";
+  const chip =
+    tone === "red" ? "bg-red-600 text-white" : "bg-green-600 text-white";
   const word = tone === "red" ? "text-red-700" : "text-green-700";
   return (
-    <div className="flex items-start gap-2" data-choice-row={label.toLowerCase()}>
+    <div
+      className="flex items-start gap-2"
+      data-choice-row={label.toLowerCase()}
+    >
       <span
         className={`mt-0.5 w-9 shrink-0 text-[11px] font-black uppercase tracking-wider ${word}`}
       >
@@ -49,19 +47,32 @@ function ToppingRow({
   );
 }
 
-/** What one dish was ordered with, grouped the way a cook reads it: cooking, special, SIN, CON. */
+/** What one dish was ordered with, grouped the way a cook reads it. */
 export function LineChoices({
   modifiers,
+  toppingChoices,
   variant = "kitchen",
 }: {
   modifiers: Modifier[];
+  toppingChoices?: OrderLine["toppingChoices"];
   variant?: ChoicesVariant;
 }) {
   const { prep, special, masa, without, extras } = groupChoices(modifiers);
-  if (!prep && !special && !masa && !without.length && !extras.length) return null;
+  if (
+    !prep &&
+    !special &&
+    !masa &&
+    !without.length &&
+    !extras.length &&
+    !toppingChoices?.length
+  )
+    return null;
   const kitchen = variant === "kitchen";
   return (
-    <div className={`space-y-1.5 ${kitchen ? "mt-2.5" : "mt-1.5"}`} data-line-choices>
+    <div
+      className={`space-y-2 ${kitchen ? "mt-2.5" : "mt-1.5"}`}
+      data-line-choices
+    >
       {(prep || masa) && (
         <div className="flex flex-wrap items-center gap-1.5">
           {masa && (
@@ -72,11 +83,8 @@ export function LineChoices({
           {prep && (
             <span
               data-modifier-kind="prep"
-              className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 font-black uppercase leading-tight ${
-                PREP_STYLE[prep.id] ?? "bg-stone-700 text-white"
-              } ${kitchen ? "text-[13px]" : "text-xs"}`}
+              className={`inline-flex items-center rounded-md bg-stone-100 px-2.5 py-1 font-bold leading-tight text-stone-800 ${kitchen ? "text-sm" : "text-xs"}`}
             >
-              {prep.id === "prep-comal" && <Flame size={kitchen ? 14 : 12} aria-hidden="true" />}
               {prep.name}
             </span>
           )}
@@ -85,33 +93,54 @@ export function LineChoices({
       {special && (
         <div
           data-modifier-kind="special"
-          className="rounded-lg border-2 border-amber-400 bg-stone-900 px-3 py-2 text-amber-300"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-amber-950"
         >
-          <p
-            className={`flex items-center gap-1.5 font-black uppercase tracking-wide ${kitchen ? "text-sm" : "text-xs"}`}
-          >
-            <Star size={kitchen ? 15 : 13} fill="currentColor" aria-hidden="true" />
-            Especial <span translate="no">{special.name}</span>
+          <p className={`font-bold ${kitchen ? "text-sm" : "text-xs"}`}>
+            ESPECIALES DE ZAPATA
           </p>
-          {special.detail && (
-            <p className={`mt-0.5 font-medium text-stone-100 ${kitchen ? "text-sm" : "text-xs"}`}>
-              {special.detail}
-            </p>
-          )}
+          <p
+            className={`mt-0.5 text-amber-950 ${kitchen ? "text-sm" : "text-xs"}`}
+          >
+            {special.detail || specialLabel(special)}
+          </p>
         </div>
       )}
-      <ToppingRow
-        label="Sin"
-        tone="red"
-        kitchen={kitchen}
-        items={without.map((m) => toppingName(m))}
-      />
-      <ToppingRow
-        label="Con"
-        tone="green"
-        kitchen={kitchen}
-        items={extras.map((m) => toppingName(m, special))}
-      />
+      {toppingChoices && toppingChoices.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5" aria-label="Ingredientes">
+          {toppingChoices.map((choice) => (
+            <span
+              key={choice.id}
+              className={`flex min-w-0 items-center gap-1.5 rounded-md border px-2 py-1 font-semibold ${kitchen ? "text-xs" : "text-[11px]"} ${choice.included ? "border-green-200 bg-green-50 text-green-900" : "border-red-200 bg-red-50 text-red-900"}`}
+            >
+              {choice.included ? (
+                <Check size={13} aria-hidden="true" />
+              ) : (
+                <X size={13} aria-hidden="true" />
+              )}
+              <span className="min-w-0 flex-1 capitalize">{choice.name}</span>
+              <span className="text-[10px] uppercase">
+                {choice.included ? "Sí" : "No"}
+              </span>
+            </span>
+          ))}
+        </div>
+      )}
+      {!toppingChoices && (
+        <ToppingRow
+          label="Sin"
+          tone="red"
+          kitchen={kitchen}
+          items={without.map((m) => toppingName(m))}
+        />
+      )}
+      {!toppingChoices && (
+        <ToppingRow
+          label="Con"
+          tone="green"
+          kitchen={kitchen}
+          items={extras.map((m) => toppingName(m, special))}
+        />
+      )}
     </div>
   );
 }

@@ -392,7 +392,7 @@ export function Menu() {
         <img className="menu-hero-photo" src={huaracheHero} alt="Huarache de bistec servido en un plato de barro" fetchPriority="high" />
         <div className="menu-hero-inner">
           <h1 id="menu-hero-title">Sabor por<br className="menu-hero-break" /> tradición.</h1>
-          <p>Pide en línea. Revisamos y preparamos tu pedido. Paga en efectivo al recogerlo o por SPEI con los datos que recibirás al confirmarlo.</p>
+          <p>Elige tus antojitos y dinos cómo te gustan. Los preparamos para ti; paga al recoger en efectivo o por transferencia.</p>
         </div>
       </section>
 

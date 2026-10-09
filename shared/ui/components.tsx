@@ -40,7 +40,7 @@ export function centsOf(text: string) {
 }
 /** How a payment was made, in the words staff use. Receipts saved before transfers existed have no method: cash. */
 export const paymentMethodLabel = (transaction: Pick<Transaction, "method">) =>
-  transaction.method === "spei" ? "Transferencia SPEI" : "Efectivo";
+  transaction.method === "spei" ? "Transferencia" : "Efectivo";
 /** One line describing what came in: cash shows the tender and change, a transfer shows only the exact total. */
 export const paymentSummary = (
   transaction: Pick<
@@ -681,9 +681,9 @@ export function OrderLines({
         // Only the left edge carries the colour, so the cook sees how it is cooked before reading a word.
         const edge =
           prep?.id === "prep-comal"
-            ? "border-l-purple-700"
+            ? "border-l-clay-600"
             : prep?.id === "prep-frito"
-              ? "border-l-amber-500"
+              ? "border-l-clay-600"
               : "border-l-stone-300";
         return (
           <li
@@ -710,7 +710,7 @@ export function OrderLines({
                 {mxn(line.lineTotalCents)}
               </span>
             </div>
-            <LineChoices modifiers={line.modifiers} variant={variant} />
+            <LineChoices modifiers={line.modifiers} toppingChoices={line.toppingChoices} variant={variant} />
           </li>
         );
       })}

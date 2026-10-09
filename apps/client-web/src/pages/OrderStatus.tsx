@@ -46,7 +46,7 @@ function SpeiInstructions({ order }: { order: Order }) {
     >
       <div className="flex items-center gap-2 text-sm font-black">
         <Building2 size={16} />
-        Paga por transferencia SPEI
+        Paga por transferencia
       </div>
       <dl className="mt-3 space-y-2.5 text-sm">
         <div className="flex items-baseline justify-between gap-3">
@@ -551,7 +551,7 @@ export function OrderStatus({
             <div className="rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-900 flex justify-between">
               {order.transaction.method === "spei" ? (
                 <>
-                  <span>Pagado por transferencia SPEI</span>
+                  <span>Pagado por transferencia</span>
                   <span>Recibimos {mxn(order.transaction.totalCents)}</span>
                 </>
               ) : (

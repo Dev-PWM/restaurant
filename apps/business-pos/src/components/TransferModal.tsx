@@ -55,7 +55,7 @@ export const TransferModal = memo(function TransferModal({
 
   return (
     <Modal
-      title={`Transferencia SPEI · ${BBVA_BANK_INFO.bank}`}
+      title={`Transferencia · ${BBVA_BANK_INFO.bank}`}
       onClose={onClose}
       layer={simulator ? "inline" : "native"}
     >
@@ -69,7 +69,7 @@ export const TransferModal = memo(function TransferModal({
           </div>
           <div>
             <h3 className="text-base font-black tracking-tight text-stone-900">
-              Pago Directo SPEI
+              Pago por transferencia
             </h3>
             <p className="text-xs font-semibold text-stone-500">
               Sin comisiones de pasarela · Banco a banco
@@ -171,7 +171,7 @@ export const TransferModal = memo(function TransferModal({
               className="btn flex-1 bg-blue-600 font-bold text-white hover:bg-blue-700"
             >
               <ShieldCheck className="size-5" />
-              Confirmar Recepción SPEI
+              Confirmar transferencia recibida
             </button>
           )}
         </div>

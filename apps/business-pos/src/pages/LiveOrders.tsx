@@ -29,6 +29,7 @@ import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapa
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import { plural, minutesBetween } from "../../../../shared/ui/text-format.js";
+import { specialLabel } from "../../../../shared/ui/choice-groups.js";
 import { UNDO_WINDOW_SECONDS, needsAcknowledgement } from "../simulator.js";
 import { AcademyBar } from "../academy/AcademyBar";
 import { AcademyLayer } from "../academy/AcademyLayer";
@@ -186,7 +187,7 @@ export function CashTender({
           }}
         >
           <Building2 size={16} />
-          Transferencia SPEI · {BBVA_BANK_INFO.bank}
+          Transferencia · {BBVA_BANK_INFO.bank}
           {order.paymentIntent === "spei" && " (eligió el cliente)"}
         </button>
         <p className="mt-4 text-center text-xs text-stone-500">
@@ -398,7 +399,7 @@ export function TicketCard({
               {isDineIn && (
                 <span
                   data-tour-target={simulator ? "badge-dine-in" : undefined}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-[#2E94A5] px-2.5 py-1 text-xs font-black tracking-wide text-white"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
                 >
                   <Utensils size={14} />
                   COMER AQUÍ
@@ -407,15 +408,16 @@ export function TicketCard({
               {isSPEI && (
                 <span
                   data-tour-target={simulator ? "badge-spei" : undefined}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-black tracking-wide text-white"
+                  className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
                 >
                   <Building2 size={14} />
-                  SPEI {BBVA_BANK_INFO.bank}
+                  {BBVA_BANK_INFO.bank}
                 </span>
               )}
             </div>
           )}
-          {(hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || specials.length > 0) && (
+          {(simulator || order.items.length > 1) &&
+            (hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || specials.length > 0) && (
             <div
               className="mb-3 flex flex-wrap items-center gap-1.5 border-y border-dashed border-stone-300 py-2"
               aria-label="Resumen del ticket"
@@ -424,16 +426,16 @@ export function TicketCard({
                 <span
                   key={special.id}
                   translate="no"
-                  className="inline-flex items-center gap-1 rounded-md border-2 border-amber-400 bg-stone-900 px-2.5 py-0.5 text-xs font-black tracking-wide text-amber-300"
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold tracking-wide text-amber-950"
                 >
                   <Star size={13} fill="currentColor" />
-                  {special.name.replace(/[¡!]/g, "").toUpperCase()} ×{special.pieces}
+                  ESPECIAL · {specialLabel(special)} ×{special.pieces}
                 </span>
               ))}
               {hasSinGrasa && (
                 <span
                   data-tour-target={simulator ? "badge-sin-grasa" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-purple-700 px-2.5 py-1 text-xs font-black tracking-wide text-white"
+                  className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
                 >
                   <Flame size={13} />
                   SIN GRASA ×{sinGrasaPieces}
@@ -442,7 +444,7 @@ export function TicketCard({
               {fritoPieces > 0 && (
                 <span
                   data-tour-target={simulator ? "badge-frito" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-amber-500 px-2.5 py-1 text-xs font-black tracking-wide text-stone-950"
+                  className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
                 >
                   FRITO ×{fritoPieces}
                 </span>
@@ -450,9 +452,9 @@ export function TicketCard({
               {hasExtraQuesillo && (
                 <span
                   data-tour-target={simulator ? "badge-quesillo" : undefined}
-                  className="inline-flex items-center rounded-md bg-[#E03188] px-2.5 py-1 text-xs font-black tracking-wide text-white"
+                  className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-1 text-xs font-bold tracking-wide text-green-900"
                 >
-                  + C/QUESILLO
+                  + QUESILLO EXTRA
                 </span>
               )}
             </div>
@@ -1588,7 +1590,7 @@ function LiveBoard({
             </h1>
             <p className="mt-3 text-stone-600">
               {activeTab === "queue"
-                ? `${plural(snapshot.activeOrders.length, "pedido")} en fila · Efectivo o transferencia SPEI, siempre al mostrador.`
+                ? `${plural(snapshot.activeOrders.length, "pedido")} en fila · Efectivo o transferencia, siempre al mostrador.`
                 : `${plural(snapshot.completedOrders.filter((o) => o.status === "completed").length, "pedido entregado", "pedidos entregados")} en este turno.`}
             </p>
           </div>

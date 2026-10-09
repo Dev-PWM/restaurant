@@ -96,6 +96,13 @@ test("cash is recognized only on payment, exactly once, with server prices and i
   assert.equal(engine.getState().revision, revision);
   assert.equal(engine.getState().activeOrders.length, 0);
   assert.equal(engine.getState().completedOrders[0].status, "completed");
+  assert.deepEqual(engine.getState().completedOrders[0].items[0].toppingChoices, [
+    { id: "omit-cebolla", name: "cebolla", included: true },
+    { id: "omit-cilantro", name: "cilantro", included: true },
+    { id: "salsa-roja", name: "salsa roja", included: false },
+    { id: "salsa-verde", name: "salsa verde", included: false },
+    { id: "quesillo-10", name: "quesillo extra", included: true },
+  ]);
   const m = engine.getState().salesMetrics;
   assert.equal(m.revenueCents, 20000);
   assert.equal(m.tenderedCents, 25000);

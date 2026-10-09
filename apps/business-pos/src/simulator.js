@@ -111,7 +111,7 @@ export function payDemoOrder(
   if (!Number.isSafeInteger(tenderedCents) || tenderedCents < order.totalCents)
     throw new Error("Demo tender must cover the order total.");
   if (method === "spei" && tenderedCents !== order.totalCents)
-    throw new Error("A demo SPEI transfer must be the exact total.");
+    throw new Error("A demo transfer must be the exact total.");
   const paidAt = now.toISOString();
   return {
     ...order,

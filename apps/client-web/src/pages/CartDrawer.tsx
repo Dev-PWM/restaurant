@@ -16,6 +16,7 @@ import type {
 } from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { summarizeCart } from "../../../../shared/ui/cart-summary.js";
+import { toppingChoicesFor } from "../../../../shared/ui/choice-groups.js";
 import { Modal, mxn } from "../../../../shared/ui/components";
 import { LineChoices } from "../../../../shared/ui/line-choices";
 import { DiningRoom } from "./DiningRoom";
@@ -95,7 +96,7 @@ export function CartDrawer({
     });
 
   return (
-    <Modal title="Tu Comanda de Antojitos" onClose={onClose}>
+    <Modal title="Tu pedido" onClose={onClose}>
       <div className="space-y-3.5">
         {cartSummary.lines.map(
           ({ line, item: menuItem, key, index, lineTotalCents }) => {
@@ -118,7 +119,14 @@ export function CartDrawer({
                     <strong className="block text-base font-black leading-tight text-stone-900">
                       {menuItem?.name || "Platillo"}
                     </strong>
-                    <LineChoices modifiers={lineMods} variant="soft" />
+                    <LineChoices
+                      modifiers={lineMods}
+                      toppingChoices={toppingChoicesFor(
+                        snapshot.modifiers.filter((modifier) => menuItem?.modifierIds.includes(modifier.id)),
+                        lineMods,
+                      )}
+                      variant="soft"
+                    />
                     {soldOut.length > 0 && (
                       <p
                         role="alert"
@@ -309,7 +317,7 @@ export function CartDrawer({
           {(
             [
               { value: "cash", label: "Efectivo", Icon: Coins },
-              { value: "spei", label: "Transferencia SPEI", Icon: Building2 },
+              { value: "spei", label: "Transferencia", Icon: Building2 },
             ] as const
           ).map(({ value, label, Icon }) => (
             <label

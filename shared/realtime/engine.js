@@ -3,6 +3,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { randomUUID, createHash } = require("node:crypto");
+const { toppingChoicesFor } = require("../ui/choice-groups.js");
 const {
   MENU_ITEMS,
   MODIFIERS,
@@ -246,6 +247,18 @@ function validate(s) {
     for (const line of order.items) {
       money(line.unitPriceCents);
       money(line.lineTotalCents);
+      if (line.toppingChoices !== undefined)
+        ensure(
+          Array.isArray(line.toppingChoices) &&
+            line.toppingChoices.every(
+              (choice) =>
+                choice &&
+                typeof choice.id === "string" &&
+                typeof choice.name === "string" &&
+                typeof choice.included === "boolean",
+            ),
+          "Opciones del platillo inválidas.",
+        );
       ensure(
         Number.isInteger(line.quantity) &&
           line.quantity > 0 &&
@@ -284,7 +297,7 @@ function validate(s) {
       );
       ensure(
         t.method !== "spei" || (t.changeCents === 0 && legacyTipCents === 0),
-        "Una transferencia SPEI no puede llevar cambio.",
+        "Una transferencia no puede llevar cambio.",
       );
     }
   }
@@ -487,11 +500,15 @@ function createEngine({ directory, persist = writeAtomic }) {
         const unitPriceCents = money(
           menu.priceCents + modifiers.reduce((sum, m) => sum + m.priceCents, 0),
         );
+        const offered = menu.modifierIds
+          .map((id) => next.modifiers.find((modifier) => modifier.id === id))
+          .filter((modifier) => modifier !== undefined);
         return {
           menuItemId: menu.id,
           name: menu.name,
           quantity: line.quantity,
           modifiers,
+          toppingChoices: toppingChoicesFor(offered, modifiers),
           unitPriceCents,
           lineTotalCents: money(unitPriceCents * line.quantity),
         };
@@ -683,7 +700,7 @@ function createEngine({ directory, persist = writeAtomic }) {
         if (method === "spei")
           ensure(
             data.tenderedCents === order.totalCents,
-            "Una transferencia SPEI debe ser por el total exacto.",
+            "Una transferencia debe ser por el total exacto.",
           );
         else
           ensure(

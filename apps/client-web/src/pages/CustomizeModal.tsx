@@ -1,10 +1,17 @@
 import { useState } from "react";
-import { Check, Star } from "lucide-react";
-import type { MenuItem, Modifier, OrderInput } from "../../../../shared/types/realtime";
+import { Check } from "lucide-react";
+import type {
+  MenuItem,
+  Modifier,
+  OrderInput,
+} from "../../../../shared/types/realtime";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { Modal, mxn, Quantity } from "../../../../shared/ui/components";
 import { LineChoices } from "../../../../shared/ui/line-choices";
-import { toppingName } from "../../../../shared/ui/choice-groups.js";
+import {
+  toppingChoicesFor,
+  toppingName,
+} from "../../../../shared/ui/choice-groups.js";
 import { ownerDescription } from "../../../../shared/ui/dish-description.js";
 
 type CartLine = OrderInput["items"][number];
@@ -28,36 +35,27 @@ export function itemAvailable(
   );
 }
 
-const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+const capitalize = (text: string) =>
+  text.charAt(0).toUpperCase() + text.slice(1);
 
 /**
- * One yes/no decision as two big buttons. Both answers are always visible, so nobody has to guess what
- * "not ticked" means: the customer sees «Con cebolla» or «Sin cebolla» and the kitchen reads the same thing.
+ * Every topping is a deliberate yes/no decision. Green and red match the kitchen ticket.
  */
 function TwoWayChoice({
   name,
   title,
   hint,
-  offLabel,
-  onLabel,
-  on,
+  answer,
   onChange,
-  onDisabled = false,
-  tone,
+  disabledValue,
 }: {
   name: string;
   title: string;
   hint?: string;
-  offLabel: string;
-  onLabel: string;
-  on: boolean;
-  onChange: (on: boolean) => void;
-  /** Sold out: the «on» answer cannot be picked. */
-  onDisabled?: boolean;
-  /** «omit» colours the «on» answer red (a SIN); «add» colours it green (a CON). */
-  tone: "omit" | "add";
+  answer: boolean | undefined;
+  onChange: (answer: boolean) => void;
+  disabledValue?: boolean;
 }) {
-  const onStyle = tone === "omit" ? "bg-red-600 text-white" : "bg-green-600 text-white";
   return (
     <fieldset
       className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white py-2.5 pr-2.5 pl-3.5"
@@ -65,17 +63,21 @@ function TwoWayChoice({
     >
       <legend className="sr-only">{title}</legend>
       <div className="min-w-0" aria-hidden="true">
-        <span className="block text-[15px] font-bold leading-tight text-stone-900">{title}</span>
+        <span className="block text-[15px] font-bold leading-tight text-stone-900">
+          {title}
+        </span>
         {hint && (
-          <span className={`mt-0.5 block text-xs ${onDisabled ? "font-semibold text-red-700" : "text-stone-500"}`}>
+          <span
+            className={`mt-0.5 block text-xs ${disabledValue !== undefined ? "font-semibold text-red-700" : "text-stone-500"}`}
+          >
             {hint}
           </span>
         )}
       </div>
       <div className="grid shrink-0 grid-cols-2 gap-1 rounded-lg bg-stone-100 p-1">
-        {([false, true] as const).map((value) => {
-          const checked = on === value;
-          const disabled = value && onDisabled;
+        {([true, false] as const).map((value) => {
+          const checked = answer === value;
+          const disabled = value === disabledValue;
           return (
             <label
               key={String(value)}
@@ -84,8 +86,8 @@ function TwoWayChoice({
                   ? "cursor-not-allowed text-stone-300 line-through"
                   : checked
                     ? value
-                      ? `${onStyle} shadow-sm`
-                      : "bg-white text-stone-900 shadow-sm"
+                      ? "bg-green-600 text-white shadow-sm"
+                      : "bg-red-600 text-white shadow-sm"
                     : "cursor-pointer text-stone-600 hover:bg-stone-200"
               }`}
             >
@@ -97,7 +99,7 @@ function TwoWayChoice({
                 disabled={disabled}
                 onChange={() => onChange(value)}
               />
-              {value ? onLabel : offLabel}
+              {value ? "Sí" : "No"}
             </label>
           );
         })}
@@ -127,6 +129,16 @@ export function CustomizeModal({
     return firstMasa ? [firstMasa.id] : [];
   });
   const [quantity, setQuantity] = useState(1);
+  const [toppingAnswers, setToppingAnswers] = useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        modifiers
+          .filter(
+            (modifier) => modifier.kind === "omit" || modifier.kind === "extra",
+          )
+          .map((modifier) => [modifier.id, modifier.kind === "omit"]),
+      ),
+  );
 
   const kindOf = (id: string) => modifiers.find((v) => v.id === id)?.kind;
   const missingChoice = REQUIRED_KINDS.some(
@@ -152,20 +164,26 @@ export function CustomizeModal({
   const extraModifiers = modifiers.filter((m) => m.kind === "extra");
   const omitModifiers = modifiers.filter((m) => m.kind === "omit");
   const hasToppings = extraModifiers.length > 0 || omitModifiers.length > 0;
-  // A dish may offer only some of these groups, so the step numbers count the ones shown.
-  let step = 0;
-  const prepStep = prepModifiers.length ? ++step : 0;
-  const masaStep = masaModifiers.length ? ++step : 0;
-  const specialStep = specialModifiers.length ? ++step : 0;
-  const toppingsStep = hasToppings ? ++step : 0;
 
-  const chosenSpecial = modifiers.find((m) => m.kind === "special" && selected.includes(m.id)) ?? null;
+  const chosenSpecial =
+    modifiers.find((m) => m.kind === "special" && selected.includes(m.id)) ??
+    null;
   const setChosen = (id: string, on: boolean) =>
     setSelected((prev) =>
-      on ? (prev.includes(id) ? prev : [...prev, id]) : prev.filter((other) => other !== id),
+      on
+        ? prev.includes(id)
+          ? prev
+          : [...prev, id]
+        : prev.filter((other) => other !== id),
     );
+  const setTopping = (modifier: Modifier, included: boolean) => {
+    setToppingAnswers((previous) => ({ ...previous, [modifier.id]: included }));
+    setChosen(modifier.id, modifier.kind === "omit" ? !included : included);
+  };
   // What the kitchen will read, in the order the dish offers its options.
-  const chosen = modifiers.filter((m) => selected.includes(m.id) && m.kind !== "masa");
+  const chosen = modifiers.filter(
+    (m) => selected.includes(m.id) && m.kind !== "masa",
+  );
 
   return (
     <Modal title={item.name} onClose={onClose}>
@@ -179,7 +197,7 @@ export function CustomizeModal({
       {prepModifiers.length > 0 && (
         <fieldset className="mb-6" data-testid="prep-choice">
           <legend className="eyebrow mb-2 flex w-full items-center justify-between gap-3 text-clay-700">
-            <span>{prepStep}. ¿Cómo lo quieres?</span>
+            <span>¿Cómo lo quieres?</span>
             <span className="text-[11px] font-bold text-clay-600 uppercase">
               Obligatorio · 1 opción
             </span>
@@ -232,7 +250,7 @@ export function CustomizeModal({
       {masaModifiers.length > 0 && (
         <fieldset className="mb-6">
           <legend className="eyebrow mb-2 flex w-full items-center justify-between gap-3 text-clay-700">
-            <span>{masaStep}. Elige tu masa</span>
+            <span>Elige tu masa</span>
             <span className="text-[11px] font-bold text-clay-600 uppercase">
               Obligatorio · 1 opción
             </span>
@@ -276,7 +294,9 @@ export function CustomizeModal({
                         )}
                       </div>
                       <span className="text-xs text-stone-500">
-                        {isBlue ? "Sabor terroso tradicional" : "Masa clásica de maíz"}
+                        {isBlue
+                          ? "Sabor terroso tradicional"
+                          : "Masa clásica de maíz"}
                       </span>
                     </div>
                   </div>
@@ -290,12 +310,14 @@ export function CustomizeModal({
         </fieldset>
       )}
 
-      {/* 2. House special (Optional): ¡Izquierdo! on huaraches and sopes, ¡Derecho! on the rest */}
+      {/* Optional house-style note. The stored modifier still identifies the recipe. */}
       {specialModifiers.length > 0 && (
         <fieldset className="mb-6" data-testid="special-choice">
           <legend className="eyebrow mb-2 flex w-full items-center justify-between gap-3 text-stone-700">
-            <span>{specialStep}. Hazlo especial</span>
-            <span className="text-[11px] font-medium text-stone-400">Opcional</span>
+            <span>ESPECIALES DE ZAPATA</span>
+            <span className="text-[11px] font-medium text-stone-400">
+              Opcional
+            </span>
           </legend>
           <div className="space-y-2.5">
             {specialModifiers.map((m) => {
@@ -305,7 +327,7 @@ export function CustomizeModal({
                   key={m.id}
                   className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 p-3.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-clay-600 ${
                     isSelected
-                      ? "border-amber-400 bg-amber-50"
+                      ? "border-amber-300 bg-amber-50"
                       : "border-stone-200 bg-white hover:border-stone-300"
                   } ${!m.available ? "cursor-not-allowed opacity-40" : ""}`}
                 >
@@ -316,24 +338,14 @@ export function CustomizeModal({
                     disabled={!m.available}
                     onChange={() => setChosen(m.id, !isSelected)}
                   />
-                  <span
-                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                      isSelected ? "bg-stone-900 text-amber-300" : "bg-stone-100 text-stone-500"
-                    }`}
-                    aria-hidden="true"
-                  >
-                    <Star size={18} fill={isSelected ? "currentColor" : "none"} />
-                  </span>
                   <span className="min-w-0 flex-1">
-                    <span
-                      translate="no"
-                      className="block text-base font-black leading-tight text-stone-900"
-                    >
-                      {m.name}
+                    <span className="block text-sm font-bold leading-tight text-stone-900">
+                      Añadir preparación especial
                     </span>
                     {m.detail && (
                       <span className="mt-0.5 block text-sm leading-snug text-stone-700">
-                        Lleva: {m.detail.charAt(0).toLowerCase() + m.detail.slice(1)}.
+                        Lleva:{" "}
+                        {m.detail.charAt(0).toLowerCase() + m.detail.slice(1)}.
                       </span>
                     )}
                     <span className="mt-1 block text-xs text-stone-500">
@@ -341,12 +353,14 @@ export function CustomizeModal({
                         ? "Agotado hoy"
                         : m.priceCents
                           ? `+${mxn(m.priceCents)}`
-                          : "Sin costo extra. Sin esto, se prepara normal."}
+                          : "Sin costo extra"}
                     </span>
                   </span>
                   <span
                     className={`mt-1 shrink-0 rounded-md px-2.5 py-1 text-xs font-bold ${
-                      isSelected ? "bg-stone-900 text-amber-300" : "bg-stone-100 text-stone-600"
+                      isSelected
+                        ? "bg-stone-900 text-amber-300"
+                        : "bg-stone-100 text-stone-600"
                     }`}
                   >
                     {isSelected ? "Agregado" : "Agregar"}
@@ -360,18 +374,24 @@ export function CustomizeModal({
 
       {/* 3. Toppings: every one is an explicit yes or no */}
       {hasToppings && (
-        <section className="mb-6" aria-labelledby="toppings-heading" data-testid="toppings">
+        <section
+          className="mb-6"
+          aria-labelledby="toppings-heading"
+          data-testid="toppings"
+        >
           <h3
             id="toppings-heading"
             className="eyebrow mb-2 flex items-center justify-between gap-3 text-stone-700"
           >
-            <span>{toppingsStep}. Toppings</span>
-            <span className="text-[11px] font-medium text-stone-400">Elige Sí o No</span>
+            <span>Ingredientes a tu gusto</span>
+            <span className="text-[11px] font-medium text-stone-500">
+              Toca para cambiar
+            </span>
           </h3>
           {omitModifiers.length > 0 && (
             <div className="mb-3">
-              <p className="mb-1.5 text-xs font-semibold text-stone-500">
-                Ya lleva. Dinos si lo quieres.
+              <p className="mb-1.5 text-xs text-stone-500">
+                Confirma lo que lleva tu platillo.
               </p>
               <div className="space-y-2">
                 {omitModifiers.map((m) => (
@@ -379,13 +399,10 @@ export function CustomizeModal({
                     key={m.id}
                     name={m.id}
                     title={capitalize(toppingName(m))}
-                    offLabel="Con"
-                    onLabel="Sin"
-                    on={selected.includes(m.id)}
-                    onChange={(on) => setChosen(m.id, on)}
-                    onDisabled={!m.available}
+                    answer={toppingAnswers[m.id]}
+                    onChange={(included) => setTopping(m, included)}
+                    disabledValue={!m.available ? false : undefined}
                     hint={m.available ? undefined : "Agotado"}
-                    tone="omit"
                   />
                 ))}
               </div>
@@ -393,25 +410,19 @@ export function CustomizeModal({
           )}
           {extraModifiers.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-stone-500">Agrega a tu gusto.</p>
+              <p className="mb-1.5 text-xs text-stone-500">Salsas y extras.</p>
               <div className="space-y-2">
                 {extraModifiers.map((m) => {
-                  // ¡Derecho! already includes quesillo, so one more is a double portion.
-                  const label = capitalize(
-                    m.id.startsWith("quesillo-") && chosenSpecial?.id === "estilo-derecho"
-                      ? `Con ${toppingName(m, chosenSpecial)}`
-                      : m.name,
-                  );
+                  // Keep each ingredient name direct; the Sí/No controls express whether it is included.
+                  const label = capitalize(toppingName(m, chosenSpecial));
                   return (
                     <TwoWayChoice
                       key={m.id}
                       name={m.id}
                       title={label}
-                      offLabel="No"
-                      onLabel="Sí"
-                      on={selected.includes(m.id)}
-                      onChange={(on) => setChosen(m.id, on)}
-                      onDisabled={!m.available}
+                      answer={toppingAnswers[m.id]}
+                      onChange={(included) => setTopping(m, included)}
+                      disabledValue={!m.available ? true : undefined}
                       hint={
                         !m.available
                           ? "Agotado"
@@ -419,7 +430,6 @@ export function CustomizeModal({
                             ? `+${mxn(m.priceCents)} extra`
                             : "Gratis"
                       }
-                      tone="add"
                     />
                   );
                 })}
@@ -437,7 +447,11 @@ export function CustomizeModal({
           data-testid="kitchen-preview"
         >
           <p className="eyebrow">Así lo leerá la cocina</p>
-          <LineChoices modifiers={chosen as Modifier[]} variant="soft" />
+          <LineChoices
+            modifiers={chosen as Modifier[]}
+            toppingChoices={toppingChoicesFor(modifiers, chosen)}
+            variant="soft"
+          />
         </section>
       )}
 

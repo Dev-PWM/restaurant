@@ -853,7 +853,7 @@ export const MODULES = [
     required: false,
     minutes: 3,
     takeaways: [
-      "El efectivo de tu caja debe cuadrar con lo cobrado en efectivo, no con las transferencias SPEI.",
+      "El efectivo de tu caja debe cuadrar con lo cobrado en efectivo, no con las transferencias.",
       "«Archivar y cerrar» se apaga si todavía hay pedidos en fila.",
       "Al cerrar se guarda un archivo permanente y el nuevo turno empieza en cero.",
     ],
@@ -895,7 +895,7 @@ export const MODULES = [
         control: "sales-card",
         title: "Tus ventas del turno",
         instruction:
-          "Aquí ves lo cobrado en las prácticas. Como hubo una transferencia, la pantalla separa «Ventas en efectivo» de «Transferencias SPEI».",
+          "Aquí ves lo cobrado en las prácticas. Como hubo una transferencia, la pantalla separa «Ventas en efectivo» de «Transferencias».",
       },
       {
         id: "cierre-3",
@@ -951,8 +951,8 @@ export const MODULES = [
     minutes: 3,
     takeaways: [
       "«SIN GRASA» es comal seco y «FRITO» lleva grasa; el número que sigue es cuántas piezas.",
-      "«+ C/QUESILLO» es un extra de pago y «COMER AQUÍ» avisa que se entrega en el comedor.",
-      "«SPEI» significa que el cliente dijo que paga por transferencia; tú registras cómo pagó de verdad.",
+      "«+ QUESILLO EXTRA» es un extra de pago y «COMER AQUÍ» avisa que se entrega en el comedor.",
+      "La etiqueta «BBVA México» indica que el cliente eligió transferencia; tú registras cómo pagó de verdad.",
     ],
     quiz: {
       question:
@@ -1001,7 +1001,7 @@ export const MODULES = [
         kind: "info",
         target: "badge-quesillo",
         control: "ticket-badges",
-        title: "«+ C/QUESILLO»",
+        title: "«+ QUESILLO EXTRA»",
         instruction:
           "Al menos un platillo lleva quesillo extra, que ya está sumado al total del ticket.",
       },
@@ -1019,7 +1019,7 @@ export const MODULES = [
         kind: "info",
         target: "badge-spei",
         control: "ticket-badges",
-        title: "«SPEI»",
+        title: "«BBVA México»",
         instruction:
           "El cliente eligió pagar por transferencia. Al cobrar, el botón de transferencia estará resaltado.",
       },
@@ -1214,15 +1214,15 @@ export const MODULES = [
     id: "transferencia",
     number: 13,
     title: "Pagar con Transferencia",
-    subtitle: "SPEI sin tocar la caja",
+    subtitle: "Transferencia sin tocar la caja",
     description:
       "Qué hacer cuando el cliente paga por transferencia bancaria: verificar en el banco y registrar el pago.",
     required: false,
     minutes: 3,
     takeaways: [
-      "Una transferencia SPEI es dinero en el banco: nunca entra a tu caja ni lleva cambio.",
+      "Una transferencia es dinero en el banco: nunca entra a tu caja ni lleva cambio.",
       "Confirma solo después de ver la transferencia en la app del banco, con el monto exacto.",
-      "Si el cliente eligió SPEI al pedir, el botón se resalta; aun así tú decides cómo cobrar.",
+      "Si el cliente eligió transferencia al pedir, el botón se resalta; aun así tú decides cómo cobrar.",
     ],
     quiz: {
       question:
@@ -1251,7 +1251,7 @@ export const MODULES = [
         kind: "info",
         target: "badge-spei",
         control: "ticket-badges",
-        title: "Mira la etiqueta «SPEI»",
+        title: "Mira la etiqueta «BBVA México»",
         instruction:
           "Esta cliente eligió pagar por transferencia al hacer su pedido.",
         view: { tab: "queue", lane: "ready", kitchenOnly: false },
@@ -1272,7 +1272,7 @@ export const MODULES = [
         control: "spei-pay",
         title: "2. Elige transferencia",
         instruction:
-          "Toca el botón de «Transferencia SPEI». Está resaltado porque la cliente lo eligió.",
+          "Toca el botón de «Transferencia». Está resaltado porque la cliente lo eligió.",
         expect: { type: "spei-open" },
       },
       {
@@ -1292,7 +1292,7 @@ export const MODULES = [
         control: "spei-confirm",
         title: "3. Confirma la recepción",
         instruction:
-          "En la práctica la transferencia ya llegó. Toca «Confirmar Recepción SPEI».",
+          "En la práctica la transferencia ya llegó. Toca «Confirmar transferencia recibida».",
         expect: { type: "spei-pay" },
       },
     ],
@@ -1367,7 +1367,7 @@ export const MODULES = [
         target: "custom-dish-rules",
         title: "Las opciones se ponen solas",
         instruction:
-          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», el especial de su lado del menú (¡Izquierdo! o ¡Derecho!) y los toppings gratis.",
+          "Según la sección, el platillo recibe las mismas opciones que los demás: quesillo, «Al comal» o «Frito», su preparación de Especiales de Zapata y los ingredientes gratis.",
         consequence:
           "Un huarache nuevo ofrece el quesillo de $10; una bebida no ofrece nada.",
         why: "No hay que configurar nada más: el platillo queda listo para pedirse.",
