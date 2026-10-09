@@ -252,17 +252,19 @@ export function CartDrawer({
                   onChange={() => setOrderType(value)}
                   className="h-4 w-4 text-clay-600 focus:ring-0"
                 />
-                <Icon size={16} />
-                <span>{label}</span>
-                {value === "dine_in" && (
-                  <span
-                    className={`ml-auto text-xs font-bold ${unavailable ? "text-red-700" : "text-teal-700"}`}
-                  >
-                    {unavailable
-                      ? "Sin mesas"
-                      : `${tablesAvailable} ${tablesAvailable === 1 ? "libre" : "libres"}`}
-                  </span>
-                )}
+                <Icon size={16} className="shrink-0" />
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span>{label}</span>
+                  {value === "dine_in" && (
+                    <span
+                      className={`text-xs font-bold ${unavailable ? "text-red-700" : "text-teal-700"}`}
+                    >
+                      {unavailable
+                        ? "Sin mesas"
+                        : `${tablesAvailable} ${tablesAvailable === 1 ? "mesa libre" : "mesas libres"}`}
+                    </span>
+                  )}
+                </span>
               </label>
             );
           })}
