@@ -3,12 +3,9 @@ import {
   Bell,
   Building2,
   Check,
-  ChefHat,
   Clock3,
   Copy,
   Flame,
-  Sparkles,
-  UtensilsCrossed,
   Volume2,
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";

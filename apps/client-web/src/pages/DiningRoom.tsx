@@ -13,7 +13,7 @@ export function DiningRoom({ variant }: { variant: "banner" | "inline" }) {
   const summary =
     free === 0
       ? "Sin mesas libres"
-      : `${free} de ${tables.length} ${free === 1 ? "mesa libre" : "mesas libres"}`;
+      : `${free} de ${tables.length} ${tables.length === 1 ? "mesa libre" : "mesas libres"}`;
   return (
     <section
       className={`dining-room dining-room-${variant}`}

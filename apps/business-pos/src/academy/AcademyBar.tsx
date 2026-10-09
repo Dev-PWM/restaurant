@@ -6,7 +6,6 @@ import {
   GraduationCap,
   LayoutList,
   LogOut,
-  Lock,
   RotateCcw,
 } from "lucide-react";
 import { useAcademy } from "./AcademyProvider";

@@ -1,4 +1,4 @@
-import React, { memo, useState, useRef, useEffect } from "react";
+import { memo, useState, useRef, useEffect } from "react";
 import { Building2, Copy, Check, AlertTriangle, ShieldCheck } from "lucide-react";
 import { BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 import { Modal, mxn } from "../../../../shared/ui/components";

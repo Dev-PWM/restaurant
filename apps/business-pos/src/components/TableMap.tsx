@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { Utensils, CheckCircle2, AlertCircle, X } from "lucide-react";
 import type { Table } from "../../../../shared/types/realtime";
 import { time } from "../../../../shared/ui/components";

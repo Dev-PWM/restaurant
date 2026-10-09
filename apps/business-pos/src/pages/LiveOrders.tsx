@@ -20,7 +20,6 @@ import {
   PlusCircle,
   Search,
   SlidersHorizontal,
-  Sparkles,
   Star,
   Table,
   Utensils,
@@ -29,6 +28,7 @@ import type { Order } from "../../../../shared/types/realtime";
 import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
+import { plural, minutesBetween } from "../../../../shared/ui/text-format.js";
 import { UNDO_WINDOW_SECONDS, needsAcknowledgement } from "../simulator.js";
 import { AcademyBar } from "../academy/AcademyBar";
 import { AcademyLayer } from "../academy/AcademyLayer";
@@ -320,7 +320,7 @@ export function TicketCard({
           aria-valuenow={progressPercent}
           aria-valuemin={0}
           aria-valuemax={100}
-          aria-label={`Tiempo de espera: ${minutes} minutos`}
+          aria-label={`Tiempo de espera: ${plural(minutes, "minuto")}`}
         >
           <div
             className={`h-full transition-all duration-220 ease-linear ${
@@ -357,7 +357,7 @@ export function TicketCard({
                   }`}
                   data-tour-target={simulator ? "ticket-timer" : undefined}
                   title={`Tiempo transcurrido: ${minutes} min ${seconds} s`}
-                  aria-label={`Tiempo transcurrido: ${minutes} minutos con ${seconds} segundos`}
+                  aria-label={`Tiempo transcurrido: ${plural(minutes, "minuto")} con ${plural(seconds, "segundo")}`}
                 >
                   <Clock3
                     size={14}
@@ -740,7 +740,7 @@ export function CompletedOrdersSection({
                 Total entregados
               </span>
               <strong className="text-xl font-bold text-stone-900">
-                {totalFulfilled} pedidos
+                {plural(totalFulfilled, "pedido")}
               </strong>
             </div>
             <div className="hidden h-8 w-px bg-stone-200 sm:block" />
@@ -807,7 +807,7 @@ export function CompletedOrdersSection({
                 <th className="px-4 py-3.5">Ticket</th>
                 <th className="px-4 py-3.5">Cliente</th>
                 <th className="px-4 py-3.5">Hora Original (Creado)</th>
-                <th className="px-4 py-3.5">Hora Entregado</th>
+                <th className="px-4 py-3.5">Hora de cierre</th>
                 <th className="px-4 py-3.5">Duración Servicio</th>
                 <th className="px-4 py-3.5">Platillos</th>
                 <th className="px-4 py-3.5 text-right">Total Cobrado</th>
@@ -818,17 +818,11 @@ export function CompletedOrdersSection({
             <tbody className="divide-y divide-stone-100 font-medium">
               {completedList.map((order) => {
                 const isNoShow = order.status === "no_show";
-                const prepMinutes =
-                  order.completedAt && order.paidAt
-                    ? Math.max(
-                        1,
-                        Math.round(
-                          (new Date(order.completedAt).getTime() -
-                            new Date(order.paidAt).getTime()) /
-                            60000,
-                        ),
-                      )
-                    : null;
+                // Creation to delivery: the whole service, not the instant between "paid" and "delivered".
+                const serviceMinutes = minutesBetween(
+                  order.createdAt,
+                  order.completedAt,
+                );
 
                 return (
                   <tr key={order.id} className="hover:bg-stone-50/70">
@@ -849,7 +843,7 @@ export function CompletedOrdersSection({
                       {order.completedAt ? time(order.completedAt) : "--"}
                     </td>
                     <td className="px-4 py-3 tabular-nums text-emerald-800">
-                      {prepMinutes !== null ? `~${prepMinutes} min` : "--"}
+                      {serviceMinutes !== null ? `~${serviceMinutes} min` : "--"}
                     </td>
                     <td className="px-4 py-3">
                       <span className="line-clamp-2 text-stone-600">
@@ -890,17 +884,8 @@ export function CompletedOrdersSection({
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {completedList.map((order) => {
             const isNoShow = order.status === "no_show";
-            const prepMinutes =
-              order.completedAt && order.paidAt
-                ? Math.max(
-                    1,
-                    Math.round(
-                      (new Date(order.completedAt).getTime() -
-                        new Date(order.paidAt).getTime()) /
-                        60000,
-                    ),
-                  )
-                : null;
+            // Accepted to ready: how long the kitchen took. Paid and delivered are the same instant.
+            const prepMinutes = minutesBetween(order.acceptedAt, order.readyAt);
 
             return (
               <article
@@ -956,7 +941,9 @@ export function CompletedOrdersSection({
                     )}
                     {order.completedAt && (
                       <div className="flex justify-between">
-                        <span className="text-stone-500">Hora entregado:</span>
+                        <span className="text-stone-500">
+                          {isNoShow ? "Hora anulado:" : "Hora entregado:"}
+                        </span>
                         <strong className="font-mono text-stone-800">
                           {time(order.completedAt)}
                         </strong>
@@ -1143,7 +1130,6 @@ function LiveBoard({
   const commandRef = useRef(command);
   const resumeRef = useRef(resumeRealtime);
   const simulatorRef = useRef(false);
-  const autoBootedRef = useRef(false);
   const actionLock = useRef(0);
   const previousActive = useRef<Set<string> | null>(null);
   const previousCooking = useRef<Set<string> | null>(null);
@@ -1306,13 +1292,16 @@ function LiveBoard({
     previousActive.current = currentActive;
     previousCooking.current = currentCooking;
   }, [liveSnapshot, simulator]);
-  const cookingOrders =
-    snapshot?.activeOrders.filter((o) => o.status === "cooking") ?? [];
+  const activeOrders = snapshot?.activeOrders;
+  const cookingOrders = useMemo(
+    () => activeOrders?.filter((o) => o.status === "cooking") ?? [],
+    [activeOrders],
+  );
 
   const comalSummary = useMemo(() => {
     const itemMap = new Map<
       string,
-      { name: string; total: number; masas: Record<string, number> }
+      { name: string; total: number; styles: Record<string, number> }
     >();
     let totalPieces = 0;
     for (const order of cookingOrders) {
@@ -1321,12 +1310,12 @@ function LiveBoard({
         const entry = itemMap.get(line.name) || {
           name: line.name,
           total: 0,
-          masas: {},
+          styles: {},
         };
         entry.total += line.quantity;
-        const masaMod = line.modifiers.find((m) => m.kind === "masa");
-        const masaName = masaMod ? masaMod.name : "Estándar";
-        entry.masas[masaName] = (entry.masas[masaName] || 0) + line.quantity;
+        // How each piece is cooked is what the cook needs to batch: comal or fried.
+        const style = line.modifiers.find((m) => m.kind === "prep")?.name ?? "Sin elegir";
+        entry.styles[style] = (entry.styles[style] || 0) + line.quantity;
         itemMap.set(line.name, entry);
       }
     }
@@ -1409,18 +1398,21 @@ function LiveBoard({
       status: "review",
       title: "En revisión",
       note: "Acepta el pedido para empezar a cocinar.",
+      empty: "Sin pedidos en revisión",
       color: "bg-stone-500",
     },
     {
       status: "cooking",
       title: "Cocinando",
       note: "Pedidos aceptados. Manos a la masa.",
+      empty: "Sin pedidos cocinando",
       color: "bg-clay-600",
     },
     {
       status: "ready",
       title: "Lista para recoger",
       note: "Cobra al entregar o marca No-Show.",
+      empty: "Sin pedidos listos para recoger",
       color: "bg-emerald-700",
     },
   ] as const;
@@ -1592,8 +1584,8 @@ function LiveBoard({
             </h1>
             <p className="mt-3 text-stone-600">
               {activeTab === "queue"
-                ? `${snapshot.activeOrders.length} pedidos en fila · Efectivo o transferencia SPEI, siempre al mostrador.`
-                : `${snapshot.completedOrders.filter((o) => o.status === "completed").length} pedidos entregados en este turno.`}
+                ? `${plural(snapshot.activeOrders.length, "pedido")} en fila · Efectivo o transferencia SPEI, siempre al mostrador.`
+                : `${plural(snapshot.completedOrders.filter((o) => o.status === "completed").length, "pedido entregado", "pedidos entregados")} en este turno.`}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -1621,7 +1613,7 @@ function LiveBoard({
                 {pendingTraining > 0 && (
                   <span
                     className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-black tabular-nums text-white"
-                    aria-label={`${pendingTraining} módulos pendientes`}
+                    aria-label={plural(pendingTraining, "módulo pendiente", "módulos pendientes")}
                   >
                     {pendingTraining}
                   </span>
@@ -1801,7 +1793,7 @@ function LiveBoard({
                     className="min-h-11 cursor-pointer px-2 text-xs font-bold text-amber-900 underline hover:text-amber-950"
                     onClick={() => setShowComalDetails(!showComalDetails)}
                   >
-                    {showComalDetails ? "Ocultar masas" : "Ver detalle de masa"}
+                    {showComalDetails ? "Ocultar detalle" : "Ver detalle"}
                   </button>
                 </div>
                 {showComalDetails && (
@@ -1815,9 +1807,9 @@ function LiveBoard({
                           {item.total}× {item.name}
                         </strong>
                         <ul className="mt-1 space-y-0.5 text-[11px] text-stone-600">
-                          {Object.entries(item.masas).map(([masa, qty]) => (
-                            <li key={masa} className="flex justify-between">
-                              <span>{masa}:</span>
+                          {Object.entries(item.styles).map(([style, qty]) => (
+                            <li key={style} className="flex justify-between">
+                              <span>{style}:</span>
                               <span className="font-bold">{qty}</span>
                             </li>
                           ))}
@@ -1917,9 +1909,7 @@ function LiveBoard({
                         })}
                         {!simulator && !connected && <TicketSkeleton />}
                         {!orders.length && (simulator || connected) && (
-                          <EmptyState>
-                            Sin pedidos {lane.title.toLowerCase()}
-                          </EmptyState>
+                          <EmptyState>{lane.empty}</EmptyState>
                         )}
                       </div>
                     </ErrorBoundary>
@@ -1938,7 +1928,7 @@ function LiveBoard({
           </span>
         </footer>
       </main>
-      {inventory && <InventoryControl onClose={() => setInventory(false)} />}{" "}
+      {inventory && <InventoryControl onClose={() => setInventory(false)} />}
       {customDishModalOpen && (
         <CustomDishModal
           simulator={simulator}

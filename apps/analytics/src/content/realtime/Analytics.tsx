@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Order } from "../../../../../shared/types/realtime";
 import { useRealtime } from "../../../../../shared/ui/RealtimeProvider";
+import { plural } from "../../../../../shared/ui/text-format.js";
 import {
   EmptyState,
   InventoryControl,
@@ -53,7 +54,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
         <div>
           <h2 className="text-xl font-bold">Historial del turno</h2>
           <p className="mt-1 text-sm text-stone-500">
-            Pagos registrados y pedidos No-Show · {rows.length} registros
+            Pagos registrados y pedidos No-Show · {plural(rows.length, "registro")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -311,7 +312,7 @@ export function Analytics() {
             </p>
             <div className="flex flex-wrap items-end justify-between gap-5 border-t border-white/25 pt-4">
               <p className="text-sm text-white/90">
-                {metrics.paidOrders} pedidos pagados · {metrics.noShows} No-Show
+                {plural(metrics.paidOrders, "pedido pagado", "pedidos pagados")} · {metrics.noShows} No-Show
                 excluidos
               </p>
               <dl className="flex flex-wrap gap-x-8 gap-y-3">
@@ -356,7 +357,7 @@ export function Analytics() {
           <section className="panel">
             <h2 className="text-xl font-bold">Los más vendidos</h2>
             <p className="mb-6 mt-1 text-sm text-stone-500">
-              Unidades de pedidos entregados · {metrics.completedOrders} pedidos
+              Unidades de pedidos entregados · {plural(metrics.completedOrders, "pedido")}
             </p>
             {metrics.itemPerformance.length ? (
               <ol className="space-y-5">
