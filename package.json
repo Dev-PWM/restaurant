@@ -20,7 +20,7 @@
     "loadtest:sockets": "node scripts/loadtest.cjs --only=sockets",
     "scan": "npm run scan:regex && npm run scan:deps",
     "scan:regex": "node scripts/scan-regex.cjs",
-    "scan:deps": "npm audit --omit=dev",
+    "scan:deps": "node -e \"try { require('child_process').execSync('npm audit --omit=dev --package-lock-only', { stdio: 'inherit', env: { ...process.env, npm_config_allow_scripts: '' } }); } catch (e) { process.exit(e.status || 1); }\"",
     "scan:sast": "semgrep scan --config .semgrep/masaflow.yml --error --severity ERROR --metrics=off server.js shared apps scripts artillery",
     "scan:secrets": "gitleaks detect --source . --config .gitleaks.toml --redact --verbose",
     "dev": "node scripts/dev.cjs",
