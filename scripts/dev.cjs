@@ -103,8 +103,21 @@ async function main() {
         health.status === "ready" &&
         pages.every((page) => page.ok)
       ) {
+        let networkDetails = "";
+        try {
+          const netResponse = await fetch(
+            `http://127.0.0.1:${backendPort}/api/network`,
+            { signal: AbortSignal.timeout(1000) },
+          );
+          if (netResponse.ok) {
+            const netData = await netResponse.json();
+            networkDetails = `\nBonjour: ${netData.urls.bonjour}/pos/\nmDNS: ${netData.urls.mdns}/pos/\nRed LAN: ${netData.urls.lan}/pos/`;
+          }
+        } catch {
+          /* non-blocking telemetry */
+        }
         console.log(
-          `\nMasaFlow listo. Mantén esta ventana abierta. Ctrl+C cierra el servicio.\nPOS: http://localhost:${backendPort}/pos/\nMenú: http://localhost:${backendPort}/order/\nCaja: http://localhost:${backendPort}/analytics/`,
+          `\nMasaFlow listo. Mantén esta ventana abierta. Ctrl+C cierra el servicio.\nPOS: http://localhost:${backendPort}/pos/${networkDetails}\nMenú: http://localhost:${backendPort}/order/\nCaja: http://localhost:${backendPort}/analytics/`,
         );
         if (process.argv.includes("--open") && process.platform === "darwin")
           spawn("open", [`http://localhost:${backendPort}/pos/`], {

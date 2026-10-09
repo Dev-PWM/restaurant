@@ -13,6 +13,11 @@ const { createEngine, UUID } = realtime;
 /** @type {typeof import("./shared/realtime/engine.js").ensure} */
 const ensure = realtime.ensure;
 const { acquireLock } = require("./shared/realtime/lock.js");
+const {
+  createMdnsAdvertiser,
+  getNetworkInfo,
+} = require("./shared/realtime/mdns.js");
+const { toSvg, toDataUri } = require("./shared/qrcode.js");
 /** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
 /** @typedef {import('./shared/types/realtime').Command} Command */
 /** @typedef {import('./shared/types/realtime').Reply} Reply */
@@ -38,7 +43,7 @@ const quietly = (/** @type {() => void} */ write) => {
     // The log stream reports its own failures on stderr.
   }
 };
-/** @param {{dataDirectory?: string, pin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string}} [options] */
+/** @param {{dataDirectory?: string, pin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean}} [options] */
 async function createService(options = {}) {
   const log = (options.logger ?? createSilentLogger()).child({
     component: "server",
@@ -50,12 +55,33 @@ async function createService(options = {}) {
   const pin =
     options.pin !== undefined
       ? options.pin
-      : process.env.MASAFLOW_STAFF_PIN || "1234";
+      : process.env.NODE_ENV === "production"
+        ? process.env.MASAFLOW_STAFF_PIN || ""
+        : process.env.MASAFLOW_STAFF_PIN || "1234";
   const sessionMs = options.sessionMs ?? 12 * 60 * 60 * 1000;
   ensure(
     /^\d{4}$/.test(pin),
     "Configura MASAFLOW_STAFF_PIN con 4 dígitos antes de iniciar.",
   );
+  const effectivePort =
+    options.port ||
+    Number(
+      process.env.PORT && process.env.PORT !== "8080"
+        ? process.env.PORT
+        : 3000,
+    );
+  /** @type {ReturnType<typeof createMdnsAdvertiser> | null} */
+  let mdns = null;
+  if (options.enableMdns) {
+    try {
+      mdns = createMdnsAdvertiser({ port: effectivePort, logger: log });
+    } catch (err) {
+      log.warn(
+        { err: /** @type {Error} */ (err).message },
+        "No se pudo iniciar el anunciador mDNS",
+      );
+    }
+  }
   const release = await acquireLock(dataDirectory);
   try {
     const engine = createEngine({ directory: dataDirectory });
@@ -400,6 +426,36 @@ async function createService(options = {}) {
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
+    app.get("/api/network", (_req, res) => {
+      const addr = server.address();
+      const currentPort =
+        (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
+      res.json(getNetworkInfo(currentPort));
+    });
+    app.get("/api/network/qr", (req, res) => {
+      const addr = server.address();
+      const currentPort =
+        (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
+      const info = getNetworkInfo(currentPort);
+      const target = String(req.query.target || "order");
+      const targetUrl =
+        typeof req.query.url === "string" && req.query.url
+          ? req.query.url
+          : target in info.urls
+            ? /** @type {Record<string, string>} */ (info.urls)[target]
+            : info.urls.order;
+
+      if (req.query.format === "json" || req.query.format === "datauri") {
+        return res.json({
+          url: targetUrl,
+          dataUri: toDataUri(targetUrl, { size: 256, color: "#1c1917" }),
+        });
+      }
+
+      const svg = toSvg(targetUrl, { size: 256, color: "#1c1917" });
+      res.setHeader("Cache-Control", "no-cache");
+      res.type("image/svg+xml").send(svg);
+    });
     app.use("/assets", express.static(path.join(__dirname, "assets")));
     app.get("/manifest.webmanifest", (_req, res) =>
       res.sendFile(path.join(__dirname, "assets", "manifest.webmanifest")),
@@ -431,13 +487,24 @@ async function createService(options = {}) {
       server,
       io,
       engine,
+      mdns,
+      getNetworkInfo: () => {
+        const addr = server.address();
+        const currentPort =
+          (addr && typeof addr === "object" ? addr.port : null) ||
+          effectivePort;
+        return getNetworkInfo(currentPort);
+      },
       close: () => {
         if (!closing)
           closing = new Promise((resolve, reject) => {
             log.info("shutting down");
             clearInterval(expiry);
-            io.close(() => {
-              release().then(() => resolve(undefined), reject);
+            const stopMdns = mdns ? mdns.close() : Promise.resolve();
+            stopMdns.finally(() => {
+              io.close(() => {
+                release().then(() => resolve(undefined), reject);
+              });
             });
           });
         return closing;
@@ -475,31 +542,38 @@ if (require.main === module) {
     logger.fatal({ err: error }, "uncaughtException");
     process.exit(1);
   });
-  createService({ logger })
-    .then((service) => {
-      const stop = () => {
-        void service.close();
-      };
-      process.once("SIGINT", stop);
-      process.once("SIGTERM", stop);
-      process.once("SIGHUP", stop);
-      service.server.once("error", async (error) => {
-        logger.error({ err: error }, "server error");
-        await service.close();
-        process.exitCode = 1;
-      });
       const port = Number(
         process.env.PORT && process.env.PORT !== "8080"
           ? process.env.PORT
           : 3000,
       );
-      service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () =>
-        logger.info(
-          { port, url: `http://localhost:${port}/pos/` },
-          "MasaFlow listo",
-        ),
-      );
-    })
+      createService({ logger, port, enableMdns: true })
+        .then((service) => {
+          const stop = () => {
+            void service.close();
+          };
+          process.once("SIGINT", stop);
+          process.once("SIGTERM", stop);
+          process.once("SIGHUP", stop);
+          service.server.once("error", async (error) => {
+            logger.error({ err: error }, "server error");
+            await service.close();
+            process.exitCode = 1;
+          });
+          service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () => {
+            const netInfo = getNetworkInfo(port);
+            logger.info(
+              {
+                port,
+                url: `http://localhost:${port}/pos/`,
+                bonjour: netInfo.urls.bonjour,
+                mdns: netInfo.urls.mdns,
+                lan: netInfo.urls.lan,
+              },
+              "MasaFlow listo con auto-descubrimiento mDNS/Bonjour",
+            );
+          });
+        })
     .catch((error) => {
       logger.fatal({ err: error }, "no se pudo iniciar MasaFlow");
       process.exitCode = 1;

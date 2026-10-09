@@ -181,6 +181,16 @@ export const GLOSSARY = [
     watch: "Son solo 5 segundos: si te equivocaste, tócalo de inmediato.",
   },
   {
+    id: "network",
+    label: "Red Local",
+    group: "Encabezado",
+    purpose:
+      "Muestra las direcciones locales y los códigos QR para conectar comandas, celulares y pantallas de cocina.",
+    effect:
+      "Abre el panel de red local con los enlaces directos y códigos QR para conectar dispositivos sin internet.",
+    why: "Permite que los clientes y el personal se conecten al servidor del restaurante usando nombres locales (.local) o escaneando el código QR.",
+  },
+  {
     id: "inventory",
     label: "Inventario",
     group: "Encabezado",

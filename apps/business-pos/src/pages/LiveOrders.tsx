@@ -18,6 +18,7 @@ import {
   Pause,
   Play,
   PlusCircle,
+  QrCode,
   Search,
   SlidersHorizontal,
   Star,
@@ -39,6 +40,7 @@ import type { AcademyEvent } from "../academy/types";
 import { TableMap } from "../components/TableMap";
 import { TransferModal } from "../components/TransferModal";
 import { CustomDishModal, type NewDish } from "../components/CustomDishModal";
+import { NetworkModal } from "../components/NetworkModal";
 import {
   chime,
   AudioUnlockButton,
@@ -1074,6 +1076,7 @@ function LiveBoard({
     ),
     [tableNotice, setTableNotice] = useState(""),
     [customDishModalOpen, setCustomDishModalOpen] = useState(false),
+    [networkModalOpen, setNetworkModalOpen] = useState(false),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
     );
@@ -1470,6 +1473,16 @@ function LiveBoard({
           <>
             <button
               className="btn"
+              data-help="network"
+              data-tour-target="btn-network"
+              onClick={() => setNetworkModalOpen(true)}
+              title="Dispositivos y Red Local (mDNS / Bonjour / QR)"
+            >
+              <QrCode size={16} />
+              <span className="hidden sm:inline">Red Local</span>
+            </button>
+            <button
+              className="btn"
               data-help="inventory"
               data-tour-target="btn-inventory"
               onClick={practice.openInventory}
@@ -1493,6 +1506,15 @@ function LiveBoard({
           </>
         ) : (
           <>
+            <button
+              className="btn"
+              data-help="network"
+              onClick={() => setNetworkModalOpen(true)}
+              title="Dispositivos y Red Local (mDNS / Bonjour / QR)"
+            >
+              <QrCode size={16} />
+              <span className="hidden sm:inline">Red Local</span>
+            </button>
             <button
               className="btn"
               data-help="inventory"
@@ -1935,6 +1957,12 @@ function LiveBoard({
         </footer>
       </main>
       {inventory && <InventoryControl onClose={() => setInventory(false)} />}
+      {networkModalOpen && (
+        <NetworkModal
+          simulator={simulator}
+          onClose={() => setNetworkModalOpen(false)}
+        />
+      )}
       {customDishModalOpen && (
         <CustomDishModal
           simulator={simulator}
