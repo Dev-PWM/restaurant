@@ -71,7 +71,7 @@ test('the compiled stylesheet contains every class the screens build at runtime'
 });
 
 test('no mockup placeholders or simulation code shipped', () => {
-  const leftovers = [/Maria Sanchez/, /Carlos Ruiz/, /Roberto J\./, /Lucia Flores/, /Terminal 0?1/, /Tablet 04/, /Head Chef/, /uxpilot-auth\.appspot\.com\/avatars/, /1,284/, /\$2,485/, /simulateNewOrder/, /cdn\.tailwindcss\.com/, /\bonclick=/, /\bz-\[\d+\]/];
+  const leftovers = [/Maria Sanchez/, /Carlos Ruiz/, /Roberto J\./, /Lucia Flores/, /Terminal 0?1/, /Tablet 04/, /Head Chef/, /uxpilot-auth\.appspot\.com/, /1,284/, /\$2,485/, /simulateNewOrder/, /cdn\.tailwindcss\.com/, /\bonclick=/, /\bz-\[\d+\]/];
   for (const page of pages) for (const pattern of leftovers) assert.doesNotMatch(read(page), pattern, `${page} still contains ${pattern}`);
 });
 

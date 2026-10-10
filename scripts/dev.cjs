@@ -27,12 +27,45 @@ async function available(port) {
     probe.listen(port, "0.0.0.0", () => probe.close(resolve));
   });
 }
+async function checkExistingMasaFlow(port) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${port}/api/health`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data?.service === "masaflow" && data?.status === "ready") {
+        return true;
+      }
+    }
+  } catch {
+    /* No active MasaFlow instance responding */
+  }
+  return false;
+}
 async function main() {
   if (!/^\d{4}$/.test(process.env.MASAFLOW_STAFF_PIN || ""))
     throw new Error("Configura MASAFLOW_STAFF_PIN en .env (4 dígitos).");
   if (!Number.isInteger(backendPort) || backendPort < 1 || backendPort > 65535)
     throw new Error("PORT debe ser un puerto válido.");
-  await available(backendPort);
+  try {
+    await available(backendPort);
+  } catch (error) {
+    if (await checkExistingMasaFlow(backendPort)) {
+      console.log(
+        `\nMasaFlow ya se encuentra en ejecución y listo en el puerto ${backendPort}.\nPOS: http://localhost:${backendPort}/pos/\nMenú: http://localhost:${backendPort}/order/\nCaja: http://localhost:${backendPort}/analytics/`,
+      );
+      if (process.argv.includes("--open") && process.platform === "darwin") {
+        spawn("open", [`http://localhost:${backendPort}/pos/`], {
+          stdio: "ignore",
+        }).on("error", (openErr) =>
+          console.error(`Abre el POS manualmente: ${openErr.message}`),
+        );
+      }
+      return;
+    }
+    throw error;
+  }
   const children = [],
     rootEnv = { ...process.env, PORT: String(backendPort) };
   let stopping = false;

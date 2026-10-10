@@ -12,7 +12,7 @@
  * @property {string} label    The text staff see on the control.
  * @property {string} group    Where it lives, for the cheat sheet.
  * @property {string} purpose  ¿Para qué sirve?
- * @property {string} effect   ¿Qué pasa en el sistema?
+ * @property {string} effect   ¿Qué pasa en la pantalla?
  * @property {string} why      ¿Por qué importa?
  * @property {string} [watch]  Cuidado.
  */
@@ -119,7 +119,7 @@ export const GLOSSARY = [
     label: "Billetes $100 · $200 · $500",
     group: "Ventana de cobro",
     purpose: "Anotan de un toque cuánto efectivo te dio el cliente.",
-    effect: "El sistema calcula el cambio al instante («Cambio a entregar»).",
+    effect: "La pantalla calcula el cambio al instante («Cambio a entregar»).",
     why: "No calcules en tu mente: lee el cambio en pantalla y evita descuadres.",
     watch: "Toca el billete que realmente te dieron, no el que esperabas.",
   },
@@ -131,7 +131,7 @@ export const GLOSSARY = [
       "Aquí escribes la cantidad exacta cuando el cliente paga con un monto que no es $100, $200 o $500.",
     effect:
       "Muestra «Cambio a entregar» si alcanza, o «Falta por recibir» si no alcanza.",
-    why: "Cobrar de menos por error cuesta dinero; el sistema te avisa antes.",
+    why: "Cobrar de menos por error cuesta dinero; tu pantalla te avisa antes.",
   },
   {
     id: "cash-change",
@@ -139,7 +139,7 @@ export const GLOSSARY = [
     group: "Ventana de cobro",
     purpose: "Te dice cuánto devolver o cuánto falta.",
     effect:
-      "Si falta dinero, el botón «Confirmar pago y entregar» se apaga: el sistema no te deja cobrar de menos.",
+      "Si falta dinero, el botón «Confirmar pago y entregar» se apaga: la pantalla no te deja cobrar de menos.",
     why: "Es tu red de seguridad al cobrar.",
   },
   {
@@ -253,7 +253,7 @@ export const GLOSSARY = [
       "Cada tarjeta es una mesa. Tócala cuando sientes a alguien y tócala otra vez cuando se desocupe.",
     effect:
       "Cambia entre «Disponible» y «Ocupada» y avisa a los teléfonos de los clientes. Un pedido «Comer aquí» no ocupa la mesa por sí solo.",
-    why: "Tú sabes cuándo se sentó alguien de verdad; el sistema solo lo muestra.",
+    why: "Tú sabes cuándo se sentó alguien de verdad; la pantalla solo lo muestra.",
     watch: "Cerrar el turno libera todas las mesas.",
   },
   {
@@ -369,6 +369,15 @@ export const GLOSSARY = [
       "Suma efectivo y transferencias. «Efectivo recibido» es el efectivo que entró y «Cambio» lo que devolviste. En cuanto hay una transferencia, la pantalla separa «Ventas en efectivo» y «Transferencias».",
     why: "Tu caja física solo debe cuadrar con las ventas en efectivo: una transferencia es dinero en el banco, no en el cajón.",
     watch: "Si hubo transferencias, no compares la caja con el total de «Ventas cobradas».",
+  },
+  {
+    id: "cash-count-card",
+    label: "Conteo de Efectivo Físico",
+    group: "Caja y ventas",
+    purpose: "Te ayuda a contar el dinero real del cajón al final del turno.",
+    effect:
+      "Muestra lo que debe haber en efectivo sumando las ventas en efectivo, y calcula la diferencia con lo que tienes en la mano.",
+    why: "Asegura que no falte ni sobre dinero en tu cajón físico antes de irte a casa.",
   },
   {
     id: "close-shift",

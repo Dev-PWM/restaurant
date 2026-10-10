@@ -223,6 +223,7 @@ export function TicketCard({
   pendingCents = 0,
   onUndoPayment,
   actionLock,
+  helpLifeline = false,
 }: {
   order: Order;
   onPay: () => void;
@@ -241,6 +242,7 @@ export function TicketCard({
    * under the finger, so a quick second tap must not land on it.
    */
   actionLock: MutableRefObject<number>;
+  helpLifeline?: boolean;
 }) {
   const { command, connected } = useRealtime();
   const [noShow, setNoShow] = useState(false),
@@ -334,6 +336,23 @@ export function TicketCard({
         </div>
       )}
       <div className="p-4">
+        {helpLifeline && (
+          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950 space-y-1">
+            <strong className="block font-black text-amber-900">💡 Recordatorio de Ayuda:</strong>
+            {isSPEI && (
+              <p>• Pago por celular: Revisa tu aplicación del banco antes de entregar la comida.</p>
+            )}
+            {hasSinGrasa && (
+              <p>• Cocina al comal sin grasa. No uses manteca ni aceite.</p>
+            )}
+            {omissions.length > 0 && (
+              <p>• Especial atención: Cliente pidió SIN {omissions.map((o) => o.name).join(", ")}.</p>
+            )}
+            {!isSPEI && !hasSinGrasa && omissions.length === 0 && (
+              <p>• Revisa los platillos y prepara a tu ritmo.</p>
+            )}
+          </div>
+        )}
         <div className={paymentPending ? "opacity-60 grayscale" : undefined}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -433,10 +452,10 @@ export function TicketCard({
               {hasSinGrasa && (
                 <span
                   data-tour-target={simulator ? "badge-sin-grasa" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
+                  className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2.5 py-1 text-xs font-bold tracking-wide text-purple-900"
                 >
                   <Flame size={13} />
-                  SIN GRASA ×{sinGrasaPieces}
+                  AL COMAL (SIN GRASA) ×{sinGrasaPieces}
                 </span>
               )}
               {fritoPieces > 0 && (
@@ -1073,13 +1092,15 @@ function LiveBoard({
     [tableNotice, setTableNotice] = useState(""),
     [activeLane, setActiveLane] = useState<"review" | "cooking" | "ready">(
       "review",
-    );
+    ),
+    [helpLifeline, setHelpLifeline] = useState(false);
   const hasPendingPayment = Object.keys(pendingPayments).length > 0;
   // "Sin conexión" about a table tap is stale the moment the connection returns.
   useEffect(() => {
     if (connected) setTableNotice("");
   }, [connected]);
   const simulator = practiceActive;
+  const hideTablesTab = simulator && academy.state.moduleId === "tablero";
   const practice = usePracticeBoard({
     active: practiceActive,
     setActive: setPracticeActive,
@@ -1433,6 +1454,8 @@ function LiveBoard({
             resolved: practice.rush.resolved,
             total: practice.rush.total,
             remaining: practice.rush.remaining,
+            calmMode: practice.rush.calmMode,
+            setCalmMode: practice.rush.setCalmMode,
           }}
           onOpenGlossary={() => setGlossaryOpen(true)}
           onExit={practice.exit}
@@ -1583,6 +1606,22 @@ function LiveBoard({
           <div className="flex flex-wrap gap-2">
             {!simulator && (
               <button
+                type="button"
+                aria-pressed={helpLifeline}
+                className={`btn transition-colors ${
+                  helpLifeline
+                    ? "border-amber-500 bg-amber-100 text-amber-950 font-black shadow-sm"
+                    : "border-stone-300 text-stone-700 hover:bg-stone-50 font-bold"
+                }`}
+                onClick={() => setHelpLifeline(!helpLifeline)}
+                title="Muestra recordatorios y consejos de ayuda en cada comanda"
+              >
+                <span>💡</span>
+                <span>{helpLifeline ? "Modo Ayuda (Activo)" : "Modo Ayuda"}</span>
+              </button>
+            )}
+            {!simulator && (
+              <button
                 className={`btn transition-all ${
                   !academy.state.trained
                     ? "animate-pulse ring-4 ring-yellow-400 ring-offset-2 bg-yellow-400 hover:bg-yellow-300 font-black border-yellow-500 shadow-md text-stone-950"
@@ -1643,7 +1682,10 @@ function LiveBoard({
         </div>
 
         {/* Tab switcher: En Fila vs Mesas vs Completados */}
-        <div className="mb-6 grid grid-cols-3 border-b border-stone-200 md:flex" role="tablist">
+        <div
+          className={`mb-6 grid ${hideTablesTab ? "grid-cols-2" : "grid-cols-3"} border-b border-stone-200 md:flex`}
+          role="tablist"
+        >
           <button
             role="tab"
             aria-selected={activeTab === "queue"}
@@ -1675,7 +1717,7 @@ function LiveBoard({
             aria-selected={activeTab === "tables"}
             data-help="tab-tables"
             data-tour-target={simulator ? "tab-tables" : undefined}
-            className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-bold transition-colors md:flex-row md:gap-2 md:px-5 md:py-3 md:text-sm ${
+            className={`${hideTablesTab ? "hidden" : "animate-fade-in flex"} min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-bold transition-colors md:flex-row md:gap-2 md:px-5 md:py-3 md:text-sm ${
               activeTab === "tables"
                 ? "border-[#2E94A5] text-[#2E94A5]"
                 : "border-transparent text-stone-500 hover:text-stone-800"
@@ -1883,6 +1925,7 @@ function LiveBoard({
                                   setPayId(order.id);
                                   report({ type: "open-pay" });
                                 }}
+                                helpLifeline={helpLifeline}
                               />
                             </ErrorBoundary>
                           );

@@ -140,6 +140,36 @@ export function PracticeAnalytics({
             </dl>
           </div>
         </section>
+        <section
+          data-help="cash-count-card"
+          className="panel mt-6 border-2 border-stone-200 bg-white p-6 shadow-sm"
+        >
+          <div className="flex items-center gap-2 text-stone-900">
+            <span className="text-xl">💵</span>
+            <h2 className="text-xl font-bold">Conteo de Efectivo Físico</h2>
+          </div>
+          <p className="mt-2 text-sm text-stone-600">
+            Es hora de ir a casa. Toma el dinero real del cajón y cuéntalo con calma billete por billete.
+          </p>
+          <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+              <span className="block text-xs font-bold uppercase tracking-wide text-stone-500">
+                Lo que debe haber en efectivo
+              </span>
+              <span className="mt-1 block text-2xl font-black text-stone-900 tabular-nums">
+                {mxn(metrics.cashCents)}
+              </span>
+            </div>
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+              <span className="block text-xs font-bold uppercase tracking-wide text-stone-500">
+                Diferencia
+              </span>
+              <span className="mt-1 block text-2xl font-black text-emerald-600 tabular-nums">
+                $0.00 MXN
+              </span>
+            </div>
+          </div>
+        </section>
         <section className="panel mt-6">
           <h2 className="text-xl font-bold">Los más vendidos</h2>
           <p className="mb-6 mt-1 text-sm text-stone-500">

@@ -74,10 +74,10 @@
   }
   function initialState() {
     const dishes = [
-      ['huarache', 'Huarache de Asada', 'Huaraches', 8500, 'Masa hecha a mano, carne asada, frijoles, cotija, crema y salsa.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_db75814d02_1b437c974642d683.png', ['Cilantro', 'Cebolla picada', 'Limón', 'Salsa verde']],
+      ['huarache', 'Huarache de Asada', 'Huaraches', 8500, 'Masa hecha a mano, carne asada, frijoles, cotija, crema y salsa.', '', ['Cilantro', 'Cebolla picada', 'Limón', 'Salsa verde']],
       ['sope', 'Sope de Chicharrón Prensado', 'Sopes', 3500, 'Masa gruesa con chicharrón prensado, frijoles y salsa verde.', '', ['Lechuga', 'Crema', 'Queso fresco', 'Salsa verde']],
-      ['pambazo', 'Pambazo de Papa con Chorizo', 'Pambazos', 5000, 'Pan bañado en guajillo con papa, chorizo, lechuga y crema.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_4938590a45_a54c3c8ba55ab6d3.png', ['Lechuga', 'Crema', 'Queso fresco']],
-      ['gordita', 'Gordita de Chicharrón', 'Gorditas', 3000, 'Gordita de masa rellena de chicharrón y salsa fresca.', 'https://storage.googleapis.com/uxpilot-auth.appspot.com/gen_825ad9b877_cafe10009ac0f8f2.png', ['Cilantro', 'Cebolla picada', 'Salsa roja']],
+      ['pambazo', 'Pambazo de Papa con Chorizo', 'Pambazos', 5000, 'Pan bañado en guajillo con papa, chorizo, lechuga y crema.', '', ['Lechuga', 'Crema', 'Queso fresco']],
+      ['gordita', 'Gordita de Chicharrón', 'Gorditas', 3000, 'Gordita de masa rellena de chicharrón y salsa fresca.', '', ['Cilantro', 'Cebolla picada', 'Salsa roja']],
       ['quesadilla', 'Quesadilla de Flor de Calabaza', 'Quesadillas', 4500, 'Flor de calabaza y queso derretido en tortilla de maíz hecha a mano.', '', ['Crema', 'Salsa verde']]
     ];
     return { version: 2, revision: 0, nextOrderNumber: 2084,

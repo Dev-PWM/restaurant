@@ -111,7 +111,7 @@ export function GlossarySheet({
                       </div>
                       <div>
                         <dt className="font-bold text-amber-300">
-                          ¿Qué pasa en el sistema?
+                          ¿Qué pasa en la pantalla?
                         </dt>
                         <dd>{entry.effect}</dd>
                       </div>

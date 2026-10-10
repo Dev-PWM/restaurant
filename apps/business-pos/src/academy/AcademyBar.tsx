@@ -15,6 +15,8 @@ export interface RushStatus {
   resolved: number;
   total: number;
   remaining: number;
+  calmMode?: boolean;
+  setCalmMode?: (calm: boolean) => void;
 }
 
 /**
@@ -58,7 +60,9 @@ export function AcademyBar({
   }, []);
 
   const where = rush.active
-    ? `Reto Almuerzo · ${rush.resolved}/${rush.total} resueltas · ${rush.remaining}s`
+    ? rush.calmMode
+      ? `Reto Almuerzo (Modo Tranquilo) · ${rush.resolved}/${rush.total} resueltas`
+      : `Reto Almuerzo · ${rush.resolved}/${rush.total} resueltas · ${rush.remaining}s`
     : state.phase === "learning" && module && step
       ? `Módulo ${module.number}: ${module.title} · Paso ${step.stepNumber} de ${step.totalSteps}`
       : state.phase === "quiz" || state.phase === "recap"
@@ -142,6 +146,23 @@ export function AcademyBar({
             >
               <RotateCcw className="size-4" aria-hidden="true" />
               <span className="hidden lg:inline">Reiniciar</span>
+            </button>
+          )}
+          {rush.active && rush.setCalmMode && (
+            <button
+              type="button"
+              data-tour-allow="rush-calm"
+              aria-pressed={rush.calmMode}
+              className={`btn min-h-11 min-w-11 gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold sm:px-3 ${
+                rush.calmMode
+                  ? "border-emerald-400 bg-emerald-950 text-emerald-200"
+                  : "border-stone-600 bg-stone-800 text-stone-200 hover:bg-stone-700"
+              }`}
+              onClick={() => rush.setCalmMode?.(!rush.calmMode)}
+              title="Practicar sin límite de tiempo"
+            >
+              <span>🌿</span>
+              <span className="hidden sm:inline">Modo Tranquilo</span>
             </button>
           )}
           <button

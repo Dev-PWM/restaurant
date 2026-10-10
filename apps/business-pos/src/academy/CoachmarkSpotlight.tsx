@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ChevronUp,
   Lock,
+  RotateCcw,
   ShieldCheck,
   Zap,
 } from "lucide-react";
@@ -114,7 +115,11 @@ function toBox(rect: DOMRect): Box {
  * it finds the control, scrolls it into the band the coach card leaves free, draws a
  * cutout exactly over it, and keeps the card from ever covering it.
  */
-export function CoachmarkSpotlight() {
+export function CoachmarkSpotlight({
+  onResetStep,
+}: {
+  onResetStep?: () => void;
+} = {}) {
   const academy = useAcademy();
   const { active, step } = academy;
   if (!active || !step) return null;
@@ -125,6 +130,7 @@ export function CoachmarkSpotlight() {
       lock={academy.explainLockRemaining}
       hesitating={academy.hesitating}
       onContinue={() => academy.dispatch({ type: "CONTINUE" })}
+      onResetStep={onResetStep}
     />
   );
 }
@@ -134,11 +140,13 @@ function Spotlight({
   lock,
   hesitating,
   onContinue,
+  onResetStep,
 }: {
   step: ResolvedStep;
   lock: number;
   hesitating: boolean;
   onContinue: () => void;
+  onResetStep?: () => void;
 }) {
   const [box, setBox] = useState<Box | null>(null);
   const [slot, setSlot] = useState<HTMLElement | null>(null);
@@ -441,6 +449,7 @@ function Spotlight({
       expanded={expanded}
       onToggleExpanded={() => setExpanded((open) => !open)}
       onContinue={onContinue}
+      onResetStep={onResetStep}
       inSlot={dock === "slot"}
     />
   );
@@ -505,6 +514,7 @@ const CoachCard = forwardRef<
     expanded: boolean;
     onToggleExpanded: () => void;
     onContinue: () => void;
+    onResetStep?: () => void;
     inSlot: boolean;
   }
 >(function CoachCard(
@@ -516,6 +526,7 @@ const CoachCard = forwardRef<
     expanded,
     onToggleExpanded,
     onContinue,
+    onResetStep,
     inSlot,
   },
   ref,
@@ -536,19 +547,27 @@ const CoachCard = forwardRef<
       <div
         className={`grid gap-x-4 gap-y-2 p-3 sm:p-4 ${showDetails ? "md:grid-cols-2" : ""}`}
       >
-        <div className="min-w-0 space-y-1.5 md:col-start-1">
-          <div className="flex items-center justify-between gap-3">
-            <span className="min-w-0 truncate rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-yellow-200">
-              Módulo {step.moduleNumber}: {step.moduleTitle}
-            </span>
+        <div className="min-w-0 space-y-2 md:col-start-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="min-w-0 truncate rounded-full border border-yellow-400/40 bg-yellow-400/15 px-3 py-1 text-xs font-black uppercase tracking-wide text-yellow-200">
+                Módulo {step.moduleNumber}: {step.moduleTitle}
+              </span>
+              {step.laneAnchor && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/60 bg-amber-500/20 px-2.5 py-1 text-xs font-black text-amber-200">
+                  <span>📍 Estás aquí:</span>
+                  <span className="text-white">{step.laneAnchor}</span>
+                </span>
+              )}
+            </div>
             <span className="shrink-0 text-xs font-bold tabular-nums text-stone-300">
               Paso {step.stepNumber} de {step.totalSteps}
             </span>
           </div>
-          <h3 className="text-base font-black leading-tight text-yellow-300">
+          <h3 className="text-xl font-black leading-tight text-yellow-300">
             {step.title}
           </h3>
-          <p className="text-sm font-semibold leading-snug text-stone-50">
+          <p className="text-base font-bold leading-snug text-stone-100">
             {step.instruction}
           </p>
         </div>
@@ -560,7 +579,7 @@ const CoachCard = forwardRef<
                 aria-hidden="true"
               />
               <span>
-                <strong className="block text-amber-300">En el sistema</strong>
+                <strong className="block text-amber-300">Qué pasa en la pantalla</strong>
                 <span className="text-stone-200">{step.consequence}</span>
               </span>
             </p>
@@ -578,30 +597,41 @@ const CoachCard = forwardRef<
             </p>
           </div>
         )}
-        <div className="flex flex-wrap items-center justify-between gap-2 md:col-start-1 md:self-end">
-          {compact ? (
-            <button
-              type="button"
-              data-tour-allow="coach-more"
-              onClick={onToggleExpanded}
-              className="inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-bold text-amber-300 underline"
-            >
-              {expanded ? (
-                <ChevronUp className="size-4" />
-              ) : (
-                <ChevronDown className="size-4" />
-              )}
-              {expanded ? "Ocultar detalles" : "Ver qué pasa en el sistema"}
-            </button>
-          ) : (
-            <span />
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3 md:col-start-1 md:self-end">
+          <div className="flex flex-wrap items-center gap-2">
+            {compact && (
+              <button
+                type="button"
+                data-tour-allow="coach-more"
+                onClick={onToggleExpanded}
+                className="inline-flex min-h-11 items-center gap-1 rounded-xl px-2 text-xs font-bold text-amber-300 underline"
+              >
+                {expanded ? (
+                  <ChevronUp className="size-4" />
+                ) : (
+                  <ChevronDown className="size-4" />
+                )}
+                {expanded ? "Ocultar detalles" : "Ver qué pasa en la pantalla"}
+              </button>
+            )}
+            {onResetStep && (
+              <button
+                type="button"
+                data-tour-allow="coach-reset-step"
+                onClick={onResetStep}
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl px-2 text-xs font-bold text-stone-300 hover:text-amber-300 underline transition-colors"
+              >
+                <RotateCcw className="size-3.5" aria-hidden="true" />
+                <span>↺ ¿Te confundiste? Reiniciar este paso</span>
+              </button>
+            )}
+          </div>
           {step.kind === "info" ? (
             <button
               type="button"
               data-tour-allow="coach-continue"
               onClick={onContinue}
-              className="btn btn-primary min-h-12 flex-1 gap-2 text-base font-black sm:flex-none sm:px-8"
+              className="btn btn-primary min-h-[60px] flex-1 gap-2 text-lg font-black sm:flex-none sm:px-8"
             >
               Entendido
               <ArrowRight className="size-5" aria-hidden="true" />

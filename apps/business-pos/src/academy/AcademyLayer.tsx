@@ -69,12 +69,27 @@ export function AcademyLayer({
               onConfirmClose={practice.confirmCloseShift}
             />
           )}
-          <CoachmarkSpotlight />
+          <CoachmarkSpotlight onResetStep={practice.resetStep} />
           <HelpPopover />
           <ModuleMenu />
           <QuizCard />
           <RecapCard />
           <ShadowWarningToast />
+          {createPortal(
+            <div className="pointer-events-none fixed bottom-3 right-3 z-[100] sm:bottom-5 sm:right-5">
+              <button
+                type="button"
+                data-tour-allow="exit-practice"
+                onClick={practice.exit}
+                className="pointer-events-auto inline-flex min-h-[50px] items-center gap-2 rounded-2xl border-2 border-amber-400 bg-stone-900/95 px-5 py-2.5 text-sm font-black text-amber-300 shadow-2xl backdrop-blur transition-transform active:scale-95 hover:border-amber-300 hover:bg-stone-800"
+                aria-label="Salir de la Práctica"
+              >
+                <span className="text-base">🚪</span>
+                <span>Salir de la Práctica</span>
+              </button>
+            </div>,
+            document.body,
+          )}
           {failedRush && (
             <AcademyDialog label="Resultado del Reto Almuerzo">
               <div className="space-y-4 p-6 text-center">

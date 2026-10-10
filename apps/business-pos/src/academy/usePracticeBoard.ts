@@ -45,6 +45,8 @@ export interface RushView {
   noShows: number;
   elapsed: number;
   total: number;
+  calmMode: boolean;
+  setCalmMode: (calm: boolean) => void;
 }
 
 /** The real dish the «Pánico y Agotados» module asks the trainee to switch off. */
@@ -100,10 +102,19 @@ export function usePracticeBoard({
   const [rushPaid, setRushPaid] = useState(0);
   const [rushResolved, setRushResolved] = useState(0);
   const [rushNoShows, setRushNoShows] = useState(0);
+  const [calmMode, setCalmMode] = useState(false);
   // Practice tables live here, never on the server: a trainee tapping a table sends nothing anywhere.
   const [tables, setTables] = useState<Table[]>(() => createPracticeTables());
 
-  const { state } = academy;
+  const lastStepIdRef = useRef<string | null>(null);
+  const stepSnapshotRef = useRef<{
+    stepId: string | null;
+    orders: Order[];
+    completed: Order[];
+    acknowledged: Set<string>;
+  } | null>(null);
+
+  const { state, step } = academy;
   const phase = state.phase;
   const rush = phase === "rush";
 
@@ -148,56 +159,66 @@ export function usePracticeBoard({
       resetTransient();
       setRushActive(false);
       setRushFinished(false);
-      setAcknowledged(new Set());
-      setCompleted([]);
+      const initialAck = new Set<string>();
+      let initialOrders: Order[] = [];
+      let initialCompleted: Order[] = [];
       switch (moduleId) {
         case "tablero":
-          setOrders(createTourOrders());
+          initialOrders = createTourOrders();
           break;
         case "flujo": {
           const order = createDemoOrder();
-          setOrders([order]);
+          initialOrders = [order];
           // The golden path is about the flow; reading badges is the next module.
-          setAcknowledged(new Set([order.id]));
+          initialAck.add(order.id);
           break;
         }
         case "exigente":
-          setOrders([createPickyEaterDemoOrder()]);
+          initialOrders = [createPickyEaterDemoOrder()];
           break;
         case "cobros":
-          setOrders([createCashDemoOrder()]);
+          initialOrders = [createCashDemoOrder()];
           break;
         case "errores": {
           const mistake = { ...createDemoOrder(), status: "ready" as const };
-          setOrders([mistake, createNoShowDemoOrder()]);
+          initialOrders = [mistake, createNoShowDemoOrder()];
           break;
         }
         case "cocina":
-          setOrders(createKitchenOrders());
+          initialOrders = createKitchenOrders();
           break;
         case "etiquetas":
-          setOrders([createTagShowcaseOrder()]);
+          initialOrders = [createTagShowcaseOrder()];
           break;
         case "tiempos":
-          setOrders(createTimingOrders());
+          initialOrders = createTimingOrders();
           break;
         case "transferencia":
-          setOrders([createSpeiDemoOrder()]);
+          initialOrders = [createSpeiDemoOrder()];
           break;
         case "mesas":
           // Nothing on the board: this lesson lives on the tables tab.
-          setOrders([]);
+          initialOrders = [];
           break;
         case "historial":
         case "cierre":
-          setOrders([]);
-          setCompleted(createHistoryOrders());
+          initialOrders = [];
+          initialCompleted = createHistoryOrders();
           break;
         default:
-          setOrders([]);
+          initialOrders = [];
       }
+      setOrders(initialOrders);
+      setCompleted(initialCompleted);
+      setAcknowledged(initialAck);
+      stepSnapshotRef.current = {
+        stepId: step?.id ?? null,
+        orders: initialOrders,
+        completed: initialCompleted,
+        acknowledged: initialAck,
+      };
     },
-    [resetTransient],
+    [resetTransient, step?.id],
   );
 
   // A module (re)starting reseeds the board. Keyed by runId so «Reiniciar» works too.
@@ -205,6 +226,34 @@ export function usePracticeBoard({
     if (!active || phase !== "learning" || !state.moduleId) return;
     seed(state.moduleId);
   }, [active, state.runId, state.moduleId, phase === "learning", seed]);
+
+  // Track the snapshot of orders at the start of each step to enable "Reiniciar este paso"
+  useEffect(() => {
+    const currentId = step?.id ?? null;
+    if (phase === "learning" && currentId && currentId !== lastStepIdRef.current) {
+      lastStepIdRef.current = currentId;
+      stepSnapshotRef.current = {
+        stepId: currentId,
+        orders: JSON.parse(JSON.stringify(orders)),
+        completed: JSON.parse(JSON.stringify(completed)),
+        acknowledged: new Set(acknowledged),
+      };
+    }
+    if (!currentId) {
+      lastStepIdRef.current = null;
+    }
+  }, [phase, step?.id, orders, completed, acknowledged]);
+
+  const resetStep = useCallback(() => {
+    if (!stepSnapshotRef.current) return;
+    setPayId(null);
+    setMistakeCountdown(0);
+    setMistakeOrderId(null);
+    setAlarmFlash(false);
+    setOrders(JSON.parse(JSON.stringify(stepSnapshotRef.current.orders)));
+    setCompleted(JSON.parse(JSON.stringify(stepSnapshotRef.current.completed)));
+    setAcknowledged(new Set(stepSnapshotRef.current.acknowledged));
+  }, [setPayId]);
 
   // Overlays belong to a step; they close when the module ends.
   useEffect(() => {
@@ -233,16 +282,27 @@ export function usePracticeBoard({
   }, [active, rush, state.runId, startRushBoard]);
 
   useEffect(() => {
-    if (!rushActive || rushRemaining <= 0) return;
+    if (!rushActive || rushRemaining <= 0 || calmMode) return;
     const timer = setTimeout(
       () => setRushRemaining((seconds) => Math.max(0, seconds - 1)),
       1000,
     );
     return () => clearTimeout(timer);
-  }, [rushActive, rushRemaining]);
+  }, [rushActive, rushRemaining, calmMode]);
 
   useEffect(() => {
-    if (!rushActive || (rushRemaining > 0 && rushResolved < RUSH_TICKET_COUNT))
+    if (!rushActive) return;
+    if (calmMode) {
+      if (rushResolved < RUSH_TICKET_COUNT) return;
+      setRushActive(false);
+      setRushFinished(true);
+      const passed = rushPaid === RUSH_TICKET_COUNT;
+      setRushPassed(passed);
+      if (passed) chime("ready");
+      academyRef.current.dispatch({ type: "RUSH_RESULT", passed });
+      return;
+    }
+    if (rushRemaining > 0 && rushResolved < RUSH_TICKET_COUNT)
       return;
     setRushActive(false);
     setRushFinished(true);
@@ -254,7 +314,7 @@ export function usePracticeBoard({
     setRushPassed(passed);
     if (passed) chime("ready");
     academyRef.current.dispatch({ type: "RUSH_RESULT", passed });
-  }, [rushActive, rushRemaining, rushResolved, rushPaid, rushNoShows]);
+  }, [rushActive, rushRemaining, rushResolved, rushPaid, rushNoShows, calmMode]);
 
   // The undo trap (module «Errores y Fantasmas»): if «Deshacer» is not tapped in time,
   // a real till would have recorded the wrong payment, so the module starts over.
@@ -438,6 +498,8 @@ export function usePracticeBoard({
     noShows: rushNoShows,
     elapsed: RUSH_LIMIT_SECONDS - rushRemaining,
     total: RUSH_TICKET_COUNT,
+    calmMode,
+    setCalmMode,
   };
 
   return {
@@ -448,6 +510,7 @@ export function usePracticeBoard({
     acknowledged,
     alarmFlash,
     rush: rushView,
+    resetStep,
     // controls
     start,
     exit,

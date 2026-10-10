@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { TriangleAlert } from "lucide-react";
+import { Lightbulb } from "lucide-react";
 import { useAcademy } from "./AcademyProvider";
 
 /**
@@ -14,10 +14,10 @@ export function ShadowWarningToast() {
       <div
         role="alert"
         aria-live="assertive"
-        className="animate-shake flex max-w-md items-center gap-3 rounded-2xl border-2 border-red-600 bg-red-600 px-5 py-3 text-white shadow-2xl"
+        className="animate-shake flex max-w-md items-center gap-3 rounded-2xl border-2 border-amber-500 bg-stone-900/95 px-5 py-3 text-stone-50 shadow-2xl backdrop-blur-md"
       >
-        <TriangleAlert
-          className="size-5 shrink-0 text-yellow-300"
+        <Lightbulb
+          className="size-5 shrink-0 text-amber-400"
           aria-hidden="true"
         />
         <span className="text-sm font-bold leading-snug">{warning}</span>

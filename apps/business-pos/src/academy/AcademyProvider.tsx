@@ -272,8 +272,8 @@ export function AcademyProvider({
         warn(
           onTarget
             ? "Lee la explicación antes de continuar."
-            : "Aún no. Termina el paso actual primero.",
-          interactive,
+            : "Aún no. Toca el botón iluminado para continuar.",
+          targetElement ?? interactive,
         );
         return;
       }

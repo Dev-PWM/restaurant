@@ -42,7 +42,7 @@ export function HelpPopover() {
               aria-hidden="true"
             />
             <span>
-              <strong className="block text-amber-300">En el sistema</strong>
+              <strong className="block text-amber-300">Qué pasa en la pantalla</strong>
               {entry.effect}
             </span>
           </p>

@@ -30,6 +30,7 @@ import { glossaryEntry } from "./glossary.js";
  * @property {string} instruction
  * @property {string} [consequence]
  * @property {string} [why]
+ * @property {string} [laneAnchor]       Location anchor badge for spatial awareness.
  * @property {Expectation} [expect]     The UI event that completes an act step.
  * @property {StepView} [view]
  * @property {boolean} [typing]         The cash field accepts typing on this step.
@@ -267,9 +268,9 @@ export const MODULES = [
         target: "tender-200",
         control: "tender-preset",
         title: "4. Anota el billete",
-        instruction: "El cliente te da un billete de $200. Toca «$200.00».",
+        instruction: "Imagina que el cliente te entrega un billete de $200. Tómalo, ponlo en tu caja y toca «$200.00».",
         consequence:
-          "El sistema calcula el cambio al instante: $200.00 menos $185.00 = $15.00.",
+          "La pantalla calcula el cambio al instante: $200.00 menos $185.00 = $15.00.",
         expect: { type: "tender", cents: 20000 },
       },
       {
@@ -316,7 +317,7 @@ export const MODULES = [
         {
           text: "Cobro doble por la molestia",
           explain:
-            "No: el sistema cobra el total del ticket; las omisiones no cuestan extra.",
+            "No: la pantalla cobra el total del ticket; quitar ingredientes no cuesta extra.",
         },
       ],
     },
@@ -373,7 +374,7 @@ export const MODULES = [
         title: "5. Anota el billete",
         instruction: "El cliente paga con $200. Toca «$200.00».",
         consequence:
-          "El sistema calcula el cambio: $200.00 menos $185.00 = $15.00.",
+          "La pantalla calcula el cambio: $200.00 menos $185.00 = $15.00.",
         expect: { type: "tender", cents: 20000 },
       },
       {
@@ -404,12 +405,12 @@ export const MODULES = [
     ],
     quiz: {
       question:
-        "El cliente da $300 y la cuenta es de $370.00. ¿Qué muestra el sistema?",
+        "El cliente da $300 y la cuenta es de $370.00. ¿Qué muestra la pantalla?",
       options: [
         {
           text: "«Falta por recibir $70.00» y no deja confirmar",
           correct: true,
-          explain: "Correcto: el sistema no te deja cobrar de menos.",
+          explain: "Correcto: la pantalla no te deja cobrar de menos.",
         },
         {
           text: "«Cambio a entregar $70.00»",
@@ -516,7 +517,7 @@ export const MODULES = [
         title: "2. Error de dedo",
         instruction: "Por distracción, toca «$200.00» (aunque te dieron $500).",
         consequence:
-          "El sistema cree que recibiste $200.00. Así pasan los errores reales con prisa.",
+          "La pantalla registró que recibiste $200.00. Así pasan las confusiones reales con prisa.",
         why: "Quieres ver qué pasa cuando te equivocas, para no asustarte después.",
         expect: { type: "tender", cents: 20000 },
       },
@@ -559,7 +560,7 @@ export const MODULES = [
         title: "6. Ahora sí, $500",
         instruction: "Toca el billete de «$500.00».",
         consequence:
-          "El sistema calcula el cambio correcto: $500.00 menos $185.00 = $315.00.",
+          "La pantalla calcula el cambio correcto: $500.00 menos $185.00 = $315.00.",
         expect: { type: "tender", cents: 50000 },
       },
       {
@@ -905,7 +906,7 @@ export const MODULES = [
         instruction:
           "Cuenta el efectivo físico de tu caja y compáralo con las ventas en efectivo. Si hubo transferencias, «Ventas en efectivo» las separa de «Ventas cobradas».",
         consequence:
-          "El sistema no te pide contar el efectivo ni lo compara por ti: es un hábito tuyo.",
+          "La pantalla no cuenta los billetes de papel por ti: es un buen hábito tuyo contarlos con las manos.",
         why: "Si no cuadra, es más fácil encontrar el error el mismo día.",
       },
       {
@@ -982,7 +983,7 @@ export const MODULES = [
         kind: "info",
         target: "badge-sin-grasa",
         control: "ticket-badges",
-        title: "«SIN GRASA»",
+        title: "«AL COMAL (SIN GRASA)»",
         instruction:
           "Estas piezas van al comal sin grasa. El número es cuántas piezas son, no cuántos pedidos.",
         view: { tab: "queue", lane: "review", kitchenOnly: false },
@@ -1137,7 +1138,7 @@ export const MODULES = [
         {
           text: "Nada: yo marco la mesa cuando siento al cliente",
           correct: true,
-          explain: "Correcto: el sistema solo muestra lo que tú marcas.",
+          explain: "Correcto: la pantalla solo muestra lo que tú marcas.",
         },
         {
           text: "Se marca una mesa ocupada sola",
@@ -1237,7 +1238,7 @@ export const MODULES = [
         {
           text: "Confirmo, seguro llega en un rato",
           explain:
-            "No: si no llega, ya entregaste y el sistema ya registró el cobro.",
+            "No: si no llega, ya entregaste la comida y la pantalla ya dio por cobrado el dinero.",
         },
         {
           text: "Cobro en efectivo y también confirmo la transferencia",
@@ -1327,10 +1328,29 @@ export const TOTAL_STEPS = MODULES.reduce(
 );
 
 /**
+ * Infers a spatial location anchor for the coachmark to help older learners stay oriented.
+ *
+ * @param {Step} step
+ * @returns {string}
+ */
+function inferLaneAnchor(step) {
+  if (step.laneAnchor) return step.laneAnchor;
+  if (step.target?.startsWith("table-") || step.view?.tab === "tables") return "Control de Mesas";
+  if (step.target?.includes("analytics") || step.target?.includes("close-shift") || step.view?.tab === "completed") return "Cierre de Turno y Ventas";
+  if (step.target?.includes("inventory")) return "Inventario de Platillos";
+  if (step.target?.includes("pause")) return "Pausa de Pedidos Web";
+  if (step.target?.startsWith("tender-") || step.target === "cash-input" || step.target === "confirm-demo-payment" || step.target === "exact-demo-payment" || step.target === "undo-demo-payment" || step.target === "spei-confirm" || step.target === "btn-spei-tender" || step.target === "spei-modal" || step.target === "cash-change") return "Ventana de Cobro";
+  if (step.target?.includes("review") || step.target === "accept-demo-order" || step.target === "acknowledge-restriction" || step.target === "badge-sin-grasa" || step.target === "badge-frito" || step.target === "badge-quesillo" || step.target === "badge-dine-in" || step.target === "badge-spei" || step.view?.lane === "review") return "Fila 1 · Por Revisar";
+  if (step.target?.includes("cooking") || step.target === "ready-demo-order" || step.target === "comal-summary" || step.view?.lane === "cooking") return "Fila 2 · En el Comal (Cocinando)";
+  if (step.target?.includes("ready") || step.target === "pay-demo-order" || step.target === "noshow-demo-order" || step.view?.lane === "ready") return "Fila 3 · Listos para Cobrar y Entregar";
+  return "Tablero Principal";
+}
+
+/**
  * A step with its consequence and «why» filled in from the glossary when the step
  * does not carry its own, and with `{item}` replaced by the practice dish name.
  *
- * @typedef {Step & {consequence: string, why: string, moduleId: ModuleId, moduleNumber: number, moduleTitle: string, stepNumber: number, totalSteps: number}} ResolvedStep
+ * @typedef {Step & {consequence: string, why: string, laneAnchor: string, moduleId: ModuleId, moduleNumber: number, moduleTitle: string, stepNumber: number, totalSteps: number}} ResolvedStep
  *
  * @param {Step} step
  * @param {ModuleDef} module
@@ -1348,6 +1368,7 @@ export function resolveStep(step, module, index, context = {}) {
     instruction: fill(step.instruction),
     consequence: fill(step.consequence ?? entry?.effect ?? ""),
     why: fill(step.why ?? entry?.why ?? ""),
+    laneAnchor: inferLaneAnchor(step),
     moduleId: module.id,
     moduleNumber: module.number,
     moduleTitle: module.title,
