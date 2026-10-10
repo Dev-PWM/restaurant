@@ -31,7 +31,13 @@ const modifierLabel = (modifier: Order["items"][number]["modifiers"][number]) =>
   modifier.kind === "special"
     ? `Especial de Zapata: ${specialLabel(modifier)}`
     : modifier.name;
-export function TransactionTable({ orders }: { orders: Order[] }) {
+export function TransactionTable({
+  orders,
+  shiftOpenedAt,
+}: {
+  orders: Order[];
+  shiftOpenedAt?: string;
+}) {
   const [filter, setFilter] = useState(""),
     [status, setStatus] = useState("all");
   const rows = orders
@@ -64,7 +70,7 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
             {plural(rows.length, "registro")}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <input
             className="field w-52"
             aria-label="Buscar transacciones"
@@ -88,6 +94,15 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
             <option value="paid">Pagados</option>
             <option value="no_show">No-Show</option>
           </select>
+          <button
+            type="button"
+            className="btn inline-flex items-center gap-1.5"
+            onClick={() => exportLedger(rows, shiftOpenedAt)}
+            title="Exportar registros filtrados a archivo CSV"
+          >
+            <ArrowDownToLine size={16} />
+            Exportar a CSV
+          </button>
         </div>
       </div>
       <div className="hidden overflow-x-auto md:block">
@@ -258,50 +273,87 @@ export function TransactionTable({ orders }: { orders: Order[] }) {
     </section>
   );
 }
-function exportLedger(orders: Order[]) {
+function sanitizeItemsSummary(items: Order["items"]): string {
+  if (!items || items.length === 0) return "";
+  return items.map((line) => `${line.quantity}x ${line.name}`).join(", ");
+}
+
+function exportLedger(orders: Order[], shiftOpenedAt?: string) {
   const protect = (value: unknown) => {
     const text = String(value ?? "");
     return `"${(/^[=+@\-\t\r\n]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`;
   };
-  const rows: unknown[][] = [
-    [
-      "Pedido",
-      "Cliente",
-      "Estado",
-      "Hora",
-      "Platillos",
-      "Método",
-      "Venta MXN",
-      "Efectivo recibido MXN",
-      "Cambio MXN",
-      "Transferencia MXN",
-    ],
+
+  const headers = [
+    "Pedido",
+    "Cliente",
+    "Estado",
+    "Platillos",
+    "Método",
+    "Total",
+    "Recibido",
+    "Cambio",
   ];
-  for (const o of orders)
+
+  const rows: unknown[][] = [headers];
+
+  for (const o of orders) {
+    const isNoShow = o.status === "no_show";
+    const statusLabel = labels[o.status] || o.status;
+    const itemsSummary = sanitizeItemsSummary(o.items);
+
+    if (isNoShow) {
+      rows.push([
+        o.number,
+        o.customerName,
+        statusLabel,
+        itemsSummary,
+        "—",
+        "0.00",
+        "",
+        "",
+      ]);
+      continue;
+    }
+
+    if (o.transaction) {
+      const isCash = o.transaction.method === "cash";
+      rows.push([
+        o.number,
+        o.customerName,
+        statusLabel,
+        itemsSummary,
+        isCash ? "Efectivo" : "Transferencia",
+        (o.transaction.totalCents / 100).toFixed(2),
+        isCash ? (o.transaction.tenderedCents / 100).toFixed(2) : "",
+        isCash ? (o.transaction.changeCents / 100).toFixed(2) : "",
+      ]);
+      continue;
+    }
+
     rows.push([
       o.number,
       o.customerName,
-      labels[o.status],
-      o.transaction?.paidAt || o.completedAt,
-      o.items
-        .map(
-          (l) =>
-            `${l.quantity} × ${l.name} (${l.modifiers.map((m) => m.name).join(", ")})`,
-        )
-        .join("; "),
-      o.transaction ? paymentMethodLabel(o.transaction) : "",
-      o.transaction ? (o.transaction.totalCents / 100).toFixed(2) : "",
-      // Empty means no transaction for that method; a recorded zero remains 0.00.
-      o.transaction?.method === "cash"
-        ? (o.transaction.tenderedCents / 100).toFixed(2)
-        : "",
-      o.transaction?.method === "cash"
-        ? (o.transaction.changeCents / 100).toFixed(2)
-        : "",
-      o.transaction?.method === "spei"
-        ? (o.transaction.totalCents / 100).toFixed(2)
-        : "",
+      statusLabel,
+      itemsSummary,
+      "—",
+      "0.00",
+      "",
+      "",
     ]);
+  }
+
+  const dateStr = (() => {
+    if (shiftOpenedAt) {
+      try {
+        return new Date(shiftOpenedAt).toISOString().slice(0, 10);
+      } catch {
+        // fallback to today below
+      }
+    }
+    return new Date().toISOString().slice(0, 10);
+  })();
+
   const url = URL.createObjectURL(
     new Blob(
       ["\uFEFF" + rows.map((row) => row.map(protect).join(",")).join("\r\n")],
@@ -310,7 +362,7 @@ function exportLedger(orders: Order[]) {
   );
   const link = document.createElement("a");
   link.href = url;
-  link.download = "masaflow-ledger.csv";
+  link.download = `caja-ventas-${dateStr}.csv`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -350,7 +402,10 @@ export function Analytics() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button className="btn" onClick={() => exportLedger(ledger)}>
+            <button
+              className="btn"
+              onClick={() => exportLedger(ledger, snapshot.shiftOpenedAt)}
+            >
               <ArrowDownToLine size={16} />
               Exportar historial
             </button>
@@ -469,7 +524,10 @@ export function Analytics() {
             )}
           </section>
         </div>
-        <TransactionTable orders={ledger} />
+        <TransactionTable
+          orders={ledger}
+          shiftOpenedAt={snapshot.shiftOpenedAt}
+        />
         <footer className="mt-6 text-xs text-stone-500">
           Actualizado {time(snapshot.observedAt)} ·{" "}
           {connected ? "En vivo" : "Último estado guardado — Sin Conexión"} ·
