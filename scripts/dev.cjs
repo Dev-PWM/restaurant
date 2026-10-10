@@ -28,9 +28,6 @@ async function available(port) {
   });
 }
 async function main() {
-  if (!process.env.MASAFLOW_STAFF_PIN) {
-    process.env.MASAFLOW_STAFF_PIN = "1234";
-  }
   if (!/^\d{4}$/.test(process.env.MASAFLOW_STAFF_PIN || ""))
     throw new Error("Configura MASAFLOW_STAFF_PIN en .env (4 dígitos).");
   if (!Number.isInteger(backendPort) || backendPort < 1 || backendPort > 65535)

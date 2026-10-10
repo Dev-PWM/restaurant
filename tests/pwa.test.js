@@ -175,6 +175,7 @@ test("people read the restaurant's name, never the software's, on every screen",
 
   const manifest = JSON.parse(read("shared/pwa/manifest.webmanifest"));
   assert.equal(manifest.name, "Los Huaraches de Zapata");
+  assert.equal(JSON.parse(read("assets/manifest.webmanifest")).name, manifest.name);
   assert.ok(manifest.short_name.length <= 13, "a home-screen label longer than 13 characters gets cut off");
   for (const [app, screen] of [["client-web", "Menú"], ["business-pos", "Cocina"], ["analytics", "Caja y ventas"]]) {
     const head = read(`apps/${app}/realtime.html`).split("</head>")[0];

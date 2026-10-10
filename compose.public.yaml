@@ -1,0 +1,42 @@
+# Public website: Caddy is the only published service. Keep the local-only compose.yaml separate.
+services:
+  app:
+    build: .
+    hostname: masaflow-public
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      MASAFLOW_HOST: 0.0.0.0
+      PORT: 4173
+      MASAFLOW_DATA_DIR: /data/realtime
+      MASAFLOW_LOG_DIR: /data/logs
+      MASAFLOW_PUBLIC_ORIGIN: https://${MASAFLOW_DOMAIN:?Set MASAFLOW_DOMAIN in .env}
+      MASAFLOW_STAFF_PASSWORD: ${MASAFLOW_STAFF_PASSWORD:?Set MASAFLOW_STAFF_PASSWORD in .env}
+    expose:
+      - "4173"
+    volumes:
+      - restaurant-data:/data
+
+  web:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      MASAFLOW_DOMAIN: ${MASAFLOW_DOMAIN:?Set MASAFLOW_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  restaurant-data:
+  caddy-data:
+  caddy-config:

@@ -145,6 +145,8 @@ export interface Snapshot {
   shiftOpenedAt: string;
   revision: number;
   observedAt: string;
+  /** Public deployments use a staff password; local restaurant installations can use their PIN. */
+  staffAuthMode: "pin" | "password";
   acceptingOrders: boolean;
   menuItems: MenuItem[];
   modifiers: Modifier[];
@@ -196,7 +198,7 @@ export type Reply =
   | { ok: false; error: string; code: string };
 export interface ClientEvents {
   request_init: (ack?: (response: Reply) => void) => void;
-  staff_login: (pin: string, ack: (response: Reply) => void) => void;
+  staff_login: (credential: string, ack: (response: Reply) => void) => void;
   staff_logout: (ack: (response: Reply) => void) => void;
 }
 export type ClientToServerEvents = ClientEvents & {

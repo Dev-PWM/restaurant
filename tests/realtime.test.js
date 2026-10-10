@@ -871,6 +871,79 @@ test("PIN attempts are bounded across fresh sockets; server refuses missing PIN 
   );
 });
 
+test("public HTTPS mode requires a long staff password and rejects foreign socket origins", async (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "masaflow-public-"));
+  const sockets = [];
+  let service;
+  t.after(async () => {
+    for (const socket of sockets) socket.disconnect();
+    if (service) await service.close();
+    fs.rmSync(directory, { force: true, recursive: true });
+  });
+  await assert.rejects(
+    createService({ dataDirectory: directory, publicOrigin: "https://orders.example.com", staffPassword: "short" }),
+    /MASAFLOW_STAFF_PASSWORD/,
+  );
+  await assert.rejects(
+    createService({ dataDirectory: directory, publicOrigin: "http://orders.example.com", staffPassword: "a-long-test-only-password" }),
+    /HTTPS/,
+  );
+  service = await createService({
+    dataDirectory: directory,
+    publicOrigin: "https://orders.example.com",
+    staffPassword: "a-long-test-only-password",
+  });
+  await new Promise((resolve) => service.server.listen(0, "127.0.0.1", resolve));
+  const url = `http://127.0.0.1:${service.server.address().port}`;
+  assert.equal((await fetch(`${url}/api/network`)).status, 404);
+  assert.equal((await fetch(`${url}/api/network/qr`)).status, 404);
+  const connect = (origin) => {
+    const socket = io(url, {
+      autoConnect: false,
+      reconnection: false,
+      auth: { sessionId: randomUUID(), token: "" },
+      extraHeaders: { Origin: origin },
+    });
+    sockets.push(socket);
+    return socket;
+  };
+  const foreign = connect("https://other.example.com");
+  const blocked = new Promise((resolve) => foreign.once("connect_error", resolve));
+  foreign.connect();
+  await blocked;
+  assert.equal(foreign.connected, false);
+  const sameOriginPoll = io(url, {
+    autoConnect: false,
+    reconnection: false,
+    transports: ["polling"],
+    auth: { sessionId: randomUUID(), token: "" },
+    extraHeaders: { "Sec-Fetch-Site": "same-origin" },
+  });
+  sockets.push(sameOriginPoll);
+  const pollingInit = new Promise((resolve) => sameOriginPoll.once("init_data", resolve));
+  sameOriginPoll.connect();
+  assert.equal((await pollingInit).staffAuthMode, "password");
+  const crossSitePoll = io(url, {
+    autoConnect: false,
+    reconnection: false,
+    transports: ["polling"],
+    auth: { sessionId: randomUUID(), token: "" },
+    extraHeaders: { "Sec-Fetch-Site": "cross-site" },
+  });
+  sockets.push(crossSitePoll);
+  const crossSiteBlocked = new Promise((resolve) => crossSitePoll.once("connect_error", resolve));
+  crossSitePoll.connect();
+  await crossSiteBlocked;
+  assert.equal(crossSitePoll.connected, false);
+  const staff = connect("https://orders.example.com");
+  const initial = new Promise((resolve) => staff.once("init_data", resolve));
+  staff.connect();
+  assert.equal((await initial).staffAuthMode, "password");
+  assert.equal((await ack(staff, "staff_login", "1234")).ok, false);
+  assert.equal((await ack(staff, "staff_login", "a-long-test-only-password")).ok, true);
+  assert.equal((await fetch(`${url}/api/health`)).status, 200);
+});
+
 test("fractional peso prices and modifiers retain every centavo through payment and archive", (t) => {
   const { engine, directory } = fixture(t);
   const seed = engine.getState();
@@ -921,6 +994,7 @@ test("proxy identity trusts only loopback and the last appended, valid client ad
     clientAddress("::1", "::ffff:192.168.1.21"),
     "::ffff:192.168.1.21",
   );
+  assert.equal(clientAddress("172.20.0.2", "203.0.113.99", true), "203.0.113.99");
 });
 
 test("payments record the full order total, calculate change, survive restart, and archive then reset", (t) => {

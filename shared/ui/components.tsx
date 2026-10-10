@@ -409,16 +409,25 @@ export function InventoryControl({ onClose }: { onClose: () => void }) {
 }
 export function PinGate({ children }: { children: ReactNode }) {
   const { snapshot, login, connected, error, suspended } = useRealtime();
-  const [pin, setPin] = useState(""),
+  const [credential, setCredential] = useState(""),
     [busy, setBusy] = useState(false),
     [shakeKey, setShakeKey] = useState(0);
+  const passwordMode = snapshot?.staffAuthMode === "password";
   // The training simulator suspends realtime (snapshot becomes null) while staff stay signed in.
   if (snapshot?.staff || suspended) return <>{children}</>;
+  if (!snapshot) return (
+    <div className="flex min-h-[90dvh] items-center justify-center px-5 py-10">
+      <section className="w-full max-w-sm text-center">
+        <Brand />
+        <p role="status" className="mt-8 text-stone-600">Conectando con el servidor…</p>
+      </section>
+    </div>
+  );
   const enter = async () => {
     setBusy(true);
-    const authenticated = await login(pin);
+    const authenticated = await login(credential);
     if (!authenticated && connected) setShakeKey((key) => key + 1);
-    setPin("");
+    setCredential("");
     setBusy(false);
   };
   return (
@@ -430,7 +439,9 @@ export function PinGate({ children }: { children: ReactNode }) {
         </div>
         <h1 className="display text-4xl">Bienvenido al turno.</h1>
         <p className="mb-6 mt-3 text-stone-600">
-          Ingresa el PIN de 4 dígitos del personal.
+          {passwordMode
+            ? "Ingresa la contraseña del personal."
+            : "Ingresa el PIN de 4 dígitos del personal."}
         </p>
         <form
           onSubmit={(event) => {
@@ -439,19 +450,21 @@ export function PinGate({ children }: { children: ReactNode }) {
           }}
         >
           <label className="sr-only" htmlFor="staff-pin">
-            PIN del personal
+            {passwordMode ? "Contraseña del personal" : "PIN del personal"}
           </label>
           <input
             id="staff-pin"
             key={shakeKey}
-            className={`field text-center text-3xl tracking-[0.5em] ${shakeKey ? "animate-shake" : ""}`}
+            className={`field w-full ${passwordMode ? "text-base" : "text-center text-3xl tracking-[0.5em]"} ${shakeKey ? "animate-shake" : ""}`}
             type="password"
-            inputMode="numeric"
-            autoComplete="off"
-            maxLength={4}
-            value={pin}
+            inputMode={passwordMode ? "text" : "numeric"}
+            autoComplete={passwordMode ? "current-password" : "off"}
+            maxLength={passwordMode ? 256 : 4}
+            value={credential}
             onChange={(e) =>
-              setPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+              setCredential(passwordMode
+                ? e.target.value.slice(0, 256)
+                : e.target.value.replace(/\D/g, "").slice(0, 4))
             }
           />
           {error && (
@@ -459,7 +472,7 @@ export function PinGate({ children }: { children: ReactNode }) {
               {error}
             </p>
           )}
-          <div className="my-4 grid grid-cols-3 gap-3">
+          {!passwordMode && <div className="my-4 grid grid-cols-3 gap-3">
             {[
               "1",
               "2",
@@ -480,7 +493,7 @@ export function PinGate({ children }: { children: ReactNode }) {
                 className="btn text-xl"
                 disabled={busy}
                 onClick={() =>
-                  setPin((p) =>
+                  setCredential((p) =>
                     key === "Borrar"
                       ? ""
                       : key === "←"
@@ -492,10 +505,10 @@ export function PinGate({ children }: { children: ReactNode }) {
                 {key}
               </button>
             ))}
-          </div>
+          </div>}
           <button
-            className="btn btn-primary w-full"
-            disabled={!connected || pin.length !== 4 || busy}
+            className="btn btn-primary mt-4 w-full"
+            disabled={!connected || (passwordMode ? credential.length < 12 : credential.length !== 4) || busy}
           >
             {busy ? "Verificando…" : "Entrar al turno"}
             <ArrowRight size={18} />

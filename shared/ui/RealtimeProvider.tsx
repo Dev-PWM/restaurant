@@ -60,7 +60,7 @@ interface ContextValue {
     event: K,
     payload: Commands[K],
   ) => Promise<Reply>;
-  login: (pin: string) => Promise<boolean>;
+  login: (credential: string) => Promise<boolean>;
   logout: () => void;
   suspendRealtime: () => void;
   resumeRealtime: () => void;
@@ -202,7 +202,7 @@ export function RealtimeProvider({
       return { ok: false, error: message, code: "ACK_TIMEOUT" };
     }
   }
-  async function login(pin: string) {
+  async function login(credential: string) {
     const socket = socketRef.current;
     if (!socket?.connected) {
       setError("Sin Conexión.");
@@ -212,7 +212,7 @@ export function RealtimeProvider({
     try {
       const response = await socket
         .timeout(8000)
-        .emitWithAck("staff_login", pin);
+        .emitWithAck("staff_login", credential);
       if (!response.ok) {
         setError(response.error);
         return false;
@@ -221,7 +221,7 @@ export function RealtimeProvider({
       socket.auth = { sessionId, token: response.token };
       return true;
     } catch {
-      setError("No se pudo verificar el PIN. Intenta otra vez.");
+      setError("No se pudo verificar el acceso. Intenta otra vez.");
       return false;
     }
   }

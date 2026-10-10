@@ -23,11 +23,11 @@ const { toSvg, toDataUri } = require("./shared/qrcode.js");
 /** @typedef {import('./shared/types/realtime').Reply} Reply */
 /** @typedef {{sessionId: string, token: string}} SocketData */
 /** @typedef {import('socket.io').Socket<import('./shared/types/realtime').ClientToServerEvents, import('./shared/types/realtime').ServerToClientEvents, Record<string, never>, SocketData>} AppSocket */
-/** Trust only the final forwarded hop appended by our loopback Vite proxy.
- * @param {string} peer @param {string | string[] | undefined} forwarded */
-function clientAddress(peer, forwarded) {
+/** Trust the final forwarded hop only for the loopback Vite proxy or the isolated public Caddy service.
+ * @param {string} peer @param {string | string[] | undefined} forwarded @param {boolean} [publicProxy] */
+function clientAddress(peer, forwarded, publicProxy = false) {
   if (
-    !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer) ||
+    (!publicProxy && !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer)) ||
     typeof forwarded !== "string"
   )
     return peer;
@@ -43,7 +43,7 @@ const quietly = (/** @type {() => void} */ write) => {
     // The log stream reports its own failures on stderr.
   }
 };
-/** @param {{dataDirectory?: string, pin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean}} [options] */
+/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean}} [options] */
 async function createService(options = {}) {
   const log = (options.logger ?? createSilentLogger()).child({
     component: "server",
@@ -52,17 +52,34 @@ async function createService(options = {}) {
     options.dataDirectory ||
     process.env.MASAFLOW_DATA_DIR ||
     path.join(__dirname, ".masaflow-realtime");
-  const pin =
-    options.pin !== undefined
-      ? options.pin
-      : process.env.NODE_ENV === "production"
-        ? process.env.MASAFLOW_STAFF_PIN || ""
-        : process.env.MASAFLOW_STAFF_PIN || "1234";
-  const sessionMs = options.sessionMs ?? 12 * 60 * 60 * 1000;
+  const publicOrigin = options.publicOrigin ?? process.env.MASAFLOW_PUBLIC_ORIGIN ?? "";
+  if (publicOrigin) {
+    const parsed = new URL(publicOrigin);
+    ensure(
+      parsed.protocol === "https:" &&
+        parsed.origin === publicOrigin &&
+        parsed.username === "" &&
+        parsed.password === "" &&
+        parsed.pathname === "/" &&
+        parsed.search === "" &&
+        parsed.hash === "",
+      "MASAFLOW_PUBLIC_ORIGIN debe ser un origen HTTPS sin ruta.",
+    );
+  }
+  const staffPassword = options.staffPassword ?? process.env.MASAFLOW_STAFF_PASSWORD ?? "";
   ensure(
-    /^\d{4}$/.test(pin),
-    "Configura MASAFLOW_STAFF_PIN con 4 dígitos antes de iniciar.",
+    (!publicOrigin || staffPassword.length >= 12) &&
+      (!staffPassword || (staffPassword.length >= 12 && staffPassword.length <= 256)),
+    "Configura MASAFLOW_STAFF_PASSWORD con 12 a 256 caracteres para publicar el sitio.",
   );
+  const authMode = staffPassword ? "password" : "pin";
+  const pin = authMode === "password" ? "" : options.pin ?? process.env.MASAFLOW_STAFF_PIN ?? "";
+  const sessionMs = options.sessionMs ?? 12 * 60 * 60 * 1000;
+  if (authMode === "pin")
+    ensure(
+      /^\d{4}$/.test(pin),
+      "Configura MASAFLOW_STAFF_PIN con 4 dígitos antes de iniciar.",
+    );
   const effectivePort =
     options.port ||
     Number(
@@ -72,16 +89,6 @@ async function createService(options = {}) {
     );
   /** @type {ReturnType<typeof createMdnsAdvertiser> | null} */
   let mdns = null;
-  if (options.enableMdns) {
-    try {
-      mdns = createMdnsAdvertiser({ port: effectivePort, logger: log });
-    } catch (err) {
-      log.warn(
-        { err: /** @type {Error} */ (err).message },
-        "No se pudo iniciar el anunciador mDNS",
-      );
-    }
-  }
   const release = await acquireLock(dataDirectory);
   try {
     const engine = createEngine({ directory: dataDirectory });
@@ -95,19 +102,29 @@ async function createService(options = {}) {
     app.use((_req, res, next) => {
       res.setHeader("X-Content-Type-Options", "nosniff");
       res.setHeader("Referrer-Policy", "no-referrer");
+      res.setHeader("X-Frame-Options", "DENY");
       next();
     });
     const server = http.createServer(app);
     /** @type {Server<import('./shared/types/realtime').ClientToServerEvents, import('./shared/types/realtime').ServerToClientEvents, Record<string, never>, SocketData>} */
     const io = new Server(server, {
-      cors: { origin: "*" },
+      cors: { origin: publicOrigin || "*" },
+      allowRequest: (req, callback) => {
+        // Browsers omit Origin on the initial same-origin polling GET, but
+        // supply it on polling POSTs and WebSocket handshakes.
+        const sameOriginPoll =
+          req.method === "GET" &&
+          req.headers.origin === undefined &&
+          req.headers["sec-fetch-site"] === "same-origin";
+        callback(null, !publicOrigin || req.headers.origin === publicOrigin || sameOriginPoll);
+      },
       maxHttpBufferSize: 65536,
     });
     /** @type {Map<string, number>} */
     const sessions = new Map();
     /** @type {Map<string, {count: number, until: number}>} */
     const limits = new Map();
-    const pinHash = crypto.createHash("sha256").update(pin).digest();
+    const credentialHash = crypto.createHash("sha256").update(staffPassword || pin).digest();
     /** @param {string} key @param {number} count @param {number} duration */
     function limit(key, count, duration) {
       const at = Date.now();
@@ -146,6 +163,7 @@ async function createService(options = {}) {
         queueNumbers: s.activeOrders
           .filter((o) => o.status === "review" || o.status === "cooking")
           .map((o) => o.number),
+        staffAuthMode: authMode,
         staff: authenticated,
         activeOrders: s.activeOrders.filter(
           (o) => authenticated || o.sessionId === socket.data.sessionId,
@@ -173,7 +191,7 @@ async function createService(options = {}) {
     io.use((socket, next) => {
       try {
         limit(
-          `connect:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"])}`,
+          `connect:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`,
           120,
           60000,
         );
@@ -193,6 +211,7 @@ async function createService(options = {}) {
             address: clientAddress(
               socket.handshake.address,
               socket.handshake.headers["x-forwarded-for"],
+              Boolean(publicOrigin),
             ),
             reason: error instanceof Error ? error.message : "unknown",
           },
@@ -219,7 +238,7 @@ async function createService(options = {}) {
       socket.on("staff_login", (value, ack) => {
         if (typeof ack !== "function") return;
         try {
-          const key = `pin:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"])}`;
+          const key = `pin:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`;
           const failures = limits.get(key);
           ensure(
             !failures || failures.until <= Date.now() || failures.count < 8,
@@ -228,15 +247,17 @@ async function createService(options = {}) {
           );
           const correct =
             typeof value === "string" &&
-            /^\d{4}$/.test(value) &&
+            (authMode === "password"
+              ? value.length >= 12 && value.length <= 256
+              : /^\d{4}$/.test(value)) &&
             crypto.timingSafeEqual(
               crypto.createHash("sha256").update(value).digest(),
-              pinHash,
+              credentialHash,
             );
           if (!correct) {
             limit(key, 8, 15 * 60000);
             log.warn({ socket: socket.id, key }, "staff login failed");
-            ensure(false, "PIN incorrecto.", "INVALID_PIN");
+            ensure(false, authMode === "password" ? "Contraseña incorrecta." : "PIN incorrecto.", "INVALID_PIN");
           }
           limits.delete(key);
           for (const [id, until] of sessions)
@@ -289,7 +310,7 @@ async function createService(options = {}) {
             try {
               if (event === "submit_client_order") {
                 limit(
-                  `orders:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"])}`,
+                  `orders:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`,
                   60,
                   60000,
                 );
@@ -373,7 +394,7 @@ async function createService(options = {}) {
       );
       /** @param {string} peer @param {string | string[] | undefined} forwarded */
       const local = (peer, forwarded) =>
-        LOOPBACK.includes(clientAddress(peer, forwarded));
+        LOOPBACK.includes(clientAddress(peer, forwarded, Boolean(publicOrigin)));
       // Registered before instrument(), so this runs ahead of the Admin UI's own password check
       // (a bcrypt compare on the main thread), and caps how often anyone can trigger it.
       io.of("/admin").use((socket, next) => {
@@ -382,7 +403,7 @@ async function createService(options = {}) {
           return next(new Error("Solo disponible desde este equipo."));
         try {
           limit(
-            `admin:${clientAddress(socket.handshake.address, forwarded)}`,
+            `admin:${clientAddress(socket.handshake.address, forwarded, Boolean(publicOrigin))}`,
             20,
             60000,
           );
@@ -426,24 +447,23 @@ async function createService(options = {}) {
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
-    app.get("/api/network", (_req, res) => {
+    if (!publicOrigin) app.get("/api/network", (_req, res) => {
       const addr = server.address();
       const currentPort =
         (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
       res.json(getNetworkInfo(currentPort));
     });
-    app.get("/api/network/qr", (req, res) => {
+    if (!publicOrigin) app.get("/api/network/qr", (req, res) => {
       const addr = server.address();
       const currentPort =
         (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
       const info = getNetworkInfo(currentPort);
       const target = String(req.query.target || "order");
-      const targetUrl =
-        typeof req.query.url === "string" && req.query.url
-          ? req.query.url
-          : target in info.urls
-            ? /** @type {Record<string, string>} */ (info.urls)[target]
-            : info.urls.order;
+      if (req.query.url !== undefined || !Object.hasOwn(info.urls, target))
+        return res.status(400).json({ error: "Elige un destino local válido." });
+      const targetUrl = /** @type {Record<string, string>} */ (info.urls)[target];
+      if (Buffer.byteLength(targetUrl, "utf8") > 200)
+        return res.status(400).json({ error: "La dirección es demasiado larga para el código QR." });
 
       if (req.query.format === "json" || req.query.format === "datauri") {
         return res.json({
@@ -458,12 +478,12 @@ async function createService(options = {}) {
     });
     app.use("/assets", express.static(path.join(__dirname, "assets")));
     app.get("/manifest.webmanifest", (_req, res) =>
-      res.sendFile(path.join(__dirname, "assets", "manifest.webmanifest")),
+      res.sendFile("manifest.webmanifest", { root: path.join(__dirname, "assets") }),
     );
     app.get("/sw.js", (_req, res) =>
       res
         .type("text/javascript")
-        .sendFile(path.join(__dirname, "assets", "sw.js")),
+        .sendFile("sw.js", { root: path.join(__dirname, "assets") }),
     );
     app.get("/", (_req, res) => res.redirect("/order/"));
     for (const [route, workspace] of [
@@ -483,6 +503,18 @@ async function createService(options = {}) {
     app.get("/insights", (_req, res) => res.redirect("/analytics/"));
     /** @type {Promise<void> | undefined} */
     let closing;
+    // Announce only after the writer lock, ledger and routes are ready. A failed
+    // startup must never leave a stale network service running.
+    if (options.enableMdns && !publicOrigin) {
+      try {
+        mdns = createMdnsAdvertiser({ port: effectivePort, logger: log });
+      } catch (err) {
+        log.warn(
+          { err: /** @type {Error} */ (err).message },
+          "No se pudo iniciar el anunciador mDNS",
+        );
+      }
+    }
     return {
       server,
       io,
@@ -542,38 +574,43 @@ if (require.main === module) {
     logger.fatal({ err: error }, "uncaughtException");
     process.exit(1);
   });
-      const port = Number(
-        process.env.PORT && process.env.PORT !== "8080"
-          ? process.env.PORT
-          : 3000,
-      );
-      createService({ logger, port, enableMdns: true })
-        .then((service) => {
-          const stop = () => {
-            void service.close();
-          };
-          process.once("SIGINT", stop);
-          process.once("SIGTERM", stop);
-          process.once("SIGHUP", stop);
-          service.server.once("error", async (error) => {
-            logger.error({ err: error }, "server error");
-            await service.close();
-            process.exitCode = 1;
-          });
-          service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () => {
-            const netInfo = getNetworkInfo(port);
-            logger.info(
-              {
-                port,
-                url: `http://localhost:${port}/pos/`,
-                bonjour: netInfo.urls.bonjour,
-                mdns: netInfo.urls.mdns,
-                lan: netInfo.urls.lan,
-              },
-              "MasaFlow listo con auto-descubrimiento mDNS/Bonjour",
-            );
-          });
-        })
+  const port = Number(
+    process.env.PORT && process.env.PORT !== "8080"
+      ? process.env.PORT
+      : 3000,
+  );
+  const publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || "";
+  createService({ logger, port, enableMdns: !publicOrigin })
+    .then((service) => {
+      const stop = () => {
+        void service.close();
+      };
+      process.once("SIGINT", stop);
+      process.once("SIGTERM", stop);
+      process.once("SIGHUP", stop);
+      service.server.once("error", async (error) => {
+        logger.error({ err: error }, "server error");
+        await service.close();
+        process.exitCode = 1;
+      });
+      service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () => {
+        if (publicOrigin) {
+          logger.info({ port, url: `${publicOrigin}/pos/` }, "MasaFlow público listo");
+          return;
+        }
+        const netInfo = getNetworkInfo(port);
+        logger.info(
+          {
+            port,
+            url: `http://localhost:${port}/pos/`,
+            bonjour: netInfo.urls.bonjour,
+            mdns: netInfo.urls.mdns,
+            lan: netInfo.urls.lan,
+          },
+          "MasaFlow listo con auto-descubrimiento mDNS/Bonjour",
+        );
+      });
+    })
     .catch((error) => {
       logger.fatal({ err: error }, "no se pudo iniciar MasaFlow");
       process.exitCode = 1;

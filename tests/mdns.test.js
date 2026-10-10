@@ -1,6 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const jsQR = require("jsqr");
 const {
   encodeName,
   parseName,
@@ -84,6 +85,37 @@ test("qrcode: handles unicode and special Spanish characters", () => {
   const text = "¡MasaFlow Tacos & Huaraches! $150.00 MXN con quesillo";
   const svg = toSvg(text);
   assert(svg.includes("<svg"));
+});
+
+test("qrcode: phone-readable output round-trips across error levels including mask 7", () => {
+  const seenMasks = new Set();
+  for (const [level, ecCode] of [["L", 1], ["M", 0], ["Q", 3], ["H", 2]]) {
+    for (let i = 0; i < 32; i++) {
+      const url = `http://masaflow.local:3000/order/?ticket=${i}&level=${level}`;
+      const matrix = createQrMatrix(url, { ecLevel: level });
+      const modules = matrix.length;
+      let format = 0;
+      for (let bit = 0; bit < 15; bit++)
+        if (bit < 8 ? matrix[8][modules - 1 - bit] : matrix[modules - 15 + bit][8])
+          format |= 1 << bit;
+      for (let mask = 0; mask < 8; mask++) {
+        const data = ecCode << 3 | mask;
+        let rem = data;
+        for (let j = 0; j < 10; j++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+        if (format === ((data << 10 | rem) ^ 0x5412)) seenMasks.add(mask);
+      }
+      const scale = 4, quiet = 4, pixels = (modules + quiet * 2) * scale;
+      const rgba = new Uint8ClampedArray(pixels * pixels * 4);
+      for (let y = 0; y < pixels; y++) for (let x = 0; x < pixels; x++) {
+        const dark = matrix[Math.floor(y / scale) - quiet]?.[Math.floor(x / scale) - quiet] || false;
+        const index = (y * pixels + x) * 4;
+        rgba[index] = rgba[index + 1] = rgba[index + 2] = dark ? 0 : 255;
+        rgba[index + 3] = 255;
+      }
+      assert.equal(jsQR(rgba, pixels, pixels)?.data, url, `QR scan failed for ${level}/${i}`);
+    }
+  }
+  assert(seenMasks.has(7), "The fixtures must exercise the corrected mask 7");
 });
 
 /* -------------------------------------------------------------------------- */
@@ -230,6 +262,7 @@ test("server api: GET /api/network returns JSON diagnostic telemetry", async () 
   const service = await createService({
     port: 0,
     enableMdns: false,
+    pin: "2468",
   });
   await new Promise((resolve) =>
     service.server.listen(0, "127.0.0.1", resolve),
@@ -250,6 +283,8 @@ test("server api: GET /api/network returns JSON diagnostic telemetry", async () 
     assert(data.urls.localhost.includes(String(port)));
     assert(data.urls.bonjour.includes(String(port)));
     assert(data.urls.mdns.includes(String(port)));
+    assert.equal((await fetch(`http://127.0.0.1:${port}/manifest.webmanifest`)).status, 200);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/sw.js`)).status, 200);
   } finally {
     await service.close();
   }
@@ -259,6 +294,7 @@ test("server api: GET /api/network/qr returns vector SVG or JSON data URI", asyn
   const service = await createService({
     port: 0,
     enableMdns: false,
+    pin: "2468",
   });
   await new Promise((resolve) =>
     service.server.listen(0, "127.0.0.1", resolve),
@@ -286,6 +322,8 @@ test("server api: GET /api/network/qr returns vector SVG or JSON data URI", asyn
     const jsonData = await jsonRes.json();
     assert(jsonData.url.endsWith("/pos/"));
     assert(jsonData.dataUri.startsWith("data:image/svg+xml;base64,"));
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/network/qr?target=toString`)).status, 400);
+    assert.equal((await fetch(`http://127.0.0.1:${port}/api/network/qr?url=https://example.com`)).status, 400);
   } finally {
     await service.close();
   }

@@ -22,7 +22,9 @@ const RECORD_TYPES = {
  * On macOS, scutil --get LocalHostName gives the exact Bonjour identifier.
  * @returns {string} e.g. "macs-MacBook-Pro"
  */
+let cachedLocalHostName = "";
 function getLocalHostName() {
+  if (cachedLocalHostName) return cachedLocalHostName;
   if (process.platform === "darwin") {
     try {
       const output = execSync("scutil --get LocalHostName", {
@@ -30,13 +32,17 @@ function getLocalHostName() {
         timeout: 1000,
         stdio: ["ignore", "pipe", "ignore"],
       }).trim();
-      if (output) return output;
+      if (output) {
+        cachedLocalHostName = output;
+        return output;
+      }
     } catch {}
   }
-  return os
+  cachedLocalHostName = os
     .hostname()
     .replace(/\.(local|lan|home|internal)$/i, "")
     .trim();
+  return cachedLocalHostName;
 }
 
 /**
@@ -296,6 +302,7 @@ function createMdnsAdvertiser(options) {
   const bonjourHost = getLocalHostName();
   const hostFqdn = `${bonjourHost}.local`;
   const mdnsFqdn = "masaflow.local";
+  const nativeBonjour = process.platform === "darwin";
 
   const txtData = {
     path: "/pos/",
@@ -375,34 +382,26 @@ function createMdnsAdvertiser(options) {
    * Broadcasts gratuitous mDNS announcement packet to the local network.
    * @param {number} [ttlA=120]
    * @param {number} [ttlService=4500]
+   * @param {(() => void) | undefined} [onSent]
    */
-  function broadcastAnnouncement(ttlA = 120, ttlService = 4500) {
-    if (!socket || closed) return;
+  function broadcastAnnouncement(ttlA = 120, ttlService = 4500, onSent = undefined) {
+    if (!socket || closed) { onSent?.(); return; }
     try {
       const recs = getRecords(ttlA, ttlService);
       const packet = buildResponsePacket({
         answers: [
           recs.aRecordPrimary,
-          recs.aRecordBonjour,
-          recs.ptrHttp,
+          ...(!nativeBonjour ? [recs.aRecordBonjour, recs.ptrHttp] : []),
           recs.ptrMasa,
         ],
         additionals: [
-          recs.srvHttp,
-          recs.txtHttp,
+          ...(!nativeBonjour ? [recs.srvHttp, recs.txtHttp] : []),
           recs.srvMasa,
           recs.txtMasa,
         ],
       });
-      socket.send(packet, 0, packet.length, MDNS_PORT, MULTICAST_IPV4);
-    } catch {}
-  }
-
-  /**
-   * Sends goodbye packet with TTL=0 to evict cached records from all clients.
-   */
-  function broadcastGoodbye() {
-    broadcastAnnouncement(0, 0);
+      socket.send(packet, 0, packet.length, MDNS_PORT, MULTICAST_IPV4, onSent);
+    } catch { onSent?.(); }
   }
 
   // 1. Initialize Pure Node.js UDP Multicast Responder on 224.0.0.251:5353
@@ -438,7 +437,7 @@ function createMdnsAdvertiser(options) {
 
         // A Record queries for masaflow.local or <host>.local
         if (
-          (qName === mdnsFqdn || qName === hostFqdn.toLowerCase()) &&
+          (qName === mdnsFqdn || (!nativeBonjour && qName === hostFqdn.toLowerCase())) &&
           (qType === RECORD_TYPES.A || qType === RECORD_TYPES.ANY)
         ) {
           answers.push(
@@ -448,7 +447,7 @@ function createMdnsAdvertiser(options) {
 
         // Service discovery queries: _http._tcp.local or _masaflow._tcp.local
         if (
-          qName === "_http._tcp.local" &&
+          !nativeBonjour && qName === "_http._tcp.local" &&
           (qType === RECORD_TYPES.PTR || qType === RECORD_TYPES.ANY)
         ) {
           answers.push(recs.ptrHttp);
@@ -464,7 +463,7 @@ function createMdnsAdvertiser(options) {
 
         // Service instance queries
         if (
-          qName === `${instanceName}._http._tcp.local`.toLowerCase() &&
+          !nativeBonjour && qName === `${instanceName}._http._tcp.local`.toLowerCase() &&
           (qType === RECORD_TYPES.SRV ||
             qType === RECORD_TYPES.TXT ||
             qType === RECORD_TYPES.ANY)
@@ -526,7 +525,7 @@ function createMdnsAdvertiser(options) {
   }
 
   // 2. Register with Native macOS Bonjour (dns-sd) if running on Darwin
-  if (process.platform === "darwin") {
+  if (nativeBonjour) {
     try {
       companionProcess = spawn(
         "/usr/bin/dns-sd",
@@ -569,9 +568,16 @@ function createMdnsAdvertiser(options) {
     announce: () => broadcastAnnouncement(),
     close: async () => {
       if (closed) return;
-      closed = true;
       if (ifaceTimer) clearInterval(ifaceTimer);
-      broadcastGoodbye();
+      if (socket) {
+        // Wait for the goodbye datagram before closing UDP, so peers drop the
+        // cached name instead of pointing at a stopped server.
+        await Promise.race([
+          new Promise((resolve) => broadcastAnnouncement(0, 0, () => resolve(undefined))),
+          new Promise((resolve) => setTimeout(resolve, 250)),
+        ]);
+      }
+      closed = true;
       if (companionProcess) {
         try {
           companionProcess.kill("SIGTERM");

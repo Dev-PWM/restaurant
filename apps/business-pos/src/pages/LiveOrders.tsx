@@ -1643,12 +1643,12 @@ function LiveBoard({
         </div>
 
         {/* Tab switcher: En Fila vs Mesas vs Completados */}
-        <div className="mb-6 flex border-b border-stone-200" role="tablist">
+        <div className="mb-6 grid grid-cols-3 border-b border-stone-200 md:flex" role="tablist">
           <button
             role="tab"
             aria-selected={activeTab === "queue"}
             data-help="tab-queue"
-            className={`flex min-h-12 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-bold transition-colors md:flex-row md:gap-2 md:px-5 md:py-3 md:text-sm ${
               activeTab === "queue"
                 ? "border-clay-600 text-clay-800"
                 : "border-transparent text-stone-500 hover:text-stone-800"
@@ -1658,8 +1658,8 @@ function LiveBoard({
               report({ type: "tab", tab: "queue" });
             }}
           >
-            <Clock3 size={16} />
-            <span>Pedidos en Fila</span>
+            <Clock3 size={16} className="hidden md:block" />
+            <span className="md:hidden">Pedidos</span><span className="hidden md:inline">Pedidos en Fila</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "queue"
@@ -1675,7 +1675,7 @@ function LiveBoard({
             aria-selected={activeTab === "tables"}
             data-help="tab-tables"
             data-tour-target={simulator ? "tab-tables" : undefined}
-            className={`flex min-h-12 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-bold transition-colors md:flex-row md:gap-2 md:px-5 md:py-3 md:text-sm ${
               activeTab === "tables"
                 ? "border-[#2E94A5] text-[#2E94A5]"
                 : "border-transparent text-stone-500 hover:text-stone-800"
@@ -1685,8 +1685,8 @@ function LiveBoard({
               report({ type: "tab", tab: "tables" });
             }}
           >
-            <Utensils size={16} />
-            <span>Control de Mesas</span>
+            <Utensils size={16} className="hidden md:block" />
+            <span className="md:hidden">Mesas</span><span className="hidden md:inline">Control de Mesas</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "tables"
@@ -1702,7 +1702,7 @@ function LiveBoard({
             aria-selected={activeTab === "completed"}
             data-help="tab-completed"
             data-tour-target={simulator ? "tab-completed" : undefined}
-            className={`flex min-h-12 items-center gap-2 border-b-2 px-5 py-3 text-sm font-bold transition-colors ${
+            className={`flex min-h-12 min-w-0 flex-col items-center justify-center gap-1 border-b-2 px-1 py-2 text-xs font-bold transition-colors md:flex-row md:gap-2 md:px-5 md:py-3 md:text-sm ${
               activeTab === "completed"
                 ? "border-clay-600 text-clay-800"
                 : "border-transparent text-stone-500 hover:text-stone-800"
@@ -1712,8 +1712,8 @@ function LiveBoard({
               report({ type: "tab", tab: "completed" });
             }}
           >
-            <Check size={16} />
-            <span>Pedidos Completados</span>
+            <Check size={16} className="hidden md:block" />
+            <span className="md:hidden">Completados</span><span className="hidden md:inline">Pedidos Completados</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "completed"
