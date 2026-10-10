@@ -96,7 +96,7 @@ export function TransactionTable({
           </select>
           <button
             type="button"
-            className="btn inline-flex items-center gap-1.5"
+            className="btn inline-flex items-center gap-1.5 border-stone-300 bg-white font-semibold text-stone-800 shadow-xs hover:border-stone-400 hover:bg-stone-50 active:scale-[0.98]"
             onClick={() => exportLedger(rows, shiftOpenedAt)}
             title="Exportar registros filtrados a archivo CSV"
           >
@@ -273,18 +273,83 @@ export function TransactionTable({
     </section>
   );
 }
+type LedgerRow = [
+  pedido: number | string,
+  cliente: string,
+  estado: string,
+  platillos: string,
+  metodo: string,
+  total: string,
+  recibido: string,
+  cambio: string,
+];
+
 function sanitizeItemsSummary(items: Order["items"]): string {
-  if (!items || items.length === 0) return "";
-  return items.map((line) => `${line.quantity}x ${line.name}`).join(", ");
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return items
+    .map((line) => {
+      const baseName = (line.name || "").replace(/\s*\(.*?\)/g, "").trim();
+      const qty = line.quantity ?? 1;
+      return `${qty}x ${baseName || "Platillo"}`;
+    })
+    .join(", ");
+}
+
+function formatLedgerRow(o: Order): LedgerRow {
+  const isNoShow = o.status === "no_show";
+  const platillos = sanitizeItemsSummary(o.items);
+  const cliente = o.customerName || "";
+  const pedido = o.number;
+
+  if (isNoShow) {
+    return [
+      pedido,
+      cliente,
+      "No-Show",
+      platillos,
+      "—",
+      "0.00",
+      "",
+      "",
+    ];
+  }
+
+  if (o.transaction) {
+    const isCash = o.transaction.method === "cash";
+    return [
+      pedido,
+      cliente,
+      labels[o.status] || o.status,
+      platillos,
+      isCash ? "Efectivo" : "Transferencia",
+      (o.transaction.totalCents / 100).toFixed(2),
+      isCash ? (o.transaction.tenderedCents / 100).toFixed(2) : "",
+      isCash ? (o.transaction.changeCents / 100).toFixed(2) : "",
+    ];
+  }
+
+  return [
+    pedido,
+    cliente,
+    labels[o.status] || o.status,
+    platillos,
+    "—",
+    "0.00",
+    "",
+    "",
+  ];
+}
+
+function csvCell(value: unknown): string {
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r]/.test(text)) {
+    text = "'" + text;
+  }
+  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 function exportLedger(orders: Order[], shiftOpenedAt?: string) {
-  const protect = (value: unknown) => {
-    const text = String(value ?? "");
-    return `"${(/^[=+@\-\t\r\n]/.test(text) ? "'" + text : text).replaceAll('"', '""')}"`;
-  };
-
-  const headers = [
+  const headers: LedgerRow = [
     "Pedido",
     "Cliente",
     "Estado",
@@ -295,75 +360,56 @@ function exportLedger(orders: Order[], shiftOpenedAt?: string) {
     "Cambio",
   ];
 
-  const rows: unknown[][] = [headers];
-
-  for (const o of orders) {
-    const isNoShow = o.status === "no_show";
-    const statusLabel = labels[o.status] || o.status;
-    const itemsSummary = sanitizeItemsSummary(o.items);
-
-    if (isNoShow) {
-      rows.push([
-        o.number,
-        o.customerName,
-        statusLabel,
-        itemsSummary,
-        "—",
-        "0.00",
-        "",
-        "",
-      ]);
-      continue;
-    }
-
-    if (o.transaction) {
-      const isCash = o.transaction.method === "cash";
-      rows.push([
-        o.number,
-        o.customerName,
-        statusLabel,
-        itemsSummary,
-        isCash ? "Efectivo" : "Transferencia",
-        (o.transaction.totalCents / 100).toFixed(2),
-        isCash ? (o.transaction.tenderedCents / 100).toFixed(2) : "",
-        isCash ? (o.transaction.changeCents / 100).toFixed(2) : "",
-      ]);
-      continue;
-    }
-
-    rows.push([
-      o.number,
-      o.customerName,
-      statusLabel,
-      itemsSummary,
-      "—",
-      "0.00",
-      "",
-      "",
-    ]);
-  }
+  const rows: (string | number)[][] = [
+    headers,
+    ...orders.map(formatLedgerRow),
+  ];
 
   const dateStr = (() => {
     if (shiftOpenedAt) {
       try {
-        return new Date(shiftOpenedAt).toISOString().slice(0, 10);
+        const d = new Date(shiftOpenedAt);
+        if (!isNaN(d.getTime())) {
+          const parts = new Intl.DateTimeFormat("en-CA", {
+            timeZone: "America/Mexico_City",
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(d);
+          if (/^\d{4}-\d{2}-\d{2}$/.test(parts)) return parts;
+          return d.toISOString().slice(0, 10);
+        }
       } catch {
         // fallback to today below
       }
     }
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "America/Mexico_City",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parts)) return parts;
+    } catch {
+      // fallback to ISO below
+    }
     return new Date().toISOString().slice(0, 10);
   })();
 
-  const url = URL.createObjectURL(
-    new Blob(
-      ["\uFEFF" + rows.map((row) => row.map(protect).join(",")).join("\r\n")],
-      { type: "text/csv;charset=utf-8" },
-    ),
-  );
+  const csvContent =
+    "\uFEFF" +
+    rows.map((row) => row.map(csvCell).join(",")).join("\r\n") +
+    "\r\n";
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = `caja-ventas-${dateStr}.csv`;
+  document.body.appendChild(link);
   link.click();
+  link.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function Analytics() {
