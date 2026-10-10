@@ -26,6 +26,7 @@ import {
   togglePracticeTable,
 } from "../simulator.js";
 import { useAcademy } from "./AcademyProvider";
+import { getModule } from "./curriculum.js";
 import { playMistakeThud, triggerHaptic } from "./sound";
 import type {
   GhostSalesMetrics,
@@ -112,6 +113,7 @@ export function usePracticeBoard({
     orders: Order[];
     completed: Order[];
     acknowledged: Set<string>;
+    mistakeOrderId: string | null;
   } | null>(null);
 
   const { state, step } = academy;
@@ -122,7 +124,12 @@ export function usePracticeBoard({
   const snapshot = useMemo<Snapshot | null>(
     () =>
       active && source
-        ? { ...source, tables, activeOrders: orders, completedOrders: completed }
+        ? {
+            ...source,
+            tables,
+            activeOrders: orders,
+            completedOrders: completed,
+          }
         : liveSnapshot,
     [active, source, tables, orders, completed, liveSnapshot],
   );
@@ -211,14 +218,17 @@ export function usePracticeBoard({
       setOrders(initialOrders);
       setCompleted(initialCompleted);
       setAcknowledged(initialAck);
+      const firstStepId = getModule(moduleId)?.steps[0]?.id ?? null;
+      lastStepIdRef.current = firstStepId;
       stepSnapshotRef.current = {
-        stepId: step?.id ?? null,
+        stepId: firstStepId,
         orders: initialOrders,
         completed: initialCompleted,
         acknowledged: initialAck,
+        mistakeOrderId: null,
       };
     },
-    [resetTransient, step?.id],
+    [resetTransient],
   );
 
   // A module (re)starting reseeds the board. Keyed by runId so «Reiniciar» works too.
@@ -230,30 +240,56 @@ export function usePracticeBoard({
   // Track the snapshot of orders at the start of each step to enable "Reiniciar este paso"
   useEffect(() => {
     const currentId = step?.id ?? null;
-    if (phase === "learning" && currentId && currentId !== lastStepIdRef.current) {
+    if (
+      phase === "learning" &&
+      currentId &&
+      currentId !== lastStepIdRef.current
+    ) {
       lastStepIdRef.current = currentId;
       stepSnapshotRef.current = {
         stepId: currentId,
         orders: JSON.parse(JSON.stringify(orders)),
         completed: JSON.parse(JSON.stringify(completed)),
         acknowledged: new Set(acknowledged),
+        mistakeOrderId,
       };
     }
     if (!currentId) {
       lastStepIdRef.current = null;
     }
-  }, [phase, step?.id, orders, completed, acknowledged]);
+  }, [phase, step?.id, orders, completed, acknowledged, mistakeOrderId]);
 
   const resetStep = useCallback(() => {
-    if (!stepSnapshotRef.current) return;
-    setPayId(null);
-    setMistakeCountdown(0);
-    setMistakeOrderId(null);
+    const snapshot = stepSnapshotRef.current;
+    if (!snapshot) return;
+    const target = step?.target;
+    const tenderStep =
+      target?.startsWith("tender-") ||
+      [
+        "cash-input",
+        "cash-change",
+        "confirm-demo-payment",
+        "exact-cash-pay",
+        "btn-spei-tender",
+        "spei-modal",
+        "confirm-spei-payment",
+      ].includes(target ?? "");
+    const undoStep = target === "undo-demo-payment";
+    setPayId(
+      tenderStep
+        ? (snapshot.orders.find((order) => order.status === "ready")?.id ??
+            null)
+        : null,
+    );
+    setMistakeCountdown(
+      undoStep && snapshot.mistakeOrderId ? UNDO_WINDOW_SECONDS : 0,
+    );
+    setMistakeOrderId(undoStep ? snapshot.mistakeOrderId : null);
     setAlarmFlash(false);
-    setOrders(JSON.parse(JSON.stringify(stepSnapshotRef.current.orders)));
-    setCompleted(JSON.parse(JSON.stringify(stepSnapshotRef.current.completed)));
-    setAcknowledged(new Set(stepSnapshotRef.current.acknowledged));
-  }, [setPayId]);
+    setOrders(JSON.parse(JSON.stringify(snapshot.orders)));
+    setCompleted(JSON.parse(JSON.stringify(snapshot.completed)));
+    setAcknowledged(new Set(snapshot.acknowledged));
+  }, [setPayId, step?.target]);
 
   // Overlays belong to a step; they close when the module ends.
   useEffect(() => {
@@ -302,8 +338,7 @@ export function usePracticeBoard({
       academyRef.current.dispatch({ type: "RUSH_RESULT", passed });
       return;
     }
-    if (rushRemaining > 0 && rushResolved < RUSH_TICKET_COUNT)
-      return;
+    if (rushRemaining > 0 && rushResolved < RUSH_TICKET_COUNT) return;
     setRushActive(false);
     setRushFinished(true);
     const passed = evaluateRush({
@@ -314,7 +349,14 @@ export function usePracticeBoard({
     setRushPassed(passed);
     if (passed) chime("ready");
     academyRef.current.dispatch({ type: "RUSH_RESULT", passed });
-  }, [rushActive, rushRemaining, rushResolved, rushPaid, rushNoShows, calmMode]);
+  }, [
+    rushActive,
+    rushRemaining,
+    rushResolved,
+    rushPaid,
+    rushNoShows,
+    calmMode,
+  ]);
 
   // The undo trap (module «Errores y Fantasmas»): if «Deshacer» is not tapped in time,
   // a real till would have recorded the wrong payment, so the module starts over.

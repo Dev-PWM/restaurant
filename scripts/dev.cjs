@@ -29,15 +29,20 @@ async function available(port) {
 }
 async function checkExistingMasaFlow(port) {
   try {
-    const res = await fetch(`http://127.0.0.1:${port}/api/health`, {
-      signal: AbortSignal.timeout(1000),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data?.service === "masaflow" && data?.status === "ready") {
-        return true;
-      }
-    }
+    const [healthResponse, ...pages] = await Promise.all(
+      ["/api/health", "/order/", "/pos/", "/analytics/"].map((route) =>
+        fetch(`http://127.0.0.1:${port}${route}`, {
+          signal: AbortSignal.timeout(1000),
+        }),
+      ),
+    );
+    const health = healthResponse.ok ? await healthResponse.json() : null;
+    return (
+      health?.service === "masaflow" &&
+      health.version === serviceVersion &&
+      health.status === "ready" &&
+      pages.every((page) => page.ok)
+    );
   } catch {
     /* No active MasaFlow instance responding */
   }
@@ -119,20 +124,7 @@ async function main() {
   });
   for (let attempt = 0; attempt < 120 && !stopping; attempt++) {
     try {
-      const [healthResponse, ...pages] = await Promise.all(
-        ["/api/health", "/order/", "/pos/", "/analytics/"].map((route) =>
-          fetch(`http://127.0.0.1:${backendPort}${route}`, {
-            signal: AbortSignal.timeout(1000),
-          }),
-        ),
-      );
-      const health = healthResponse.ok ? await healthResponse.json() : null;
-      if (
-        health?.service === "masaflow" &&
-        health.version === serviceVersion &&
-        health.status === "ready" &&
-        pages.every((page) => page.ok)
-      ) {
+      if (await checkExistingMasaFlow(backendPort)) {
         let networkDetails = "";
         try {
           const netResponse = await fetch(

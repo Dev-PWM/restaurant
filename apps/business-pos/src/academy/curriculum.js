@@ -268,7 +268,8 @@ export const MODULES = [
         target: "tender-200",
         control: "tender-preset",
         title: "4. Anota el billete",
-        instruction: "Imagina que el cliente te entrega un billete de $200. Tómalo, ponlo en tu caja y toca «$200.00».",
+        instruction:
+          "Imagina que el cliente te entrega un billete de $200. Tómalo, ponlo en tu caja y toca «$200.00».",
         consequence:
           "La pantalla calcula el cambio al instante: $200.00 menos $185.00 = $15.00.",
         expect: { type: "tender", cents: 20000 },
@@ -1204,8 +1205,7 @@ export const MODULES = [
         title: "Al cerrar el turno",
         instruction:
           "Cuando cierras el turno todas las mesas quedan libres para el siguiente.",
-        consequence:
-          "No tienes que liberarlas una por una antes de cerrar.",
+        consequence: "No tienes que liberarlas una por una antes de cerrar.",
         why: "El nuevo turno empieza con el comedor vacío.",
       },
     ],
@@ -1283,7 +1283,8 @@ export const MODULES = [
         title: "Los datos del banco",
         instruction:
           "Aquí ves el monto exacto, la CLABE y la referencia con el número de pedido. Abre la app del banco y busca esa transferencia.",
-        consequence: "Todavía no se registra nada: solo estás mirando los datos.",
+        consequence:
+          "Todavía no se registra nada: solo estás mirando los datos.",
         why: "Verificar antes de confirmar evita entregar sin cobrar.",
       },
       {
@@ -1335,14 +1336,58 @@ export const TOTAL_STEPS = MODULES.reduce(
  */
 function inferLaneAnchor(step) {
   if (step.laneAnchor) return step.laneAnchor;
-  if (step.target?.startsWith("table-") || step.view?.tab === "tables") return "Control de Mesas";
-  if (step.target?.includes("analytics") || step.target?.includes("close-shift") || step.view?.tab === "completed") return "Cierre de Turno y Ventas";
-  if (step.target?.includes("inventory")) return "Inventario de Platillos";
+  if (step.target?.startsWith("table-") || step.target === "tab-tables")
+    return "Control de Mesas";
+  if (
+    step.target?.includes("analytics") ||
+    step.target?.includes("close-shift") ||
+    step.target?.startsWith("completed-") ||
+    step.target === "tab-completed"
+  )
+    return "Cierre de Turno y Ventas";
+  if (step.target?.includes("inventory") || step.target === "inv-toggle")
+    return "Inventario de Platillos";
   if (step.target?.includes("pause")) return "Pausa de Pedidos Web";
-  if (step.target?.startsWith("tender-") || step.target === "cash-input" || step.target === "confirm-demo-payment" || step.target === "exact-demo-payment" || step.target === "undo-demo-payment" || step.target === "spei-confirm" || step.target === "btn-spei-tender" || step.target === "spei-modal" || step.target === "cash-change") return "Ventana de Cobro";
-  if (step.target?.includes("review") || step.target === "accept-demo-order" || step.target === "acknowledge-restriction" || step.target === "badge-sin-grasa" || step.target === "badge-frito" || step.target === "badge-quesillo" || step.target === "badge-dine-in" || step.target === "badge-spei" || step.view?.lane === "review") return "Fila 1 · Por Revisar";
-  if (step.target?.includes("cooking") || step.target === "ready-demo-order" || step.target === "comal-summary" || step.view?.lane === "cooking") return "Fila 2 · En el Comal (Cocinando)";
-  if (step.target?.includes("ready") || step.target === "pay-demo-order" || step.target === "noshow-demo-order" || step.view?.lane === "ready") return "Fila 3 · Listos para Cobrar y Entregar";
+  if (
+    step.target?.startsWith("tender-") ||
+    [
+      "cash-input",
+      "cash-change",
+      "confirm-demo-payment",
+      "exact-cash-pay",
+      "undo-demo-payment",
+      "btn-spei-tender",
+      "spei-modal",
+      "confirm-spei-payment",
+    ].includes(step.target)
+  )
+    return "Ventana de Cobro";
+  if (
+    step.target?.includes("review") ||
+    step.target === "accept-demo-order" ||
+    step.target === "acknowledge-restriction"
+  )
+    return "Fila 1 · Por Revisar";
+  if (
+    step.target?.includes("cooking") ||
+    step.target === "mark-demo-ready" ||
+    step.target === "comal-summary"
+  )
+    return "Fila 2 · En el Comal (Cocinando)";
+  if (
+    step.target?.includes("ready") ||
+    step.target === "pay-demo-order" ||
+    step.target === "noshow-demo-order" ||
+    step.target === "noshow-confirm"
+  )
+    return "Fila 3 · Listos para Cobrar y Entregar";
+  if (step.view?.tab === "tables") return "Control de Mesas";
+  if (step.view?.tab === "completed") return "Cierre de Turno y Ventas";
+  if (step.view?.lane === "ready")
+    return "Fila 3 · Listos para Cobrar y Entregar";
+  if (step.view?.lane === "cooking") return "Fila 2 · En el Comal (Cocinando)";
+  if (step.view?.lane === "review" || step.target?.startsWith("badge-"))
+    return "Fila 1 · Por Revisar";
   return "Tablero Principal";
 }
 

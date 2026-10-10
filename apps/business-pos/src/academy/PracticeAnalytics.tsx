@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ArrowUpRight, Banknote, Check } from "lucide-react";
-import { Brand, Modal, mxn } from "../../../../shared/ui/components";
+import { Brand, Modal, centsOf, mxn } from "../../../../shared/ui/components";
 import type { GhostSalesMetrics } from "./types";
 
 /**
@@ -24,6 +24,10 @@ export function PracticeAnalytics({
 }) {
   const [closing, setClosing] = useState(false);
   const [archived, setArchived] = useState(false);
+  const [countedCash, setCountedCash] = useState("");
+  const countedCashCents = centsOf(countedCash);
+  const differenceCents =
+    countedCashCents === null ? null : countedCashCents - metrics.cashCents;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !closing) onBack();
@@ -110,7 +114,9 @@ export function PracticeAnalytics({
               {metrics.speiOrders > 0 && (
                 <>
                   <div>
-                    <dt className="text-xs text-white/75">Ventas en efectivo</dt>
+                    <dt className="text-xs text-white/75">
+                      Ventas en efectivo
+                    </dt>
                     <dd className="mt-1 text-lg font-semibold tabular-nums">
                       {mxn(metrics.cashCents)}
                     </dd>
@@ -149,8 +155,19 @@ export function PracticeAnalytics({
             <h2 className="text-xl font-bold">Conteo de Efectivo Físico</h2>
           </div>
           <p className="mt-2 text-sm text-stone-600">
-            Es hora de ir a casa. Toma el dinero real del cajón y cuéntalo con calma billete por billete.
+            Es hora de ir a casa. Toma el dinero real del cajón y cuéntalo con
+            calma billete por billete.
           </p>
+          <label className="mt-5 block text-lg font-bold text-stone-900">
+            ¿Cuánto efectivo contaste? (MXN)
+            <input
+              className="field mt-2 w-full text-xl tabular-nums"
+              inputMode="decimal"
+              value={countedCash}
+              onChange={(event) => setCountedCash(event.target.value)}
+              placeholder="0.00"
+            />
+          </label>
           <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
               <span className="block text-xs font-bold uppercase tracking-wide text-stone-500">
@@ -164,8 +181,16 @@ export function PracticeAnalytics({
               <span className="block text-xs font-bold uppercase tracking-wide text-stone-500">
                 Diferencia
               </span>
-              <span className="mt-1 block text-2xl font-black text-emerald-600 tabular-nums">
-                $0.00 MXN
+              <span
+                className={`mt-1 block text-2xl font-black tabular-nums ${differenceCents === null ? "text-stone-500" : differenceCents < 0 ? "text-red-700" : "text-emerald-700"}`}
+              >
+                {differenceCents === null
+                  ? "—"
+                  : differenceCents < 0
+                    ? `Faltan ${mxn(-differenceCents)}`
+                    : differenceCents > 0
+                      ? `Sobran ${mxn(differenceCents)}`
+                      : mxn(0)}
               </span>
             </div>
           </div>

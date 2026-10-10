@@ -152,6 +152,7 @@ export function AcademyBar({
             <button
               type="button"
               data-tour-allow="rush-calm"
+              aria-label="Modo Tranquilo: practicar sin límite de tiempo"
               aria-pressed={rush.calmMode}
               className={`btn min-h-11 min-w-11 gap-1.5 rounded-xl border px-2.5 py-2 text-xs font-bold sm:px-3 ${
                 rush.calmMode

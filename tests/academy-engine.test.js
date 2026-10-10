@@ -322,6 +322,22 @@ test("the curriculum is well formed", async () => {
   );
 });
 
+test("location anchors follow the control and then its actual view", async () => {
+  const lib = await load();
+  const anchor = (moduleId, stepId) => {
+    const module = lib.getModule(moduleId);
+    const index = module.steps.findIndex((step) => step.id === stepId);
+    return lib.resolveStep(module.steps[index], module, index).laneAnchor;
+  };
+  assert.equal(
+    anchor("transferencia", "transferencia-1"),
+    "Fila 3 · Listos para Cobrar y Entregar",
+  );
+  assert.equal(anchor("cobros", "cobros-4"), "Ventana de Cobro");
+  assert.equal(anchor("errores", "errores-4"), "Ventana de Cobro");
+  assert.equal(anchor("transferencia", "transferencia-5"), "Ventana de Cobro");
+});
+
 /** Every file whose strings a trainee could actually see on a screen. */
 function sourceText() {
   const roots = [
@@ -414,7 +430,10 @@ function boardSource() {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const full = path.join(directory, entry.name);
       if (entry.isDirectory()) walk(full);
-      else if (/\.(tsx|ts|js)$/.test(entry.name) && !definitions.has(entry.name))
+      else if (
+        /\.(tsx|ts|js)$/.test(entry.name) &&
+        !definitions.has(entry.name)
+      )
         chunks.push(fs.readFileSync(full, "utf8"));
     }
   };
@@ -492,5 +511,10 @@ test("the exam is offered as soon as the required modules are done, not after ev
   assert.equal(lib.rushOffered(state), true);
   // Passing it ends the offer; it is never offered to a tablet that already passed.
   assert.equal(lib.rushOffered({ ...state, rushPassed: true }), false);
-  assert.equal(lib.rushOffered(lib.createState({ completed: lib.REQUIRED_MODULES.slice(0, -1) })), false);
+  assert.equal(
+    lib.rushOffered(
+      lib.createState({ completed: lib.REQUIRED_MODULES.slice(0, -1) }),
+    ),
+    false,
+  );
 });
