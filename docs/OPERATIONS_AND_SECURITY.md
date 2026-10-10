@@ -93,8 +93,8 @@ Current results (2026-10-07): 344 regular expressions scanned, **0 exponential**
 
 ## 6. Known findings and decisions
 
-- **Default staff PIN.** `server.js` and `scripts/dev.cjs` fall back to `1234` when `MASAFLOW_STAFF_PIN` is unset, and `.env.example` shows the same value. Anyone who knows the project can sign in to a server started without a PIN. Not changed, because it would stop an unconfigured install from starting; the Semgrep rule `masaflow-staff-pin-default` tracks it.
-- **Wildcard CORS** (`origin: "*"`) on the Socket.io server. Customer sessions are UUID-scoped and rate-limited per address, but a same-origin policy would be tighter. The Vite dev setup needs the current behaviour, so it was left alone.
+- **Staff credential.** The local server requires an explicitly configured four-digit PIN. The public HTTPS stack requires a 12–256 character password and accepts Socket.IO requests only from its configured HTTPS origin. The sample environment files contain no credential.
+- **Local CORS.** The LAN development mode allows Socket.IO requests from any origin so the Vite dev apps work on separate ports; staff commands still require a valid session. Public mode restricts the origin. Keep the LAN port off the public internet.
 - **`bun.lock` is not updated** by `npm install`. The Dockerfile and `npm ci` use `package-lock.json`; regenerate `bun.lock` with Bun if you rely on it.
 - **Per-command state copy.** Every command clones the whole ledger (`structuredClone`) before applying it. Cheap at restaurant scale (the load test above), but it is the first thing to look at if the 500-order cap is ever raised.
 

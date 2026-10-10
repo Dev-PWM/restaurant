@@ -18,6 +18,7 @@ COPY --from=build /app/shared/logger.js ./shared/logger.js
 COPY --from=build /app/shared/qrcode.js ./shared/qrcode.js
 COPY --from=build /app/shared/ui/choice-groups.js ./shared/ui/choice-groups.js
 COPY --from=build /app/shared/types/realtime.ts ./shared/types/realtime.ts
+COPY --from=build /app/assets/apple-touch-icon.png /app/assets/icon.svg /app/assets/manifest.webmanifest /app/assets/sw.js /app/assets/pwa-192x192.png /app/assets/pwa-512x512.png /app/assets/pwa-maskable-512x512.png ./assets/
 COPY --from=build /app/apps/client-web/dist-realtime ./apps/client-web/dist-realtime
 COPY --from=build /app/apps/business-pos/dist-realtime ./apps/business-pos/dist-realtime
 COPY --from=build /app/apps/analytics/dist-realtime ./apps/analytics/dist-realtime

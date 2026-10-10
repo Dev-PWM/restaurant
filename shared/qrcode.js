@@ -441,7 +441,7 @@ function createQrMatrix(text, { ecLevel = "M" } = {}) {
     (/** @type {number} */ r, /** @type {number} */ c) =>
       (((r * c) % 2) + ((r * c) % 3)) % 2 === 0,
     (/** @type {number} */ r, /** @type {number} */ c) =>
-      (((r + c) % 2) + ((r + c) % 3)) % 2 === 0,
+      (((r + c) % 2) + ((r * c) % 3)) % 2 === 0,
   ];
 
   let bestMask = 0;
@@ -551,11 +551,11 @@ function createQrMatrix(text, { ecLevel = "M" } = {}) {
   const fmt = getFormatBits(ecCode, bestMask);
   for (let i = 0; i < 15; i++) {
     const bit = (fmt >> i) & 1;
-    if (i < 6) matrix[8][i] = bit;
-    else if (i === 6) matrix[8][7] = bit;
+    if (i < 6) matrix[i][8] = bit;
+    else if (i === 6) matrix[7][8] = bit;
     else if (i === 7) matrix[8][8] = bit;
-    else if (i === 8) matrix[7][8] = bit;
-    else matrix[14 - i][8] = bit;
+    else if (i === 8) matrix[8][7] = bit;
+    else matrix[8][14 - i] = bit;
 
     if (i < 8) matrix[8][size - 1 - i] = bit;
     else matrix[size - 1 - (14 - i)][8] = bit;

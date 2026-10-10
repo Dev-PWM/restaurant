@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "MasaFlow POS",
-  "short_name": "MasaFlow",
-  "description": "MasaFlow upfront cash ordering, kitchen display, and drawer reconciliation POS",
+  "name": "Los Huaraches de Zapata",
+  "short_name": "Los Huaraches",
+  "description": "Pedidos, cocina y caja de Los Huaraches de Zapata.",
   "start_url": "/pos/",
   "scope": "/",
   "display": "standalone",
