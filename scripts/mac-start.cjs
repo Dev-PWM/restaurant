@@ -9,10 +9,10 @@ const http = require('node:http');
 const { parseEnv } = require('node:util');
 const { spawn, spawnSync } = require('node:child_process');
 
-const MINIMUM_NODE = '22.12.0';
+const MINIMUM_NODE = '22.18.0 (22.x) or 24.11.0';
 function supportedVersion(value) {
   const match = /^v?(\d+)\.(\d+)\.(\d+)$/.exec(String(value).trim());
-  return !!match && (Number(match[1]) > 22 || (Number(match[1]) === 22 && Number(match[2]) >= 12));
+  return !!match && (Number(match[1]) > 24 || (Number(match[1]) === 24 && Number(match[2]) >= 11) || (Number(match[1]) === 22 && Number(match[2]) >= 18));
 }
 function findNode({ env = process.env, home = os.homedir(), current = process.execPath, run = spawnSync } = {}) {
   const candidates = [env.MASAFLOW_NODE, current, ...String(env.PATH || '').split(path.delimiter).filter(Boolean).map(dir => path.join(dir, 'node')), path.join(home, '.local/bin/node'), '/opt/homebrew/bin/node', '/usr/local/bin/node'];

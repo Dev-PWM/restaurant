@@ -4,7 +4,7 @@ A restaurant ordering suite for cash and bank transfers built with **React, Type
 
 ## Start on your Mac
 
-1. Install Node.js **22.12 or newer** (includes npm).
+1. Install Node.js **22.18+ (22.x) or 24.11+** (includes npm).
 2. Double-click **`Start_MasaFlow.command`** in this folder. If macOS asks which app to use, choose Terminal.
 3. On first launch, dependencies are installed and you choose a private four-digit staff PIN. The launcher writes it to your local `.env` file.
 4. The POS opens automatically. Enter your PIN. Keep the Terminal window open while the restaurant is operating.

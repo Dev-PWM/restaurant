@@ -10,11 +10,31 @@ const ports: Record<string, number> = {
 export default defineConfig(({ mode, command }) => {
   if (!(mode in ports)) throw new Error("Choose a MasaFlow workspace mode.");
   const root = path.join(repo, "apps", mode);
+  const publicEnv = loadEnv(mode, repo, "VITE_");
+  const bankFields = [
+    "VITE_BANK_NAME",
+    "VITE_BANK_CLABE",
+    "VITE_BANK_BENEFICIARY",
+  ];
+  if (
+    bankFields.some((key) => publicEnv[key]) &&
+    !bankFields.every((key) => publicEnv[key]?.trim())
+  )
+    throw new Error(
+      "Configura juntos VITE_BANK_NAME, VITE_BANK_CLABE y VITE_BANK_BENEFICIARY para no mezclar cuentas bancarias.",
+    );
+  const clabe = publicEnv.VITE_BANK_CLABE?.trim();
+  if (clabe && !/^\d{18}$/.test(clabe))
+    throw new Error("VITE_BANK_CLABE debe contener exactamente 18 dígitos.");
   const dataDirectory =
     process.env.MASAFLOW_DATA_DIR ||
     loadEnv(mode, repo, "MASAFLOW_").MASAFLOW_DATA_DIR;
   return {
     root,
+    envDir: repo,
+    define: clabe
+      ? { "import.meta.env.VITE_BANK_CLABE": JSON.stringify(clabe) }
+      : {},
     publicDir: path.join(repo, "shared/pwa"),
     plugins: [tailwindcss()],
     base:

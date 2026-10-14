@@ -20,11 +20,11 @@ async function fixture(t) {
 const missing = async () => ({ state: 'missing' });
 const unloaded = args => ({ status: args[0] === 'print' ? 1 : 0, stdout: '', stderr: '' });
 
-test('native startup requires Node 22.12 and resolves a validated executable without cache-specific paths', () => {
-  for (const version of ['v20.19.0', 'v22.11.0', '', 'v22.12.0-rc.1']) assert.equal(supportedVersion(version), false);
-  for (const version of ['v22.12.0', '24.0.0', 'v26.7.0']) assert.equal(supportedVersion(version), true);
+test('native startup requires supported Node 22.18/24.11 runtimes and resolves a validated executable without cache-specific paths', () => {
+  for (const version of ['v20.19.0', 'v22.17.0', 'v23.0.0', 'v24.10.0', '', 'v22.18.0-rc.1']) assert.equal(supportedVersion(version), false);
+  for (const version of ['v22.18.0', '24.11.0', 'v26.7.0']) assert.equal(supportedVersion(version), true);
   const tried = [];
-  const runtime = findNode({ current: '/test/old-node', env: { PATH: '/portable/bin' }, home: '/other/home', run(candidate) { tried.push(candidate); return { status: 0, stdout: candidate.endsWith('/portable/bin/node') ? 'v22.12.0\n' : 'v20.0.0\n' }; } });
+  const runtime = findNode({ current: '/test/old-node', env: { PATH: '/portable/bin' }, home: '/other/home', run(candidate) { tried.push(candidate); return { status: 0, stdout: candidate.endsWith('/portable/bin/node') ? 'v22.18.0\n' : 'v20.0.0\n' }; } });
   assert.equal(runtime, '/portable/bin/node');
   assert.deepEqual(tried, ['/test/old-node', '/portable/bin/node']);
   assert.throws(() => findNode({ env: { MASAFLOW_NODE: '/unsupported/node' }, run: () => ({ status: 0, stdout: 'v20.0.0' }) }), /MASAFLOW_NODE/);

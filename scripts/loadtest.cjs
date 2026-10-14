@@ -33,8 +33,8 @@ const flags = Object.fromEntries(
 const only = flags.only || "all";
 const LIMITS = {
   /** Slowest acceptable realtime ack while a static-asset spike is running. */
-  probeMaxMs: Number(process.env.PROBE_MAX_MS || 500),
-  latencyP99Ms: Number(process.env.LATENCY_P99_MS || 1000),
+  probeMaxMs: Number(process.env.PROBE_MAX_MS || 100),
+  latencyP99Ms: Number(process.env.LATENCY_P99_MS || 100),
 };
 const percentile = (values, p) => {
   if (!values.length) return 0;
@@ -94,6 +94,9 @@ async function profileAssets(target) {
       connections,
       duration,
       workers: 2,
+      // Worker request errors are not forwarded as events. Print their original
+      // stack traces so a failing stress run can be diagnosed, not just counted.
+      debug: true,
       timeout: 10,
       requests,
     });
@@ -162,6 +165,13 @@ function runArtillery(target, pin) {
 }
 
 async function main() {
+  if (!["all", "assets", "sockets"].includes(only))
+    throw new Error(
+      "--only must be all, assets, or sockets; an empty workload cannot pass.",
+    );
+  for (const [name, value] of Object.entries(LIMITS))
+    if (!Number.isFinite(value) || value <= 0)
+      throw new Error(`${name} must be a positive finite latency threshold.`);
   for (const app of ["client-web", "business-pos"])
     if (!fs.existsSync(path.join(root, "apps", app, "dist-realtime")))
       throw new Error("Ejecuta npm run build antes de la prueba de carga.");

@@ -21,7 +21,7 @@ tags = ["masaflow", "bcrypt"]
 [rules.allowlist]
 paths = ['''^docs/''', '''^tests/''']
 
-[allowlist]
+[[allowlists]]
 description = "Generated files and lockfiles"
 paths = [
   '''package-lock\.json$''',
@@ -29,3 +29,9 @@ paths = [
   '''(^|/)node_modules/''',
   '''(^|/)dist(-realtime)?/''',
 ]
+[[allowlists]]
+description = "Integrity manifest SHA-256 entries only"
+condition = "AND"
+paths = ['''^apps/analytics/protected-runtime\.json$''']
+regexTarget = "line"
+regexes = ['''^\s*"src/[^"\r\n]+": "[a-f0-9]{64}",?\s*$''']

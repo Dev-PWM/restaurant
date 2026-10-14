@@ -3,6 +3,15 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const { summarizeCart } = require("../shared/ui/cart-summary");
 
+test("cart identity survives deleting a preceding row and changing quantity", () => {
+  const first = { id: "first", menuItemId: "dish", quantity: 1, modifierIds: [] };
+  const second = { id: "second", menuItemId: "dish", quantity: 1, modifierIds: [] };
+  const before = summarizeCart([first, second], [], []);
+  const after = summarizeCart([{ ...second, quantity: 2 }], [], []);
+  assert.equal(before.lines[1].key, after.lines[0].key);
+  assert.notEqual(before.lines[0].key, before.lines[1].key);
+});
+
 test("customer cart rows, item count, and total use the same priced projection", () => {
   const cart = [
     { menuItemId: "huarache", quantity: 1, modifierIds: ["dough"] },

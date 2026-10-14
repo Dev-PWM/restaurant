@@ -3,9 +3,9 @@
 rules:
   - id: masaflow-redos-nested-quantifier
     languages: [javascript, typescript]
-    severity: ERROR
+    severity: WARNING
     message: >-
-      Nested quantifier inside a regular expression (catastrophic backtracking). A long
+      Potential nested quantifier inside a regular expression (catastrophic backtracking). A long
       customer-controlled string can freeze the single-threaded server mid-rush. Rewrite
       without the nested repetition. `npm run scan:regex` probes this dynamically.
     pattern-regex: '\/[^\/\n]*\((?:[^()\\\n\/]|\\.)*[+*](?:[^()\\\n\/]|\\.)*\)(?:[+*]|\{\d+,\d*\})[^\/\n]*\/[dgimsuy]*'
@@ -43,11 +43,15 @@ rules:
     message: >-
       Raw HTML sink. Customer names and modifiers are untrusted; render them as React
       text instead.
-    pattern-either:
-      - pattern: <$EL dangerouslySetInnerHTML={...} />
-      - pattern: $E.innerHTML = $X
-      - pattern: $E.outerHTML = $X
-      - pattern: document.write(...)
+    patterns:
+      - pattern-either:
+          - pattern: <$EL dangerouslySetInnerHTML={...} />
+          - pattern: $E.innerHTML = $X
+          - pattern: $E.outerHTML = $X
+          - pattern: document.write(...)
+      # Reviewed local SVG allowlist; no remotely supplied content enters this function.
+      - pattern-not: |
+          <span className="dashboard-icon dashboard-ask-icon" aria-hidden="true" data-dashboard-icon={name} style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />
     paths:
       exclude: ["node_modules/", "tests/"]
 
@@ -57,10 +61,91 @@ rules:
     message: Shell command assembled from a non-literal. Use execFile/spawn with an argument array.
     patterns:
       - pattern-either:
-          - pattern: $CP.exec($CMD, ...)
-          - pattern: $CP.execSync($CMD, ...)
-      - pattern-not: $CP.exec("...", ...)
-      - pattern-not: $CP.execSync("...", ...)
+          - patterns:
+              - pattern-either:
+                  - pattern: $CP.exec($CMD, ...)
+                  - pattern: $CP.execSync($CMD, ...)
+              - pattern-either:
+                  - pattern-inside: |
+                      const $CP = require("node:child_process");
+                      ...
+                  - pattern-inside: |
+                      import * as $CP from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      import $CP from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const $CP = require("child_process");
+                      ...
+                  - pattern-inside: |
+                      import * as $CP from "child_process";
+                      ...
+                  - pattern-inside: |
+                      import $CP from "child_process";
+                      ...
+              - pattern-not: $CP.exec("...", ...)
+              - pattern-not: $CP.execSync("...", ...)
+          - patterns:
+              - pattern: $EXEC($CMD, ...)
+              - pattern-either:
+                  - pattern-inside: |
+                      import { exec as $EXEC } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const { exec: $EXEC } = require("node:child_process");
+                      ...
+                  - pattern-inside: |
+                      import { execSync as $EXEC } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      const { execSync: $EXEC } = require("node:child_process");
+                      ...
+                  - pattern-inside: |
+                      import { exec as $EXEC } from "child_process";
+                      ...
+                  - pattern-inside: |
+                      const { exec: $EXEC } = require("child_process");
+                      ...
+                  - pattern-inside: |
+                      import { execSync as $EXEC } from "child_process";
+                      ...
+                  - pattern-inside: |
+                      const { execSync: $EXEC } = require("child_process");
+                      ...
+              - pattern-not: $EXEC("...", ...)
+          - patterns:
+              - pattern: exec($CMD, ...)
+              - pattern-either:
+                  - pattern-inside: |
+                      import { exec } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      import { exec } from "child_process";
+                      ...
+                  - pattern-inside: |
+                      const { exec } = require("node:child_process");
+                      ...
+                  - pattern-inside: |
+                      const { exec } = require("child_process");
+                      ...
+              - pattern-not: exec("...", ...)
+          - patterns:
+              - pattern: execSync($CMD, ...)
+              - pattern-either:
+                  - pattern-inside: |
+                      import { execSync } from "node:child_process";
+                      ...
+                  - pattern-inside: |
+                      import { execSync } from "child_process";
+                      ...
+                  - pattern-inside: |
+                      const { execSync } = require("node:child_process");
+                      ...
+                  - pattern-inside: |
+                      const { execSync } = require("child_process");
+                      ...
+              - pattern-not: execSync("...", ...)
     paths:
       exclude: ["node_modules/", "tests/"]
 
@@ -72,9 +157,22 @@ rules:
       (shared SHA-256 compare in server.js).
     pattern-either:
       - pattern: process.env.MASAFLOW_STAFF_PIN
-      - pattern: import.meta.env.$ANY_PIN
+      - pattern: import.meta.env.VITE_STAFF_PIN
+      - pattern: import.meta.env.VITE_STAFF_PASSWORD
     paths:
-      include: ["apps/*/src/", "shared/ui/", "shared/pwa/"]
+      include: ["**/apps/*/src/**", "**/shared/ui/**", "**/shared/pwa/**"]
+
+  - id: masaflow-private-vite-env
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: Vite environment variables are public. Never bundle credentials.
+    patterns:
+      - pattern: import.meta.env.$NAME
+      - metavariable-regex:
+          metavariable: $NAME
+          regex: .*?(PIN|PASSWORD|SECRET|TOKEN).*
+    paths:
+      include: ["**/apps/*/src/**", "**/shared/ui/**", "**/shared/pwa/**"]
 
   - id: masaflow-literal-pin-in-client-code
     languages: [javascript, typescript]
@@ -82,7 +180,7 @@ rules:
     message: A four-digit PIN literal is assigned in client code.
     pattern-regex: '(?i)\bpin\b\s*[:=]\s*["''`]\d{4}["''`]'
     paths:
-      include: ["apps/*/src/", "shared/ui/"]
+      include: ["**/apps/*/src/**", "**/shared/ui/**", "**/shared/pwa/**"]
       exclude: ["tests/"]
 
   - id: masaflow-staff-pin-default

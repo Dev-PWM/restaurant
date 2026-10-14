@@ -3,6 +3,7 @@
 const express = require("express");
 const http = require("node:http");
 const path = require("node:path");
+const fs = require("node:fs");
 const crypto = require("node:crypto");
 const { isIP } = require("node:net");
 const { Server } = require("socket.io");
@@ -21,13 +22,14 @@ const { toSvg, toDataUri } = require("./shared/qrcode.js");
 /** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
 /** @typedef {import('./shared/types/realtime').Command} Command */
 /** @typedef {import('./shared/types/realtime').Reply} Reply */
-/** @typedef {{sessionId: string, token: string}} SocketData */
+/** @typedef {{sessionId: string, token: string, delta: boolean, historyCursor?: number, historyShiftId?: string, historyStaff?: boolean}} SocketData */
 /** @typedef {import('socket.io').Socket<import('./shared/types/realtime').ClientToServerEvents, import('./shared/types/realtime').ServerToClientEvents, Record<string, never>, SocketData>} AppSocket */
 /** Trust the final forwarded hop only for the loopback Vite proxy or the isolated public Caddy service.
  * @param {string} peer @param {string | string[] | undefined} forwarded @param {boolean} [publicProxy] */
 function clientAddress(peer, forwarded, publicProxy = false) {
   if (
-    (!publicProxy && !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer)) ||
+    (!publicProxy &&
+      !["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(peer)) ||
     typeof forwarded !== "string"
   )
     return peer;
@@ -43,7 +45,7 @@ const quietly = (/** @type {() => void} */ write) => {
     // The log stream reports its own failures on stderr.
   }
 };
-/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean}} [options] */
+/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean, persist?: typeof import('./shared/realtime/engine.js').writeAtomic}} [options] */
 async function createService(options = {}) {
   const log = (options.logger ?? createSilentLogger()).child({
     component: "server",
@@ -52,7 +54,8 @@ async function createService(options = {}) {
     options.dataDirectory ||
     process.env.MASAFLOW_DATA_DIR ||
     path.join(__dirname, ".masaflow-realtime");
-  const publicOrigin = options.publicOrigin ?? process.env.MASAFLOW_PUBLIC_ORIGIN ?? "";
+  const publicOrigin =
+    options.publicOrigin ?? process.env.MASAFLOW_PUBLIC_ORIGIN ?? "";
   if (publicOrigin) {
     const parsed = new URL(publicOrigin);
     ensure(
@@ -66,14 +69,19 @@ async function createService(options = {}) {
       "MASAFLOW_PUBLIC_ORIGIN debe ser un origen HTTPS sin ruta.",
     );
   }
-  const staffPassword = options.staffPassword ?? process.env.MASAFLOW_STAFF_PASSWORD ?? "";
+  const staffPassword =
+    options.staffPassword ?? process.env.MASAFLOW_STAFF_PASSWORD ?? "";
   ensure(
     (!publicOrigin || staffPassword.length >= 12) &&
-      (!staffPassword || (staffPassword.length >= 12 && staffPassword.length <= 256)),
+      (!staffPassword ||
+        (staffPassword.length >= 12 && staffPassword.length <= 256)),
     "Configura MASAFLOW_STAFF_PASSWORD con 12 a 256 caracteres para publicar el sitio.",
   );
   const authMode = staffPassword ? "password" : "pin";
-  const pin = authMode === "password" ? "" : options.pin ?? process.env.MASAFLOW_STAFF_PIN ?? "";
+  const pin =
+    authMode === "password"
+      ? ""
+      : (options.pin ?? process.env.MASAFLOW_STAFF_PIN ?? "");
   const sessionMs = options.sessionMs ?? 12 * 60 * 60 * 1000;
   if (authMode === "pin")
     ensure(
@@ -83,15 +91,26 @@ async function createService(options = {}) {
   const effectivePort =
     options.port ||
     Number(
-      process.env.PORT && process.env.PORT !== "8080"
-        ? process.env.PORT
-        : 3000,
+      process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000,
     );
   /** @type {ReturnType<typeof createMdnsAdvertiser> | null} */
   let mdns = null;
   const release = await acquireLock(dataDirectory);
   try {
-    const engine = createEngine({ directory: dataDirectory });
+    const engine = createEngine({
+      directory: dataDirectory,
+      persist: options.persist,
+    });
+    // The writer lock is held and data.json has validated. Unrenamed temporary
+    // snapshots were never acknowledged and cannot replace this committed ledger.
+    for (const name of fs.readdirSync(dataDirectory)) {
+      if (
+        name.startsWith("data.json.") &&
+        name.endsWith(".tmp") &&
+        UUID.test(name.slice("data.json.".length, -".tmp".length))
+      )
+        fs.rmSync(path.join(dataDirectory, name));
+    }
     if (engine.menuBackup)
       log.info(
         { backup: engine.menuBackup },
@@ -116,7 +135,12 @@ async function createService(options = {}) {
           req.method === "GET" &&
           req.headers.origin === undefined &&
           req.headers["sec-fetch-site"] === "same-origin";
-        callback(null, !publicOrigin || req.headers.origin === publicOrigin || sameOriginPoll);
+        callback(
+          null,
+          !publicOrigin ||
+            req.headers.origin === publicOrigin ||
+            sameOriginPoll,
+        );
       },
       maxHttpBufferSize: 65536,
     });
@@ -124,7 +148,10 @@ async function createService(options = {}) {
     const sessions = new Map();
     /** @type {Map<string, {count: number, until: number}>} */
     const limits = new Map();
-    const credentialHash = crypto.createHash("sha256").update(staffPassword || pin).digest();
+    const credentialHash = crypto
+      .createHash("sha256")
+      .update(staffPassword || pin)
+      .digest();
     /** @param {string} key @param {number} count @param {number} duration */
     function limit(key, count, duration) {
       const at = Date.now();
@@ -148,9 +175,18 @@ async function createService(options = {}) {
     function staff(socket) {
       return (sessions.get(socket.data.token) || 0) > Date.now();
     }
-    /** @param {AppSocket} socket @param {import("./shared/types/realtime").State} [s] @returns {Snapshot} */
-    function snapshot(socket, s = engine.getState()) {
+    /** @param {AppSocket} socket @param {import("./shared/types/realtime").State} [s] @param {boolean} [incremental] @returns {Snapshot} */
+    function snapshot(socket, s = engine.getState(), incremental = false) {
       const authenticated = staff(socket);
+      const cursor =
+        incremental &&
+        socket.data.historyShiftId === s.shiftId &&
+        socket.data.historyStaff === authenticated
+          ? (socket.data.historyCursor ?? 0)
+          : 0;
+      socket.data.historyShiftId = s.shiftId;
+      socket.data.historyStaff = authenticated;
+      socket.data.historyCursor = s.completedOrders.length;
       return {
         shiftId: s.shiftId,
         shiftOpenedAt: s.shiftOpenedAt,
@@ -168,9 +204,11 @@ async function createService(options = {}) {
         activeOrders: s.activeOrders.filter(
           (o) => authenticated || o.sessionId === socket.data.sessionId,
         ),
-        completedOrders: s.completedOrders.filter(
-          (o) => authenticated || o.sessionId === socket.data.sessionId,
-        ),
+        completedOrders: s.completedOrders
+          .slice(cursor)
+          .filter(
+            (o) => authenticated || o.sessionId === socket.data.sessionId,
+          ),
         salesMetrics: authenticated ? s.salesMetrics : null,
       };
     }
@@ -178,7 +216,9 @@ async function createService(options = {}) {
     function broadcast(event) {
       const s = engine.getState();
       for (const socket of io.sockets.sockets.values()) {
-        socket.emit("state_updated", snapshot(socket, s));
+        const next = snapshot(socket, s, socket.data.delta);
+        if (socket.data.delta) socket.emit("state_delta", next);
+        else socket.emit("state_updated", next);
         if (staff(socket)) socket.emit("metrics_updated", s.salesMetrics);
       }
       if (event === "admin_toggle_stock" || event === "admin_add_menu_item")
@@ -203,6 +243,7 @@ async function createService(options = {}) {
         socket.data = {
           sessionId,
           token: typeof token === "string" ? token : "",
+          delta: socket.handshake.auth.delta === true,
         };
         next();
       } catch (error) {
@@ -257,7 +298,13 @@ async function createService(options = {}) {
           if (!correct) {
             limit(key, 8, 15 * 60000);
             log.warn({ socket: socket.id, key }, "staff login failed");
-            ensure(false, authMode === "password" ? "Contraseña incorrecta." : "PIN incorrecto.", "INVALID_PIN");
+            ensure(
+              false,
+              authMode === "password"
+                ? "Contraseña incorrecta."
+                : "PIN incorrecto.",
+              "INVALID_PIN",
+            );
           }
           limits.delete(key);
           for (const [id, until] of sessions)
@@ -302,7 +349,7 @@ async function createService(options = {}) {
       for (const event of events)
         socket.on(
           event,
-          /** @param {import('./shared/types/realtime').Commands[Command]} input @param {(reply: Reply) => void} ack */ (
+          /** @param {import('./shared/types/realtime').Commands[Command]} input @param {(reply: Reply) => void} ack */ async (
             input,
             ack,
           ) => {
@@ -330,7 +377,7 @@ async function createService(options = {}) {
                 }
                 limit(`staff:${socket.id}`, 300, 60000);
               }
-              const result = engine.dispatch(event, input);
+              const result = await engine.dispatchAsync(event, input);
               broadcast(event);
               // Reply first: nothing about logging may change what the cashier sees.
               ack(result);
@@ -352,6 +399,20 @@ async function createService(options = {}) {
               );
             } catch (error) {
               const reply = failure(error);
+              if (
+                !reply.ok &&
+                ["PERSISTENCE_FAILED", "PERSISTENCE_UNCERTAIN"].includes(
+                  reply.code,
+                )
+              ) {
+                // Every cashier needs the storage alert; no success snapshot is broadcast.
+                for (const peer of io.sockets.sockets.values())
+                  if (staff(peer))
+                    peer.emit("storage_error", {
+                      code: reply.code,
+                      error: reply.error,
+                    });
+              }
               ack(reply);
               if (!reply.ok)
                 quietly(() => {
@@ -394,7 +455,9 @@ async function createService(options = {}) {
       );
       /** @param {string} peer @param {string | string[] | undefined} forwarded */
       const local = (peer, forwarded) =>
-        LOOPBACK.includes(clientAddress(peer, forwarded, Boolean(publicOrigin)));
+        LOOPBACK.includes(
+          clientAddress(peer, forwarded, Boolean(publicOrigin)),
+        );
       // Registered before instrument(), so this runs ahead of the Admin UI's own password check
       // (a bcrypt compare on the main thread), and caps how often anyone can trigger it.
       io.of("/admin").use((socket, next) => {
@@ -447,38 +510,52 @@ async function createService(options = {}) {
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
-    if (!publicOrigin) app.get("/api/network", (_req, res) => {
-      const addr = server.address();
-      const currentPort =
-        (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
-      res.json(getNetworkInfo(currentPort));
-    });
-    if (!publicOrigin) app.get("/api/network/qr", (req, res) => {
-      const addr = server.address();
-      const currentPort =
-        (addr && typeof addr === "object" ? addr.port : null) || effectivePort;
-      const info = getNetworkInfo(currentPort);
-      const target = String(req.query.target || "order");
-      if (req.query.url !== undefined || !Object.hasOwn(info.urls, target))
-        return res.status(400).json({ error: "Elige un destino local válido." });
-      const targetUrl = /** @type {Record<string, string>} */ (info.urls)[target];
-      if (Buffer.byteLength(targetUrl, "utf8") > 200)
-        return res.status(400).json({ error: "La dirección es demasiado larga para el código QR." });
+    if (!publicOrigin)
+      app.get("/api/network", (_req, res) => {
+        const addr = server.address();
+        const currentPort =
+          (addr && typeof addr === "object" ? addr.port : null) ||
+          effectivePort;
+        res.json(getNetworkInfo(currentPort));
+      });
+    if (!publicOrigin)
+      app.get("/api/network/qr", (req, res) => {
+        const addr = server.address();
+        const currentPort =
+          (addr && typeof addr === "object" ? addr.port : null) ||
+          effectivePort;
+        const info = getNetworkInfo(currentPort);
+        const target = String(req.query.target || "order");
+        if (req.query.url !== undefined || !Object.hasOwn(info.urls, target))
+          return res
+            .status(400)
+            .json({ error: "Elige un destino local válido." });
+        const targetUrl = /** @type {Record<string, string>} */ (info.urls)[
+          target
+        ];
+        if (Buffer.byteLength(targetUrl, "utf8") > 200)
+          return res
+            .status(400)
+            .json({
+              error: "La dirección es demasiado larga para el código QR.",
+            });
 
-      if (req.query.format === "json" || req.query.format === "datauri") {
-        return res.json({
-          url: targetUrl,
-          dataUri: toDataUri(targetUrl, { size: 256, color: "#1c1917" }),
-        });
-      }
+        if (req.query.format === "json" || req.query.format === "datauri") {
+          return res.json({
+            url: targetUrl,
+            dataUri: toDataUri(targetUrl, { size: 256, color: "#1c1917" }),
+          });
+        }
 
-      const svg = toSvg(targetUrl, { size: 256, color: "#1c1917" });
-      res.setHeader("Cache-Control", "no-cache");
-      res.type("image/svg+xml").send(svg);
-    });
+        const svg = toSvg(targetUrl, { size: 256, color: "#1c1917" });
+        res.setHeader("Cache-Control", "no-cache");
+        res.type("image/svg+xml").send(svg);
+      });
     app.use("/assets", express.static(path.join(__dirname, "assets")));
     app.get("/manifest.webmanifest", (_req, res) =>
-      res.sendFile("manifest.webmanifest", { root: path.join(__dirname, "assets") }),
+      res.sendFile("manifest.webmanifest", {
+        root: path.join(__dirname, "assets"),
+      }),
     );
     app.get("/sw.js", (_req, res) =>
       res
@@ -533,9 +610,15 @@ async function createService(options = {}) {
             log.info("shutting down");
             clearInterval(expiry);
             const stopMdns = mdns ? mdns.close() : Promise.resolve();
-            stopMdns.finally(() => {
+            Promise.allSettled([stopMdns, engine.close()]).then((results) => {
               io.close(() => {
-                release().then(() => resolve(undefined), reject);
+                release().then(() => {
+                  const failed = results.find(
+                    (result) => result.status === "rejected",
+                  );
+                  if (failed?.status === "rejected") reject(failed.reason);
+                  else resolve(undefined);
+                }, reject);
               });
             });
           });
@@ -575,9 +658,7 @@ if (require.main === module) {
     process.exit(1);
   });
   const port = Number(
-    process.env.PORT && process.env.PORT !== "8080"
-      ? process.env.PORT
-      : 3000,
+    process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000,
   );
   const publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || "";
   createService({ logger, port, enableMdns: !publicOrigin })
@@ -593,23 +674,30 @@ if (require.main === module) {
         await service.close();
         process.exitCode = 1;
       });
-      service.server.listen(port, process.env.MASAFLOW_HOST || "0.0.0.0", () => {
-        if (publicOrigin) {
-          logger.info({ port, url: `${publicOrigin}/pos/` }, "MasaFlow público listo");
-          return;
-        }
-        const netInfo = getNetworkInfo(port);
-        logger.info(
-          {
-            port,
-            url: `http://localhost:${port}/pos/`,
-            bonjour: netInfo.urls.bonjour,
-            mdns: netInfo.urls.mdns,
-            lan: netInfo.urls.lan,
-          },
-          "MasaFlow listo con auto-descubrimiento mDNS/Bonjour",
-        );
-      });
+      service.server.listen(
+        port,
+        process.env.MASAFLOW_HOST || "0.0.0.0",
+        () => {
+          if (publicOrigin) {
+            logger.info(
+              { port, url: `${publicOrigin}/pos/` },
+              "MasaFlow público listo",
+            );
+            return;
+          }
+          const netInfo = getNetworkInfo(port);
+          logger.info(
+            {
+              port,
+              url: `http://localhost:${port}/pos/`,
+              bonjour: netInfo.urls.bonjour,
+              mdns: netInfo.urls.mdns,
+              lan: netInfo.urls.lan,
+            },
+            "MasaFlow listo con auto-descubrimiento mDNS/Bonjour",
+          );
+        },
+      );
     })
     .catch((error) => {
       logger.fatal({ err: error }, "no se pudo iniciar MasaFlow");

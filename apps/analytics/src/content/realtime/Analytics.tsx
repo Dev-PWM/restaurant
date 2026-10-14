@@ -9,6 +9,7 @@ import {
 import type { Order } from "../../../../../shared/types/realtime";
 import { useRealtime } from "../../../../../shared/ui/RealtimeProvider";
 import { plural } from "../../../../../shared/ui/text-format.js";
+import { orderLineRows } from "../../../../../shared/ui/order-line-rows.js";
 import { specialLabel } from "../../../../../shared/ui/choice-groups.js";
 import {
   EmptyState,
@@ -141,8 +142,8 @@ export function TransactionTable({
                 <td className="max-w-sm px-3 py-4">
                   <strong>{o.customerName}</strong>
                   <ul className="mt-1 space-y-1 text-xs text-stone-500">
-                    {o.items.map((line, i) => (
-                      <li key={i}>
+                    {orderLineRows(o).map(({ id, line }) => (
+                      <li key={id}>
                         {line.quantity} × {line.name}
                         {line.modifiers.length > 0 &&
                           ` · ${line.modifiers.map(modifierLabel).join(", ")}`}
@@ -205,8 +206,8 @@ export function TransactionTable({
             </div>
             <strong className="mt-3 block">{o.customerName}</strong>
             <ul className="mt-1 space-y-1 text-xs text-stone-500">
-              {o.items.map((line, index) => (
-                <li key={index}>
+              {orderLineRows(o).map(({ id, line }) => (
+                <li key={id}>
                   {line.quantity} × {line.name}
                   {line.modifiers.length > 0 &&
                     ` · ${line.modifiers.map(modifierLabel).join(", ")}`}
@@ -288,7 +289,21 @@ function sanitizeItemsSummary(items: Order["items"]): string {
   if (!Array.isArray(items) || items.length === 0) return "";
   return items
     .map((line) => {
-      const baseName = (line.name || "").replace(/\s*\(.*?\)/g, "").trim();
+      // Scan once: an unmatched parenthesis or long whitespace cannot stall CSV export.
+      const name = line.name || "";
+      const parts: string[] = [];
+      let start = 0;
+      let opening = -1;
+      for (let i = 0; i < name.length; i++) {
+        if (opening < 0 && name[i] === "(") opening = i;
+        else if (opening >= 0 && name[i] === ")") {
+          parts.push(name.slice(start, opening).trimEnd());
+          start = i + 1;
+          opening = -1;
+        }
+      }
+      parts.push(name.slice(start));
+      const baseName = parts.join("").trim();
       const qty = line.quantity ?? 1;
       return `${qty}x ${baseName || "Platillo"}`;
     })
@@ -493,7 +508,7 @@ export function Analytics() {
                 {metrics.speiOrders > 0 && (
                   <>
                     <div data-testid="cash-sales">
-                      <dt className="text-xs text-white/75">
+                      <dt className="text-xs text-white/90">
                         Ventas en efectivo
                       </dt>
                       <dd className="mt-1 text-lg font-semibold tabular-nums">
@@ -501,7 +516,7 @@ export function Analytics() {
                       </dd>
                     </div>
                     <div data-testid="spei-total">
-                      <dt className="text-xs text-white/75">
+                      <dt className="text-xs text-white/90">
                         Transferencias ({metrics.speiOrders})
                       </dt>
                       <dd className="mt-1 text-lg font-semibold tabular-nums">
@@ -511,13 +526,13 @@ export function Analytics() {
                   </>
                 )}
                 <div>
-                  <dt className="text-xs text-white/75">Efectivo recibido</dt>
+                  <dt className="text-xs text-white/90">Efectivo recibido</dt>
                   <dd className="mt-1 text-lg font-semibold tabular-nums">
                     {mxn(metrics.tenderedCents)}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-white/75">Cambio</dt>
+                  <dt className="text-xs text-white/90">Cambio</dt>
                   <dd className="mt-1 text-lg font-semibold tabular-nums">
                     {mxn(metrics.changeCents)}
                   </dd>
@@ -539,7 +554,7 @@ export function Analytics() {
                   <li key={item.id}>
                     <div className="mb-2 flex justify-between gap-3 text-sm">
                       <span>
-                        <span className="mr-3 text-stone-400">
+                        <span className="mr-3 text-stone-500">
                           {String(index + 1).padStart(2, "0")}
                         </span>
                         <strong>{item.name}</strong>
@@ -547,7 +562,7 @@ export function Analytics() {
                       <span className="font-bold">
                         {item.quantity}{" "}
                         <span className="font-normal text-stone-500">
-                          unidades
+                          {item.quantity === 1 ? "unidad" : "unidades"}
                         </span>
                       </span>
                     </div>

@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { io, type Socket } from "socket.io-client";
+import { mergeDelta } from "./snapshot-state.js";
 import type {
   ClientToServerEvents,
   Command,
@@ -84,7 +85,11 @@ export function RealtimeProvider({
   useEffect(() => {
     const socket: AppSocket = io({
       autoConnect: false,
-      auth: { sessionId, token: staff ? readStorage(tokenKey) || "" : "" },
+      auth: {
+        sessionId,
+        token: staff ? readStorage(tokenKey) || "" : "",
+        delta: true,
+      },
       reconnectionDelayMax: 3000,
     });
     socketRef.current = socket;
@@ -93,7 +98,7 @@ export function RealtimeProvider({
       setConnected(socket.connected && navigator.onLine);
       if (staff && !next.staff) {
         writeStorage(tokenKey, null);
-        socket.auth = { sessionId, token: "" };
+        socket.auth = { sessionId, token: "", delta: true };
       }
     };
     let retryTimer: ReturnType<typeof setTimeout> | undefined;
@@ -121,6 +126,11 @@ export function RealtimeProvider({
     });
     socket.on("init_data", apply);
     socket.on("state_updated", apply);
+    socket.on("state_delta", (next) => {
+      setSnapshot((previous) => mergeDelta(previous, next));
+      setConnected(socket.connected && navigator.onLine);
+    });
+    socket.on("storage_error", (failure) => setError(failure.error));
     socket.on("menu_updated", (menu) =>
       setSnapshot((previous) =>
         previous && menu.revision >= previous.revision
@@ -135,7 +145,7 @@ export function RealtimeProvider({
     );
     socket.on("staff_expired", () => {
       writeStorage(tokenKey, null);
-      socket.auth = { sessionId, token: "" };
+      socket.auth = { sessionId, token: "", delta: true };
       setSnapshot((previous) =>
         previous
           ? {
@@ -218,7 +228,7 @@ export function RealtimeProvider({
         return false;
       }
       writeStorage(tokenKey, response.token || "");
-      socket.auth = { sessionId, token: response.token };
+      socket.auth = { sessionId, token: response.token, delta: true };
       return true;
     } catch {
       setError("No se pudo verificar el acceso. Intenta otra vez.");
@@ -229,7 +239,7 @@ export function RealtimeProvider({
     writeStorage(tokenKey, null);
     const socket = socketRef.current;
     if (socket) {
-      socket.auth = { sessionId, token: "" };
+      socket.auth = { sessionId, token: "", delta: true };
       if (socket.connected) socket.emit("staff_logout", () => {});
       socket.disconnect();
       if (!suspended) socket.connect();
@@ -241,6 +251,12 @@ export function RealtimeProvider({
   // the PIN gate and board do not flash empty when training starts or ends;
   // reconnecting replaces it with a fresh init_data.
   function suspendRealtime() {
+    // Cut off transport and listeners before React schedules the simulator render.
+    // A stale live callback must not emit or mutate state during this handoff.
+    const socket = socketRef.current;
+    socketRef.current = null;
+    socket?.removeAllListeners();
+    socket?.disconnect();
     setSuspended(true);
     setConnected(false);
   }

@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "include": [
+    "src/content/realtime/**/*",
+    "../../shared/types/**/*.ts",
+    "../../shared/ui/**/*"
+  ],
+  "exclude": ["dist", "dist-realtime", "node_modules"]
+}

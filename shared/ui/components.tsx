@@ -1,3 +1,4 @@
+import { orderLineRows } from "./order-line-rows.js";
 import {
   useEffect,
   useRef,
@@ -180,7 +181,10 @@ export function PWAInstallButton() {
         Instalar app
       </button>
       {showHelp && (
-        <Modal title={`Instalar ${RESTAURANT_NAME}`} onClose={() => setShowHelp(false)}>
+        <Modal
+          title={`Instalar ${RESTAURANT_NAME}`}
+          onClose={() => setShowHelp(false)}
+        >
           <p>
             En Safari, pulsa <strong>Compartir</strong> y elige{" "}
             <strong>Añadir a pantalla de inicio</strong> para abrir{" "}
@@ -339,7 +343,10 @@ function StockHint({
   modifier: Modifier;
   dishes: { category: string; modifierIds: string[] }[];
 }) {
-  if (modifier.kind !== "special" && !(modifier.kind === "extra" && modifier.priceCents > 0))
+  if (
+    modifier.kind !== "special" &&
+    !(modifier.kind === "extra" && modifier.priceCents > 0)
+  )
     return null;
   const sections = [
     ...new Set(
@@ -415,14 +422,17 @@ export function PinGate({ children }: { children: ReactNode }) {
   const passwordMode = snapshot?.staffAuthMode === "password";
   // The training simulator suspends realtime (snapshot becomes null) while staff stay signed in.
   if (snapshot?.staff || suspended) return <>{children}</>;
-  if (!snapshot) return (
-    <div className="flex min-h-[90dvh] items-center justify-center px-5 py-10">
-      <section className="w-full max-w-sm text-center">
-        <Brand />
-        <p role="status" className="mt-8 text-stone-600">Conectando con el servidor…</p>
-      </section>
-    </div>
-  );
+  if (!snapshot)
+    return (
+      <div className="flex min-h-[90dvh] items-center justify-center px-5 py-10">
+        <section className="w-full max-w-sm text-center">
+          <Brand />
+          <p role="status" className="mt-8 text-stone-600">
+            Conectando con el servidor…
+          </p>
+        </section>
+      </div>
+    );
   const enter = async () => {
     setBusy(true);
     const authenticated = await login(credential);
@@ -462,9 +472,11 @@ export function PinGate({ children }: { children: ReactNode }) {
             maxLength={passwordMode ? 256 : 4}
             value={credential}
             onChange={(e) =>
-              setCredential(passwordMode
-                ? e.target.value.slice(0, 256)
-                : e.target.value.replace(/\D/g, "").slice(0, 4))
+              setCredential(
+                passwordMode
+                  ? e.target.value.slice(0, 256)
+                  : e.target.value.replace(/\D/g, "").slice(0, 4),
+              )
             }
           />
           {error && (
@@ -472,43 +484,51 @@ export function PinGate({ children }: { children: ReactNode }) {
               {error}
             </p>
           )}
-          {!passwordMode && <div className="my-4 grid grid-cols-3 gap-3">
-            {[
-              "1",
-              "2",
-              "3",
-              "4",
-              "5",
-              "6",
-              "7",
-              "8",
-              "9",
-              "Borrar",
-              "0",
-              "←",
-            ].map((key) => (
-              <button
-                key={key}
-                type="button"
-                className="btn text-xl"
-                disabled={busy}
-                onClick={() =>
-                  setCredential((p) =>
-                    key === "Borrar"
-                      ? ""
-                      : key === "←"
-                        ? p.slice(0, -1)
-                        : (p + key).slice(0, 4),
-                  )
-                }
-              >
-                {key}
-              </button>
-            ))}
-          </div>}
+          {!passwordMode && (
+            <div className="my-4 grid grid-cols-3 gap-3">
+              {[
+                "1",
+                "2",
+                "3",
+                "4",
+                "5",
+                "6",
+                "7",
+                "8",
+                "9",
+                "Borrar",
+                "0",
+                "←",
+              ].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className="btn text-xl"
+                  disabled={busy}
+                  onClick={() =>
+                    setCredential((p) =>
+                      key === "Borrar"
+                        ? ""
+                        : key === "←"
+                          ? p.slice(0, -1)
+                          : (p + key).slice(0, 4),
+                    )
+                  }
+                >
+                  {key}
+                </button>
+              ))}
+            </div>
+          )}
           <button
             className="btn btn-primary mt-4 w-full"
-            disabled={!connected || (passwordMode ? credential.length < 12 : credential.length !== 4) || busy}
+            disabled={
+              !connected ||
+              (passwordMode
+                ? credential.length < 12
+                : credential.length !== 4) ||
+              busy
+            }
           >
             {busy ? "Verificando…" : "Entrar al turno"}
             <ArrowRight size={18} />
@@ -537,7 +557,7 @@ export function Brand() {
       />
       {/* The two-line name from the printed menu: pink «Los Huaraches» over teal «De Zapata». */}
       <span className="flex flex-col leading-none">
-        <span className="text-[11.5px] font-black uppercase tracking-normal text-[#E03188] sm:text-[0.8125rem] sm:tracking-wide">
+        <span className="text-[11.5px] font-black uppercase tracking-normal text-[#D1227A] sm:text-[0.8125rem] sm:tracking-wide">
           Los Huaraches
         </span>
         <span className="mt-0.5 text-xl font-black tracking-tight text-[#2E94A5] sm:text-[1.375rem]">
@@ -689,7 +709,7 @@ export function OrderLines({
   const kitchen = variant === "kitchen";
   return (
     <ul className={kitchen ? "space-y-2.5" : "space-y-3"}>
-      {order.items.map((line, index) => {
+      {orderLineRows(order).map(({ id, line }) => {
         const prep = line.modifiers.find((m) => m.kind === "prep");
         // Only the left edge carries the colour, so the cook sees how it is cooked before reading a word.
         const edge =
@@ -700,14 +720,16 @@ export function OrderLines({
               : "border-l-stone-300";
         return (
           <li
-            key={index}
+            key={id}
             data-order-line
             className={`rounded-lg border border-stone-200 bg-white p-3 ${kitchen ? `border-l-[6px] ${edge}` : ""}`}
           >
             <div className="flex items-start gap-2.5">
               <span
                 className={`inline-flex shrink-0 items-center justify-center rounded-md bg-stone-900 px-2 font-black tabular-nums text-white ${
-                  kitchen ? "min-h-9 min-w-10 text-lg" : "min-h-7 min-w-8 text-sm"
+                  kitchen
+                    ? "min-h-9 min-w-10 text-lg"
+                    : "min-h-7 min-w-8 text-sm"
                 }`}
               >
                 {line.quantity}×
@@ -723,7 +745,11 @@ export function OrderLines({
                 {mxn(line.lineTotalCents)}
               </span>
             </div>
-            <LineChoices modifiers={line.modifiers} toppingChoices={line.toppingChoices} variant={variant} />
+            <LineChoices
+              modifiers={line.modifiers}
+              toppingChoices={line.toppingChoices}
+              variant={variant}
+            />
           </li>
         );
       })}

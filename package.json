@@ -24,10 +24,10 @@
     "scan:sast": "semgrep scan --config .semgrep/masaflow.yml --error --severity ERROR --metrics=off server.js shared apps scripts artillery",
     "scan:secrets": "gitleaks detect --source . --config .gitleaks.toml --redact --verbose",
     "dev": "node scripts/dev.cjs",
-    "lint": "tsc --noEmit",
+    "lint": "npm run typecheck && eslint .",
     "test": "node --test tests/*.test.js",
     "start:mac": "bash Start_MasaFlow.command",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/client-web/tsconfig.json && tsc --noEmit -p apps/business-pos/tsconfig.json && tsc --noEmit -p apps/analytics/tsconfig.json",
     "test:realtime": "node --test tests/realtime.test.js",
     "legacy:start": "node legacy-server.cjs",
     "legacy:build": "npm --prefix apps/analytics run build",
@@ -40,7 +40,7 @@
     "legacy:startup:status": "node scripts/mac-login.cjs status"
   },
   "engines": {
-    "node": ">=22.12"
+    "node": "^22.18.0 || >=24.11.0"
   },
   "dependencies": {
     "@socket.io/admin-ui": "^0.5.1",
@@ -63,6 +63,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "autocannon": "^8.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
     "jsqr": "^1.4.0",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
@@ -70,6 +72,9 @@
     "vite": "^8.3.2"
   },
   "overrides": {
-    "@parcel/watcher": "^2.6.0"
+    "@parcel/watcher": "^2.6.0",
+    "hyperid": {
+      "uuid": "^11.1.1"
+    }
   }
 }

@@ -1,7 +1,13 @@
 # Public website: Caddy is the only published service. Keep the local-only compose.yaml separate.
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_BANK_NAME: ${VITE_BANK_NAME:-}
+        VITE_BANK_CLABE: ${VITE_BANK_CLABE:-}
+        VITE_BANK_BENEFICIARY: ${VITE_BANK_BENEFICIARY:-}
+        VITE_BANK_CONCEPT_PREFIX: ${VITE_BANK_CONCEPT_PREFIX:-}
     hostname: masaflow-public
     restart: unless-stopped
     init: true

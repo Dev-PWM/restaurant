@@ -6,7 +6,7 @@ MasaFlow runs locally with customer ordering, upfront cash collection, kitchen f
 
 ## Run locally
 
-Use Node 22.12 or later (the analytics build uses Vite 8).
+Use Node 22.18+ (22.x) or 24.11+ (the analytics build uses Vite 8).
 
 ```sh
 npm run setup

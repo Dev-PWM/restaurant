@@ -1,7 +1,13 @@
 # Trusted local deployment only. Public hosting requires a stronger access gateway.
 services:
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_BANK_NAME: ${VITE_BANK_NAME:-}
+        VITE_BANK_CLABE: ${VITE_BANK_CLABE:-}
+        VITE_BANK_BENEFICIARY: ${VITE_BANK_BENEFICIARY:-}
+        VITE_BANK_CONCEPT_PREFIX: ${VITE_BANK_CONCEPT_PREFIX:-}
     hostname: masaflow-local
     restart: unless-stopped
     init: true

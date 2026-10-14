@@ -65,7 +65,7 @@ What was reviewed for leaks:
 | Per-socket listeners | attached per connection and released with the socket |
 | React timers (ticket clock, training countdowns, payment undo) | cleared on unmount; a pending live payment is flushed instead of dropped |
 
-The ledger is written by a temporary-file replacement with fsync and every command is applied synchronously on one thread, so two sockets emitting in the same millisecond are serialized; there is no write race to guard against.
+The server serializes mutations through one asynchronous queue, with at most 1000 pending commands. Disk writes and fsync do not block the event loop. Commands validate against the last durable state and are acknowledged only after the temporary-file replacement and directory fsync complete. Shutdown drains this queue before releasing the writer lock. JSON serialization and ledger validation still use the event loop; measure larger ledgers as well as empty-server load.
 
 ## 4. Load and stress testing
 
@@ -73,8 +73,10 @@ The ledger is written by a temporary-file replacement with fsync and every comma
 
 | Command | What it does | Fails when |
 |---|---|---|
-| `npm run loadtest:assets` | autocannon: 10 connections, then a 200-connection spike (2 worker threads) on `/api/health`, `/order/`, `/pos/` and the JS bundle, while a Socket.io probe measures ack latency once a second | any error, timeout or non-2xx; p99 over 1000 ms; a socket ack over 500 ms or timing out during the spike |
-| `npm run loadtest:sockets` | Artillery (`artillery/masaflow.yml`): 50 phones submit `submit_client_order` while one POS cashier accepts, readies and pays every ticket with `pos_update_status` / `pos_order_paid` | any rejected or timed-out ack; p99 over 500 ms (acks) or 1000 ms (broadcast delivery) |
+| `npm run loadtest:assets` | autocannon: 10 connections, then a 200-connection spike (2 worker threads) on `/api/health`, `/order/`, `/pos/` and the JS bundle, while a Socket.io probe measures ack latency once a second | any error, timeout or non-2xx; p99 over 100 ms; a socket ack over 100 ms or timing out during the spike |
+| `npm run loadtest:sockets` | Artillery (`artillery/masaflow.yml`): 50 phones submit `submit_client_order` while one POS cashier accepts, readies and pays every ticket with `pos_update_status` / `pos_order_paid` | any rejected or timed-out ack; acknowledgments differ from the expected workload; p99 at or above 100 ms for acks or broadcast delivery |
+
+Finish `npm run build` before loading assets; rebuilding replaces the output directory and invalidates concurrent asset delivery measurements. The order admission limit is 60 new orders per minute per IP, so customers behind one NAT share it. A load beyond this limit should receive `RATE_LIMITED`, and those refused tickets must not enter the ledger.
 
 Each simulated phone presents its own address in `x-forwarded-for`, which the server honors only from loopback, so the per-address rate limits are exercised realistically instead of throttling one client. Artillery 2.0.34 (pinned in `scripts/loadtest.cjs`) is fetched with `npx` on first use; if npm reports a root-owned cache, fix it once with `sudo chown -R "$(id -u):$(id -g)" ~/.npm` or run with `npm_config_cache=/some/folder`.
 
@@ -96,7 +98,7 @@ Current results (2026-10-07): 344 regular expressions scanned, **0 exponential**
 - **Staff credential.** The local server requires an explicitly configured four-digit PIN. The public HTTPS stack requires a 12–256 character password and accepts Socket.IO requests only from its configured HTTPS origin. The sample environment files contain no credential.
 - **Local CORS.** The LAN development mode allows Socket.IO requests from any origin so the Vite dev apps work on separate ports; staff commands still require a valid session. Public mode restricts the origin. Keep the LAN port off the public internet.
 - **`bun.lock` is not updated** by `npm install`. The Dockerfile and `npm ci` use `package-lock.json`; regenerate `bun.lock` with Bun if you rely on it.
-- **Per-command state copy.** Every command clones the whole ledger (`structuredClone`) before applying it. Cheap at restaurant scale (the load test above), but it is the first thing to look at if the 500-order cap is ever raised.
+- **Ledger growth.** Completed receipts are immutable, so commands copy their array rather than cloning every line item. Negotiated deltas reduce broadcast serialization, but validating and serializing the JSON file still scales with current-shift history. The 500-order cap bounds the active queue, not completed history. Measure large ledgers and close shifts regularly.
 
 ## 7. Training mode and the payment undo window
 

@@ -1,5 +1,7 @@
 @import "tailwindcss" source(none);
 @theme {
+  /* Small operational labels need 4.5:1 against both cream and stone panels. */
+  --color-stone-500: #726a63;
   --color-clay-50: #faf0eb;
   --color-clay-100: #f3ded2;
   --color-clay-200: #e8c4b4;

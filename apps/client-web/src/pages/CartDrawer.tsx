@@ -21,7 +21,7 @@ import { Modal, mxn } from "../../../../shared/ui/components";
 import { LineChoices } from "../../../../shared/ui/line-choices";
 import { DiningRoom } from "./DiningRoom";
 
-type CartLine = OrderInput["items"][number];
+import type { CartLine } from "./Menu";
 
 export function CartDrawer({
   cart,

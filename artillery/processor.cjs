@@ -26,7 +26,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const address = (n) => `10.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
 /** @param {string} shiftId @param {string} sessionId @param {{id: string}[]} menuItems @param {number} n */
-function buildOrder(shiftId, sessionId, menuItems, n) {
+function buildOrder(shiftId, sessionId, menuItems, n, modifiers = []) {
+  const item = menuItems[n % menuItems.length];
+  const modifierIds = ["masa", "prep"].flatMap((kind) => {
+    const choice = modifiers.find(
+      (m) => m.kind === kind && m.available && item.modifierIds.includes(m.id),
+    );
+    return choice ? [choice.id] : [];
+  });
   return {
     orderId: randomUUID(),
     sessionId,
@@ -34,9 +41,9 @@ function buildOrder(shiftId, sessionId, menuItems, n) {
     customerName: `Carga ${n}`,
     items: [
       {
-        menuItemId: menuItems[n % menuItems.length].id,
+        menuItemId: item.id,
         quantity: 1 + (n % 3),
-        modifierIds: [],
+        modifierIds,
       },
     ],
   };
@@ -57,6 +64,7 @@ function connect(target, auth, ip) {
     }, 10000);
     socket.once("connect_error", (error) => {
       clearTimeout(timer);
+      socket.close();
       reject(error);
     });
     socket.once("init_data", (snapshot) => {
@@ -93,12 +101,12 @@ async function phone(events, n) {
   const sessionId = randomUUID();
   const { socket, snapshot } = await connect(
     target,
-    { sessionId, token: "" },
+    { sessionId, token: "", delta: true },
     address(n),
   );
   events.emit("counter", "masaflow.connected", 1);
   const sentAt = new Map();
-  socket.on("state_updated", (next) => {
+  const observe = (next) => {
     for (const order of next.activeOrders) {
       const sent = sentAt.get(order.id);
       if (sent === undefined) continue;
@@ -109,7 +117,10 @@ async function phone(events, n) {
         performance.now() - sent,
       );
     }
-  });
+  };
+  socket.on("state_updated", observe);
+  socket.on("state_delta", observe);
+  events.emit("counter", "masaflow.expected_acks", ORDERS_PER_CLIENT * 4);
   const started = Date.now();
   for (let i = 0; i < ORDERS_PER_CLIENT; i++) {
     await sleep(500 + Math.random() * 2500);
@@ -118,6 +129,7 @@ async function phone(events, n) {
       sessionId,
       snapshot.menuItems,
       n + i,
+      snapshot.modifiers,
     );
     sentAt.set(order.orderId, performance.now());
     await timed(
@@ -138,7 +150,7 @@ async function cashier(events, n) {
     throw new Error("MASAFLOW_STAFF_PIN is required for the POS virtual user");
   const { socket } = await connect(
     process.env.LOADTEST_TARGET,
-    { sessionId: randomUUID(), token: "" },
+    { sessionId: randomUUID(), token: "", delta: true },
     address(n),
   );
   const login = await socket
@@ -175,6 +187,7 @@ async function cashier(events, n) {
   // Logging in makes the server send a fresh, staff-scoped init_data.
   socket.on("init_data", work);
   socket.on("state_updated", work);
+  socket.on("state_delta", work);
   await sleep(HOLD_MS + 20000);
   socket.close();
 }
@@ -188,6 +201,7 @@ function virtualUser(context, events, done) {
     "ack_timeout",
     "connected",
     "vu_error",
+    "expected_acks",
   ])
     events.emit("counter", `masaflow.${counter}`, 0);
   (n === 0 ? cashier(events, n) : phone(events, n)).then(

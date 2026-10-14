@@ -41,7 +41,7 @@ export const activeKey = "masaflow.v3.orderId";
 export const pendingKey = "masaflow.v3.pending";
 export const pendingTotalKey = "masaflow.v3.pendingTotalCents";
 
-type CartLine = OrderInput["items"][number];
+export type CartLine = OrderInput["items"][number] & { id: string };
 
 export { itemAvailable };
 
@@ -621,7 +621,7 @@ export function Menu() {
         <CustomizeModal
           item={customizeItem}
           onClose={() => setCustomizeId(null)}
-          onAdd={(line) => setCart((prev) => [...prev, line])}
+          onAdd={(line) => setCart((prev) => [...prev, { ...line, id: uuid() }])}
         />
       )}
 

@@ -652,12 +652,13 @@ test("recovery rejects corrupt paid receipts without overwriting the original da
   assert.throws(() => createEngine({ directory }), /inconsistente/);
   assert.equal(fs.readFileSync(file, "utf8"), bytes);
 });
-async function serviceFixture(t) {
+async function serviceFixture(t, options = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "masaflow-socket-"));
   const sockets = [];
   const service = await createService({
     dataDirectory: directory,
     pin: "2468",
+    ...options,
   });
   await new Promise((resolve) =>
     service.server.listen(0, "127.0.0.1", resolve),
@@ -668,11 +669,12 @@ async function serviceFixture(t) {
     fs.rmSync(directory, { force: true, recursive: true });
   });
   const url = `http://127.0.0.1:${service.server.address().port}`;
-  const connect = async (sessionId = randomUUID(), token = "") => {
+  const connect = async (sessionId = randomUUID(), token = "", options = {}) => {
     const socket = io(url, {
       autoConnect: false,
       auth: { sessionId, token },
       reconnection: false,
+      ...options,
     });
     sockets.push(socket);
     const initial = new Promise((resolve, reject) => {
@@ -1309,4 +1311,74 @@ test("a customer sees how many orders are ahead of theirs, and nothing else abou
     assert.equal((await ack(staff.socket, "pos_update_status", { orderId: a.orderId, status })).ok, true);
   const later = await connect(second.sessionId);
   assert.deepEqual(later.initial.queueNumbers, [2]);
+});
+
+test("disk-full payment rejects its ack, alerts all cashiers, and preserves the unpaid ledger", async (t) => {
+  let fail = false;
+  const { connect, engine, directory } = await serviceFixture(t, {
+    persist(file, state) {
+      if (fail) throw Object.assign(new Error("disk full"), { code: "ENOSPC" });
+      writeAtomic(file, state);
+    },
+  });
+  const customer = await connect(), cashier = await connect(), other = await connect();
+  await ack(cashier.socket, "staff_login", "2468");
+  await ack(other.socket, "staff_login", "2468");
+  const order = input(engine, { sessionId: customer.sessionId });
+  await ack(customer.socket, "submit_client_order", order);
+  for (const status of ["cooking", "ready"])
+    await ack(cashier.socket, "pos_update_status", { orderId: order.orderId, status });
+  const before = engine.getState();
+  const bytes = fs.readFileSync(path.join(directory, "data.json"), "utf8");
+  let broadcasts = 0;
+  customer.socket.on("state_updated", () => broadcasts++);
+  const alerts = [cashier, other].map(({socket}, index) => new Promise((resolve, reject) => {
+    const onAlert = alert => { clearTimeout(timer); resolve(alert); };
+    const timer = setTimeout(() => {
+      socket.off("storage_error", onAlert);
+      reject(new Error(`Cashier ${index + 1} did not receive the storage alert within 2 seconds`));
+    }, 2000);
+    socket.once("storage_error", onAlert);
+    t.after(() => { clearTimeout(timer); socket.off("storage_error", onAlert); });
+  }));
+  const receivedAlerts = Promise.all(alerts);
+  // Install a handler immediately while waiting for the command acknowledgement.
+  void receivedAlerts.catch(() => {});
+  fail = true;
+  const reply = await ack(cashier.socket, "pos_order_paid", { orderId: order.orderId, tenderedCents: 25000 });
+  assert.equal(reply.ok, false);
+  assert.equal(reply.code, "PERSISTENCE_FAILED");
+  assert.ok((await receivedAlerts).every(alert => alert.code === "PERSISTENCE_FAILED"));
+  assert.deepEqual(engine.getState(), before);
+  assert.equal(fs.readFileSync(path.join(directory, "data.json"), "utf8"), bytes);
+  assert.equal(broadcasts, 0);
+  fail = false;
+  assert.equal((await ack(cashier.socket, "pos_order_paid", { orderId: order.orderId, tenderedCents: 25000 })).ok, true);
+  assert.equal(engine.getState().salesMetrics.paidOrders, 1);
+});
+
+test("50 independent phones and three cashiers settle concurrent mixed payments exactly once", async (t) => {
+  const {connect, engine, directory} = await serviceFixture(t);
+  const cashiers = await Promise.all(Array.from({length:3}, () => connect()));
+  for (const cashier of cashiers) await ack(cashier.socket, "staff_login", "2468");
+  const phones = await Promise.all(Array.from({length:50}, (_, i) => connect(randomUUID(), "", {
+    transports: ["websocket"], extraHeaders: { "x-forwarded-for": `10.1.0.${i + 1}` },
+  })));
+  const orders = phones.map((phone, i) => input(engine, {sessionId:phone.sessionId, customerName:`Rush ${i}`}));
+  assert.ok((await Promise.all(orders.map((order,i) => ack(phones[i].socket,"submit_client_order",order)))).every(r=>r.ok));
+  for (const status of ["cooking","ready"])
+    assert.ok((await Promise.all(orders.map((order,i) => ack(cashiers[i%3].socket,"pos_update_status",{orderId:order.orderId,status})))).every(r=>r.ok));
+  const replies=await Promise.all(orders.flatMap((order,i) => [0,1].map(() => ack(cashiers[i%3].socket,"pos_order_paid",{
+    orderId:order.orderId, method:i%2 ? "spei":"cash", tenderedCents:i%2 ? 20000:25000,
+  }))));
+  assert.ok(replies.every(r=>r.ok));
+  const state=engine.getState();
+  assert.equal(state.activeOrders.length,0);
+  assert.equal(state.completedOrders.length,50);
+  assert.equal(new Set(state.completedOrders.map(o=>o.transaction.id)).size,50);
+  assert.equal(state.salesMetrics.cashCents,500000);
+  assert.equal(state.salesMetrics.speiCents,500000);
+  assert.equal(state.salesMetrics.revenueCents,1000000);
+  assert.equal(state.salesMetrics.changeCents,125000);
+  assert.deepEqual(createEngine({directory}).getState(),state);
 });

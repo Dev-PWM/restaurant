@@ -2,7 +2,7 @@
 
 Double-click **[Start MasaFlow.command](../launchers/Start%20MasaFlow.command)** in Finder. The launcher starts the local server, waits until it confirms the correct restaurant data directory, and opens the cashier screen. If this same instance is already ready, it opens that instance. It refuses to reuse another application or a MasaFlow instance with different data on the same port.
 
-Node.js **22.12 or newer** must be installed. The Finder shortcuts look in the current shell's Node path, `~/.local/bin`, Homebrew, and common nvm/fnm locations. To select a different executable explicitly, set `MASAFLOW_NODE`. The login installer resolves the executable to an absolute path; it does not require an interactive shell or a particular Node installation manager. Nothing downloads or installs Node automatically.
+Node.js **22.18+ (22.x) or 24.11+** must be installed. The Finder shortcuts look in the current shell's Node path, `~/.local/bin`, Homebrew, and common nvm/fnm locations. To select a different executable explicitly, set `MASAFLOW_NODE`. The login installer resolves the executable to an absolute path; it does not require an interactive shell or a particular Node installation manager. Nothing downloads or installs Node automatically.
 
 ## Start after login
 

@@ -208,6 +208,9 @@ export type ClientToServerEvents = ClientEvents & {
   ) => void;
 };
 export interface ServerToClientEvents {
+  /** Full active queue; completedOrders contains only newly closed tickets since this connection's last snapshot. */
+  state_delta: (snapshot: Snapshot) => void;
+  storage_error: (failure: { code: string; error: string }) => void;
   init_data: (snapshot: Snapshot) => void;
   state_updated: (snapshot: Snapshot) => void;
   menu_updated: (

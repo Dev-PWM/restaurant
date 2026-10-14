@@ -17,13 +17,15 @@ config:
       arrivalCount: 51
   ensure:
     thresholds:
-      - masaflow.submit_ack_ms.p99: 500
-      - masaflow.pos_ack_ms.p99: 500
-      - masaflow.state_update_ms.p99: 1000
+      - masaflow.submit_ack_ms.p99: 100
+      - masaflow.pos_ack_ms.p99: 100
+      - masaflow.state_update_ms.p99: 100
     conditions:
       - expression: "masaflow.rejected == 0"
       - expression: "masaflow.ack_timeout == 0"
       - expression: "masaflow.vu_error == 0"
+      - expression: "masaflow.expected_acks > 0"
+      - expression: "masaflow.acked == masaflow.expected_acks"
 scenarios:
   - name: "phones and POS"
     flow:

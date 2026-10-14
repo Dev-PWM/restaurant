@@ -28,4 +28,7 @@ Browser notifications require permission and an open page. Background push and S
 
 ## Current release boundary
 
+Bank details can be set with `VITE_BANK_NAME`, `VITE_BANK_CLABE`, `VITE_BANK_BENEFICIARY`, and `VITE_BANK_CONCEPT_PREFIX` in the root `.env`. These are public display values. The CLABE must contain exactly 18 digits; verify the account and beneficiary with the owner before launch. Both Compose configurations pass these values as Docker build arguments. Rebuild the application after changing them; a container restart alone does not replace compiled bank details.
+
 The domain and always-on host are pending. Local automated and browser checks cannot prove DNS, certificate issuance, container startup, external connectivity, or backups on the eventual host. Complete the host checks above when those resources are available.
+When customizing a bank identity, set `VITE_BANK_NAME`, `VITE_BANK_CLABE` and `VITE_BANK_BENEFICIARY` together. The build rejects partial settings and a CLABE that is not exactly 18 digits, preventing customized labels from being combined with a default account number. This validates configuration completeness, not account ownership or whether a transfer reached the bank.

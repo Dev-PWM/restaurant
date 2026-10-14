@@ -126,15 +126,17 @@ const CHOICE_MESSAGES = {
 /** @param {string} file @param {unknown} value */
 function writeAtomic(file, value) {
   const temporary = `${file}.${randomUUID()}.tmp`;
+  let renamed = false;
   try {
     const fd = fs.openSync(temporary, "wx", 0o600);
     try {
-      fs.writeFileSync(fd, JSON.stringify(value, null, 2));
+      fs.writeFileSync(fd, JSON.stringify(value));
       fs.fsyncSync(fd);
     } finally {
       fs.closeSync(fd);
     }
     fs.renameSync(temporary, file);
+    renamed = true;
     // Flush the directory entry too: the replacement must survive a power loss.
     try {
       const directoryFd = fs.openSync(path.dirname(file), "r");
@@ -154,7 +156,56 @@ function writeAtomic(file, value) {
       );
     }
   } finally {
-    fs.rmSync(temporary, { force: true });
+    // Never let cleanup replace an uncertain-commit error with an ordinary rollback.
+    if (!renamed) {
+      try {
+        fs.rmSync(temporary, { force: true });
+      } catch {
+        // Replacement did not complete: preserve its error, and let startup
+        // remove any orphan after validating the committed ledger.
+      }
+    }
+  }
+}
+/** The same durability boundary as writeAtomic, without blocking the event loop on disk I/O.
+ * @param {string} file @param {unknown} value */
+async function writeAtomicAsync(file, value) {
+  const temporary = `${file}.${randomUUID()}.tmp`;
+  let renamed = false;
+  try {
+    const fd = await fs.promises.open(temporary, "wx", 0o600);
+    try {
+      await fd.writeFile(JSON.stringify(value));
+      await fd.sync();
+    } finally {
+      await fd.close();
+    }
+    await fs.promises.rename(temporary, file);
+    renamed = true;
+    try {
+      const directoryFd = await fs.promises.open(path.dirname(file), "r");
+      try {
+        await directoryFd.sync();
+      } finally {
+        await directoryFd.close();
+      }
+    } catch (cause) {
+      throw Object.assign(
+        new Error(
+          "No se pudo confirmar el guardado. Reinicia el servidor y verifica el pedido antes de volver a cobrar.",
+          { cause },
+        ),
+        { code: "PERSISTENCE_UNCERTAIN" },
+      );
+    }
+  } finally {
+    if (!renamed) {
+      try {
+        await fs.promises.rm(temporary, { force: true });
+      } catch {
+        // Keep the original write failure; cleanup must not replace it.
+      }
+    }
   }
 }
 /** Validate ledger invariants before using a recovery file; never silently replace corrupt cash records.
@@ -211,7 +262,8 @@ function validate(s) {
     );
     if (!Object.hasOwn(order, "acceptedAt"))
       order.acceptedAt =
-        order.status === "cooking" || order.status === "ready" ||
+        order.status === "cooking" ||
+        order.status === "ready" ||
         order.status === "completed"
           ? order.paidAt || order.createdAt
           : null;
@@ -225,7 +277,15 @@ function validate(s) {
       "Menú inválido.",
     );
   }
+  for (const collection of [s.menuItems, s.modifiers])
+    ensure(
+      new Set(collection.map((item) => item.id)).size === collection.length,
+      "Identificadores del menú duplicados.",
+    );
   const ids = new Set();
+  const numbers = new Set();
+  const receiptIds = new Set();
+  const activeIds = new Set(s.activeOrders.map((order) => order.id));
   for (const order of [...s.activeOrders, ...s.completedOrders]) {
     ensure(
       UUID.test(order.id) &&
@@ -237,7 +297,15 @@ function validate(s) {
     );
     ids.add(order.id);
     ensure(
-      (s.activeOrders.includes(order)
+      Number.isSafeInteger(order.number) &&
+        order.number > 0 &&
+        order.number < s.nextOrderNumber &&
+        !numbers.has(order.number),
+      "Número de pedido inválido o duplicado.",
+    );
+    numbers.add(order.number);
+    ensure(
+      (activeIds.has(order.id)
         ? ["review", "cooking", "ready"]
         : ["completed", "no_show"]
       ).includes(order.status),
@@ -280,9 +348,17 @@ function validate(s) {
     );
     if (order.transaction) {
       const t = order.transaction;
+      ensure(
+        UUID.test(t.id) && !receiptIds.has(t.id),
+        "Recibo inválido o duplicado.",
+      );
+      receiptIds.add(t.id);
       // Receipts from before transfers existed carry no method; they were all cash.
       if (t.method === undefined) t.method = "cash";
-      ensure(t.method === "cash" || t.method === "spei", "Método de pago inválido.");
+      ensure(
+        t.method === "cash" || t.method === "spei",
+        "Método de pago inválido.",
+      );
       money(t.totalCents);
       money(t.tenderedCents);
       money(t.changeCents);
@@ -304,8 +380,8 @@ function validate(s) {
   s.salesMetrics = metrics([...s.activeOrders, ...s.completedOrders]);
   return s;
 }
-/** @param {{directory: string, persist?: typeof writeAtomic}} options */
-function createEngine({ directory, persist = writeAtomic }) {
+/** @param {{directory: string, persist?: typeof writeAtomic, persistAsync?: typeof writeAtomicAsync}} options */
+function createEngine({ directory, persist = writeAtomic, persistAsync }) {
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const file = path.join(directory, "data.json");
   /** @type {State} */
@@ -314,6 +390,31 @@ function createEngine({ directory, persist = writeAtomic }) {
     : initialState();
   if (!fs.existsSync(file)) persist(file, state);
   let storageFault = false;
+  const asyncPersist =
+    persistAsync ??
+    (persist === writeAtomic
+      ? writeAtomicAsync
+      : async (
+          /** @type {string} */ destination,
+          /** @type {unknown} */ next,
+        ) => persist(destination, next));
+  let pending = 0;
+  let closing = false;
+  let queue = Promise.resolve();
+  /** @param {string} destination @param {State} next */
+  async function saveAsync(destination, next) {
+    try {
+      await asyncPersist(destination, next);
+    } catch (error) {
+      if (
+        /** @type {{code?: string}} */ (error)?.code === "PERSISTENCE_UNCERTAIN"
+      ) {
+        storageFault = true;
+        if (destination === file) state = next;
+      }
+      throw error;
+    }
+  }
   /** @param {string} destination @param {State} next */
   function save(destination, next) {
     try {
@@ -378,18 +479,26 @@ function createEngine({ directory, persist = writeAtomic }) {
     next.completedOrders.push(order);
     order.completedAt = new Date().toISOString();
   }
-  /** @template {keyof Commands} K @param {K} event @param {Commands[K]} input @returns {import('../types/realtime').Reply} */
-  function dispatch(event, input) {
+  /** @template {keyof Commands} K @param {K} event @param {Commands[K]} input
+   * @param {boolean} asynchronous @returns {import('../types/realtime').Reply | Promise<import('../types/realtime').Reply>} */
+  function apply(event, input, asynchronous) {
     ensure(
       !storageFault,
       "Guardado pendiente de verificar. Reinicia el servidor y revisa el pedido antes de volver a cobrar.",
       "PERSISTENCE_UNCERTAIN",
     );
     ensure(input && typeof input === "object", "Solicitud inválida.");
-    const next = structuredClone(state);
+    // Historical receipts are immutable: every terminal action either retries
+    // unchanged or is rejected. Copy the history array, not thousands of frozen lines.
+    const next = {
+      ...structuredClone({ ...state, completedOrders: [] }),
+      completedOrders: [...state.completedOrders],
+    };
     const at = new Date().toISOString();
     /** @type {import('../types/realtime').Reply} */
     let reply = { ok: true };
+    /** @type {{destination: string, value: State} | null} */
+    let archiveWrite = null;
     // The event boundary is checked at runtime. Narrowing a generic indexed map needs explicit branch casts.
     if (event === "submit_client_order") {
       const data = /** @type {Commands['submit_client_order']} */ (input);
@@ -414,7 +523,8 @@ function createEngine({ directory, persist = writeAtomic }) {
         paymentIntent === "cash" || paymentIntent === "spei",
         "Método de pago inválido.",
       );
-      const orderType = data.orderType === undefined ? "takeout" : data.orderType;
+      const orderType =
+        data.orderType === undefined ? "takeout" : data.orderType;
       ensure(
         orderType === "takeout" || orderType === "dine_in",
         "Tipo de pedido inválido.",
@@ -583,7 +693,8 @@ function createEngine({ directory, persist = writeAtomic }) {
       );
       const name = data.name.trim();
       const id = `custom-${data.id}`;
-      const description = data.description?.trim() || `Platillo especial: ${name}`;
+      const description =
+        data.description?.trim() || `Platillo especial: ${name}`;
       const existing = next.menuItems.find((item) => item.id === id);
       if (existing) {
         // A retry after a lost acknowledgement must repeat the same dish, not create a second one.
@@ -606,7 +717,10 @@ function createEngine({ directory, persist = writeAtomic }) {
         "Ya existe un platillo con ese nombre en esa categoría.",
         "DUPLICATE_ITEM",
       );
-      ensure(next.menuItems.length < 200, "El menú ya tiene demasiados platillos.");
+      ensure(
+        next.menuItems.length < 200,
+        "El menú ya tiene demasiados platillos.",
+      );
       next.menuItems.push({
         id,
         name,
@@ -623,7 +737,9 @@ function createEngine({ directory, persist = writeAtomic }) {
           (data.status === "available" || data.status === "occupied"),
         "Mesa inválida.",
       );
-      const table = next.tables.find((candidate) => candidate.number === data.number);
+      const table = next.tables.find(
+        (candidate) => candidate.number === data.number,
+      );
       ensure(table, "Mesa no encontrada.");
       // Tapping twice, or two cashiers at once, must not churn the ledger.
       if (table.status === data.status) return { ok: true };
@@ -654,7 +770,7 @@ function createEngine({ directory, persist = writeAtomic }) {
         closedAt: at,
       };
       // Deterministic name: a crash after archive but before reset may safely retry the same close.
-      save(archivePath, archived);
+      archiveWrite = { destination: archivePath, value: archived };
       next.closedShifts.push({ shiftId: state.shiftId, archive, closedAt: at });
       next.shiftId = randomUUID();
       next.shiftOpenedAt = at;
@@ -673,7 +789,7 @@ function createEngine({ directory, persist = writeAtomic }) {
       const order = [...next.activeOrders, ...next.completedOrders].find(
         (o) => o.id === data.orderId,
       );
-      ensure(order, "Pedido no encontrado.", "ORDER_NOT_FOUND"      );
+      ensure(order, "Pedido no encontrado.", "ORDER_NOT_FOUND");
       if (event === "pos_order_paid") {
         ensure(
           !Object.hasOwn(data, "tipCents"),
@@ -696,7 +812,10 @@ function createEngine({ directory, persist = writeAtomic }) {
           );
           return { ok: true };
         }
-        ensure(order.status === "ready", "Solo puedes cobrar un pedido listo para entregar.");
+        ensure(
+          order.status === "ready",
+          "Solo puedes cobrar un pedido listo para entregar.",
+        );
         if (method === "spei")
           ensure(
             data.tenderedCents === order.totalCents,
@@ -723,17 +842,13 @@ function createEngine({ directory, persist = writeAtomic }) {
       } else if (event === "pos_mark_noshow") {
         if (order.status === "no_show") return { ok: true };
         ensure(
-          ["review", "ready"].includes(order.status) &&
-            !order.transaction,
+          ["review", "ready"].includes(order.status) && !order.transaction,
           "Solo puedes anular pedidos sin cobrar que estén en revisión o listos para recoger.",
         );
         order.status = "no_show";
         finish(order, next);
       } else if (event === "pos_update_status") {
-        ensure(
-          ["cooking", "ready"].includes(data.status),
-          "Estado inválido.",
-        );
+        ensure(["cooking", "ready"].includes(data.status), "Estado inválido.");
         if (order.status === data.status) return { ok: true };
         ensure(
           (order.status === "review" && data.status === "cooking") ||
@@ -747,13 +862,64 @@ function createEngine({ directory, persist = writeAtomic }) {
     }
     next.revision++;
     validate(next);
+    if (asynchronous)
+      return (async () => {
+        if (archiveWrite)
+          await saveAsync(archiveWrite.destination, archiveWrite.value);
+        await saveAsync(file, next);
+        state = next;
+        return reply;
+      })();
+    if (archiveWrite) save(archiveWrite.destination, archiveWrite.value);
     save(file, next);
     state = next;
     return reply;
   }
+  /** Synchronous reducer for local tools/tests; cannot race the server's queued writes.
+   * @template {keyof Commands} K @param {K} event @param {Commands[K]} input */
+  function dispatch(event, input) {
+    ensure(
+      !closing && pending === 0,
+      "Hay operaciones pendientes de guardar.",
+      "COMMAND_PENDING",
+    );
+    return /** @type {import('../types/realtime').Reply} */ (
+      apply(event, input, false)
+    );
+  }
+  /** One writer: validate against the last durable state, then commit before resolving.
+   * @template {keyof Commands} K @param {K} event @param {Commands[K]} input */
+  function dispatchAsync(event, input) {
+    if (closing || pending >= 1000)
+      return Promise.reject(
+        Object.assign(
+          new Error(
+            "Servidor ocupado. Reconecta y verifica antes de reintentar.",
+          ),
+          { code: "RATE_LIMITED" },
+        ),
+      );
+    const payload = structuredClone(input);
+    pending++;
+    const operation = queue.then(() => apply(event, payload, true));
+    queue = operation.then(
+      () => {
+        pending--;
+      },
+      () => {
+        pending--;
+      },
+    );
+    return operation;
+  }
   return {
     getState: () => structuredClone(state),
     dispatch,
+    dispatchAsync,
+    close: () => {
+      closing = true;
+      return queue;
+    },
     file,
     menuBackup,
     catalogBackup,
@@ -765,6 +931,7 @@ module.exports = {
   metrics,
   validate,
   writeAtomic,
+  writeAtomicAsync,
   UUID,
   ensure,
 };

@@ -6,6 +6,10 @@ COPY apps/business-pos/package.json ./apps/business-pos/
 COPY apps/analytics/package.json ./apps/analytics/
 RUN npm ci
 COPY . .
+ARG VITE_BANK_NAME
+ARG VITE_BANK_CLABE
+ARG VITE_BANK_BENEFICIARY
+ARG VITE_BANK_CONCEPT_PREFIX
 RUN npm test && npm run build && npm prune --omit=dev
 
 FROM node:22-bookworm-slim

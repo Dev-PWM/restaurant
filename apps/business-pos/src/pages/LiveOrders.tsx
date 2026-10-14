@@ -24,7 +24,10 @@ import {
   Utensils,
 } from "lucide-react";
 import type { Order } from "../../../../shared/types/realtime";
-import { detectOrderBadges, BBVA_BANK_INFO } from "../../../../shared/types/zapata";
+import {
+  detectOrderBadges,
+  BBVA_BANK_INFO,
+} from "../../../../shared/types/zapata";
 import { useRealtime } from "../../../../shared/ui/RealtimeProvider";
 import { ErrorBoundary } from "../../../../shared/ui/ErrorBoundary";
 import { plural, minutesBetween } from "../../../../shared/ui/text-format.js";
@@ -67,7 +70,11 @@ export function CashTender({
   order: Order;
   onClose: () => void;
   /** Queues the payment. Live mode starts the undo window; the simulator grades it. */
-  onConfirm: (orderId: string, tenderedCents: number, via?: "exact" | "spei") => void;
+  onConfirm: (
+    orderId: string,
+    tenderedCents: number,
+    via?: "exact" | "spei",
+  ) => void;
   simulator?: boolean;
   /** Practice: the cash field accepts typing (otherwise it is read-only and only the bills work). */
   typing?: boolean;
@@ -146,7 +153,9 @@ export function CashTender({
           className={`my-5 rounded-xl p-4 ${change >= 0 && valid ? "bg-emerald-50 text-emerald-900" : "bg-stone-100"}`}
         >
           <div className="flex justify-between">
-            <span>{change >= 0 ? "Cambio a entregar" : "Falta por recibir"}</span>
+            <span>
+              {change >= 0 ? "Cambio a entregar" : "Falta por recibir"}
+            </span>
             <strong className="text-2xl tabular-nums">
               {mxn(Math.abs(change))}
             </strong>
@@ -177,7 +186,9 @@ export function CashTender({
           disabled={!simulator && !connected}
           data-help="spei-pay"
           className={`btn mt-3 w-full border-blue-500 bg-blue-50 font-bold text-blue-900 hover:bg-blue-100 disabled:opacity-50 ${
-            order.paymentIntent === "spei" ? "ring-4 ring-blue-400 ring-offset-2" : ""
+            order.paymentIntent === "spei"
+              ? "ring-4 ring-blue-400 ring-offset-2"
+              : ""
           }`}
           onClick={() => {
             setShowSpei(true);
@@ -189,8 +200,8 @@ export function CashTender({
           {order.paymentIntent === "spei" && " (eligió el cliente)"}
         </button>
         <p className="mt-4 text-center text-xs text-stone-500">
-          Confirma solo después de recibir el efectivo o verificar la transferencia. Tendrás{" "}
-          {UNDO_WINDOW_SECONDS} segundos para deshacer.
+          Confirma solo después de recibir el efectivo o verificar la
+          transferencia. Tendrás {UNDO_WINDOW_SECONDS} segundos para deshacer.
         </p>
       </Modal>
 
@@ -338,15 +349,23 @@ export function TicketCard({
       <div className="p-4">
         {helpLifeline && (
           <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-950 space-y-1">
-            <strong className="block font-black text-amber-900">💡 Recordatorio de Ayuda:</strong>
+            <strong className="block font-black text-amber-900">
+              💡 Recordatorio de Ayuda:
+            </strong>
             {isSPEI && (
-              <p>• Pago por celular: Revisa tu aplicación del banco antes de entregar la comida.</p>
+              <p>
+                • Pago por celular: Revisa tu aplicación del banco antes de
+                entregar la comida.
+              </p>
             )}
             {hasSinGrasa && (
               <p>• Cocina al comal sin grasa. No uses manteca ni aceite.</p>
             )}
             {omissions.length > 0 && (
-              <p>• Especial atención: Cliente pidió SIN {omissions.map((o) => o.name).join(", ")}.</p>
+              <p>
+                • Especial atención: Cliente pidió SIN{" "}
+                {omissions.map((o) => o.name).join(", ")}.
+              </p>
             )}
             {!isSPEI && !hasSinGrasa && omissions.length === 0 && (
               <p>• Revisa los platillos y prepara a tu ritmo.</p>
@@ -434,48 +453,51 @@ export function TicketCard({
             </div>
           )}
           {(simulator || order.items.length > 1) &&
-            (hasSinGrasa || fritoPieces > 0 || hasExtraQuesillo || specials.length > 0) && (
-            <div
-              className="mb-3 flex flex-wrap items-center gap-1.5 border-y border-dashed border-stone-300 py-2"
-              aria-label="Resumen del ticket"
-            >
-              {specials.map((special) => (
-                <span
-                  key={special.id}
-                  translate="no"
-                  className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold tracking-wide text-amber-950"
-                >
-                  <Star size={13} fill="currentColor" />
-                  ESPECIAL · {specialLabel(special)} ×{special.pieces}
-                </span>
-              ))}
-              {hasSinGrasa && (
-                <span
-                  data-tour-target={simulator ? "badge-sin-grasa" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2.5 py-1 text-xs font-bold tracking-wide text-purple-900"
-                >
-                  <Flame size={13} />
-                  AL COMAL (SIN GRASA) ×{sinGrasaPieces}
-                </span>
-              )}
-              {fritoPieces > 0 && (
-                <span
-                  data-tour-target={simulator ? "badge-frito" : undefined}
-                  className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
-                >
-                  FRITO ×{fritoPieces}
-                </span>
-              )}
-              {hasExtraQuesillo && (
-                <span
-                  data-tour-target={simulator ? "badge-quesillo" : undefined}
-                  className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-1 text-xs font-bold tracking-wide text-green-900"
-                >
-                  + QUESILLO EXTRA
-                </span>
-              )}
-            </div>
-          )}
+            (hasSinGrasa ||
+              fritoPieces > 0 ||
+              hasExtraQuesillo ||
+              specials.length > 0) && (
+              <div
+                className="mb-3 flex flex-wrap items-center gap-1.5 border-y border-dashed border-stone-300 py-2"
+                aria-label="Resumen del ticket"
+              >
+                {specials.map((special) => (
+                  <span
+                    key={special.id}
+                    translate="no"
+                    className="inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-xs font-bold tracking-wide text-amber-950"
+                  >
+                    <Star size={13} fill="currentColor" />
+                    ESPECIAL · {specialLabel(special)} ×{special.pieces}
+                  </span>
+                ))}
+                {hasSinGrasa && (
+                  <span
+                    data-tour-target={simulator ? "badge-sin-grasa" : undefined}
+                    className="inline-flex items-center gap-1 rounded-md bg-purple-100 border border-purple-300 px-2.5 py-1 text-xs font-bold tracking-wide text-purple-900"
+                  >
+                    <Flame size={13} />
+                    AL COMAL (SIN GRASA) ×{sinGrasaPieces}
+                  </span>
+                )}
+                {fritoPieces > 0 && (
+                  <span
+                    data-tour-target={simulator ? "badge-frito" : undefined}
+                    className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2.5 py-1 text-xs font-bold tracking-wide text-stone-800"
+                  >
+                    FRITO ×{fritoPieces}
+                  </span>
+                )}
+                {hasExtraQuesillo && (
+                  <span
+                    data-tour-target={simulator ? "badge-quesillo" : undefined}
+                    className="inline-flex items-center rounded-md bg-green-50 px-2.5 py-1 text-xs font-bold tracking-wide text-green-900"
+                  >
+                    + QUESILLO EXTRA
+                  </span>
+                )}
+              </div>
+            )}
           <OrderLines order={order} />
           {requiresAcknowledgement && (isReview || isCooking) && (
             <button
@@ -491,9 +513,13 @@ export function TicketCard({
           )}
           <div className="mt-4 flex items-center justify-between border-t border-dashed border-stone-200 pt-3 text-sm">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-stone-500">{time(order.createdAt)}</span>
+              <span className="font-medium text-stone-500">
+                {time(order.createdAt)}
+              </span>
             </div>
-            <strong className="text-xl font-black tabular-nums">{mxn(order.totalCents)}</strong>
+            <strong className="text-xl font-black tabular-nums">
+              {mxn(order.totalCents)}
+            </strong>
           </div>
         </div>
         {order.status === "review" ? (
@@ -862,7 +888,9 @@ export function CompletedOrdersSection({
                       {order.completedAt ? time(order.completedAt) : "--"}
                     </td>
                     <td className="px-4 py-3 tabular-nums text-emerald-800">
-                      {serviceMinutes !== null ? `~${serviceMinutes} min` : "--"}
+                      {serviceMinutes !== null
+                        ? `~${serviceMinutes} min`
+                        : "--"}
                     </td>
                     <td className="px-4 py-3">
                       <span className="line-clamp-2 text-stone-600">
@@ -1327,7 +1355,8 @@ function LiveBoard({
         };
         entry.total += line.quantity;
         // How each piece is cooked is what the cook needs to batch: comal or fried.
-        const style = line.modifiers.find((m) => m.kind === "prep")?.name ?? "Sin elegir";
+        const style =
+          line.modifiers.find((m) => m.kind === "prep")?.name ?? "Sin elegir";
         entry.styles[style] = (entry.styles[style] || 0) + line.quantity;
         itemMap.set(line.name, entry);
       }
@@ -1551,6 +1580,25 @@ function LiveBoard({
               role="tab"
               aria-selected={activeLane === lane.status}
               aria-controls={`lane-panel-${lane.status}`}
+              tabIndex={activeLane === lane.status ? 0 : -1}
+              onKeyDown={(event) => {
+                const index = visibleLanes.findIndex((candidate) => candidate.status === lane.status);
+                const next =
+                  event.key === "ArrowRight"
+                    ? (index + 1) % visibleLanes.length
+                    : event.key === "ArrowLeft"
+                      ? (index - 1 + visibleLanes.length) % visibleLanes.length
+                      : event.key === "Home"
+                        ? 0
+                        : event.key === "End"
+                          ? visibleLanes.length - 1
+                          : -1;
+                if (next < 0) return;
+                event.preventDefault();
+                const status = visibleLanes[next].status;
+                setActiveLane(status);
+                document.getElementById(`lane-tab-${status}`)?.focus();
+              }}
               className={`min-h-12 flex-1 border-b-4 px-2 py-3 text-center text-sm font-bold ${activeLane === lane.status ? "border-clay-600 text-clay-700" : "border-transparent text-stone-500"}`}
               onClick={() => setActiveLane(lane.status)}
             >
@@ -1617,7 +1665,9 @@ function LiveBoard({
                 title="Muestra recordatorios y consejos de ayuda en cada comanda"
               >
                 <span>💡</span>
-                <span>{helpLifeline ? "Modo Ayuda (Activo)" : "Modo Ayuda"}</span>
+                <span>
+                  {helpLifeline ? "Modo Ayuda (Activo)" : "Modo Ayuda"}
+                </span>
               </button>
             )}
             {!simulator && (
@@ -1644,7 +1694,11 @@ function LiveBoard({
                 {pendingTraining > 0 && (
                   <span
                     className="rounded-full bg-red-600 px-2 py-0.5 text-xs font-black tabular-nums text-white"
-                    aria-label={plural(pendingTraining, "módulo pendiente", "módulos pendientes")}
+                    aria-label={plural(
+                      pendingTraining,
+                      "módulo pendiente",
+                      "módulos pendientes",
+                    )}
                   >
                     {pendingTraining}
                   </span>
@@ -1701,7 +1755,8 @@ function LiveBoard({
             }}
           >
             <Clock3 size={16} className="hidden md:block" />
-            <span className="md:hidden">Pedidos</span><span className="hidden md:inline">Pedidos en Fila</span>
+            <span className="md:hidden">Pedidos</span>
+            <span className="hidden md:inline">Pedidos en Fila</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "queue"
@@ -1728,7 +1783,8 @@ function LiveBoard({
             }}
           >
             <Utensils size={16} className="hidden md:block" />
-            <span className="md:hidden">Mesas</span><span className="hidden md:inline">Control de Mesas</span>
+            <span className="md:hidden">Mesas</span>
+            <span className="hidden md:inline">Control de Mesas</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "tables"
@@ -1736,7 +1792,8 @@ function LiveBoard({
                   : "bg-stone-100 text-stone-600"
               }`}
             >
-              {tables.filter((t) => t.status === "occupied").length}/{tables.length}
+              {tables.filter((t) => t.status === "occupied").length}/
+              {tables.length}
             </span>
           </button>
           <button
@@ -1755,7 +1812,8 @@ function LiveBoard({
             }}
           >
             <Check size={16} className="hidden md:block" />
-            <span className="md:hidden">Completados</span><span className="hidden md:inline">Pedidos Completados</span>
+            <span className="md:hidden">Completados</span>
+            <span className="hidden md:inline">Pedidos Completados</span>
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-black ${
                 activeTab === "completed"
@@ -1856,6 +1914,10 @@ function LiveBoard({
                 return (
                   <section
                     key={lane.status}
+                    id={`lane-panel-${lane.status}`}
+                    role="tabpanel"
+                    aria-labelledby={`lane-tab-${lane.status}`}
+                    tabIndex={0}
                     className={`${lane.status === activeLane ? "flex" : "hidden"} min-w-0 flex-col rounded-2xl bg-stone-100 p-3 md:flex`}
                     aria-label={lane.title}
                   >

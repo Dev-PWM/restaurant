@@ -37,6 +37,7 @@ const STRICT_ROOTS = [
   "shared/",
   "apps/business-pos/src/",
   "apps/client-web/src/",
+  "apps/analytics/src/content/realtime/",
 ];
 const EXTENSIONS = new Set([".js", ".cjs", ".mjs", ".jsx", ".ts", ".tsx"]);
 const SKIP = new Set(["node_modules", "dist", "dist-realtime", "legacy"]);
@@ -217,7 +218,8 @@ if (require.main === module) {
   console.log(
     `\n${findings.length} regular expressions scanned: ${count("EXPONENTIAL")} exponential, ${count("QUADRATIC")} quadratic, ${count("DYNAMIC")} dynamic, ${count("SUSPECT")} suspect. ${bad.length} gating failure(s).`,
   );
-  process.exitCode = bad.length ? 1 : 0;
+  // A skipped/unparseable file is an incomplete audit, never a successful scan.
+  process.exitCode = bad.length || unparsed.length ? 1 : 0;
 }
 
 module.exports = { probe, scanSource, scanProject, gating, STRICT_ROOTS };

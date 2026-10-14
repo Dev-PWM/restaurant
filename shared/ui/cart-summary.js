@@ -1,7 +1,15 @@
 "use strict";
+const legacyLineIds = new WeakMap();
+let nextLegacyId = 0;
+/** Old callers without a client row id still get identity, never position-based keys. */
+function lineKey(line) {
+  if (line.id) return line.id;
+  if (!legacyLineIds.has(line)) legacyLineIds.set(line, `cart-row-${++nextLegacyId}`);
+  return legacyLineIds.get(line);
+}
 
 /**
- * @typedef {import("../types/realtime").OrderInput["items"][number]} CartItem
+ * @typedef {import("../types/realtime").OrderInput["items"][number] & { id?: string }} CartItem
  * @typedef {import("../types/realtime").MenuItem} MenuItem
  * @typedef {import("../types/realtime").Modifier} Modifier
  */
@@ -23,7 +31,7 @@ function summarizeCart(cart, menuItems, modifiers) {
         0,
       );
     return {
-      key: `${line.menuItemId}-${index}`,
+      key: lineKey(line),
       index,
       line,
       item,

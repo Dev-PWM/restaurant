@@ -1,6 +1,9 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
 const jsQR = require("jsqr");
 const {
   encodeName,
@@ -258,8 +261,11 @@ test("mdns: createMdnsAdvertiser starts and stops without leaking sockets", asyn
 /*                     Server HTTP API Integration Tests                      */
 /* -------------------------------------------------------------------------- */
 
-test("server api: GET /api/network returns JSON diagnostic telemetry", async () => {
+test("server api: GET /api/network returns JSON diagnostic telemetry", async (t) => {
+  const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "masaflow-network-test-"));
+  t.after(() => fs.rmSync(dataDirectory, { recursive: true, force: true }));
   const service = await createService({
+    dataDirectory,
     port: 0,
     enableMdns: false,
     pin: "2468",
@@ -290,8 +296,11 @@ test("server api: GET /api/network returns JSON diagnostic telemetry", async () 
   }
 });
 
-test("server api: GET /api/network/qr returns vector SVG or JSON data URI", async () => {
+test("server api: GET /api/network/qr returns vector SVG or JSON data URI", async (t) => {
+  const dataDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "masaflow-network-qr-test-"));
+  t.after(() => fs.rmSync(dataDirectory, { recursive: true, force: true }));
   const service = await createService({
+    dataDirectory,
     port: 0,
     enableMdns: false,
     pin: "2468",
