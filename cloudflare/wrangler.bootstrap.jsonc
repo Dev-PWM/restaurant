@@ -1,0 +1,42 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "zapata-restaurant",
+  "account_id": "821abce2fbab4f1f34b4b0ff6bbb5f06",
+  "main": "worker.mjs",
+  "compatibility_date": "2026-10-14",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true,
+    "html_handling": "none",
+    "not_found_handling": "none"
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "RESTAURANT",
+        "class_name": "Restaurant"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "Restaurant"
+      ]
+    }
+  ],
+  "vars": {
+    "CUSTOMER_DOMAIN": "loshuarachesdezapata.live",
+    "STAFF_DOMAIN": "zapatapos.live"
+  },
+  "observability": {
+    "enabled": false
+  },
+  "routes": []
+}

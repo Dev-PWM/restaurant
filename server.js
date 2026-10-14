@@ -10,6 +10,7 @@ const { Server } = require("socket.io");
 const { instrument } = require("@socket.io/admin-ui");
 const { createLogger, createSilentLogger } = require("./shared/logger.js");
 const realtime = require("./shared/realtime/engine.js");
+const { validateSchedule, isOpen } = require("./shared/business-hours.js");
 const { createEngine, UUID } = realtime;
 /** @type {typeof import("./shared/realtime/engine.js").ensure} */
 const ensure = realtime.ensure;
@@ -49,8 +50,10 @@ const quietly = (/** @type {() => void} */ write) => {
     // The log stream reports its own failures on stderr.
   }
 };
-/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, customerDomain?: string, staffDomain?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean, persist?: typeof import('./shared/realtime/engine.js').writeAtomic}} [options] */
+/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, customerDomain?: string, staffDomain?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean, orderSchedule?: import('./shared/business-hours.js').Schedule, businessNow?: () => Date, persist?: typeof import('./shared/realtime/engine.js').writeAtomic}} [options] */
 async function createService(options = {}) {
+  const orderSchedule = options.orderSchedule ? validateSchedule(options.orderSchedule) : null;
+  const ordersOpen = () => !orderSchedule || isOpen(orderSchedule, (options.businessNow ?? (() => new Date()))());
   const log = (options.logger ?? createSilentLogger()).child({
     component: "server",
   });
@@ -118,6 +121,7 @@ async function createService(options = {}) {
     const engine = createEngine({
       directory: dataDirectory,
       persist: options.persist,
+      ordersOpen,
     });
     // The writer lock is held and data.json has validated. Unrenamed temporary
     // snapshots were never acknowledged and cannot replace this committed ledger.
@@ -201,6 +205,7 @@ async function createService(options = {}) {
     /** @param {AppSocket} socket @param {import("./shared/types/realtime").State} [s] @param {boolean} [incremental] @returns {Snapshot} */
     function snapshot(socket, s = engine.getState(), incremental = false) {
       const authenticated = staff(socket);
+      const open = ordersOpen();
       const cursor =
         incremental &&
         socket.data.historyShiftId === s.shiftId &&
@@ -215,7 +220,8 @@ async function createService(options = {}) {
         shiftOpenedAt: s.shiftOpenedAt,
         revision: s.revision,
         observedAt: new Date().toISOString(),
-        acceptingOrders: s.acceptingOrders,
+        acceptingOrders: s.acceptingOrders && (authenticated || open),
+        orderingHours: orderSchedule ? { ...orderSchedule, open } : undefined,
         menuItems: s.menuItems,
         modifiers: s.modifiers,
         tables: s.tables,
@@ -455,7 +461,13 @@ async function createService(options = {}) {
           },
         );
     });
+    let lastOrdersOpen = ordersOpen();
     const expiry = setInterval(() => {
+      const open = ordersOpen();
+      if (open !== lastOrdersOpen) {
+        lastOrdersOpen = open;
+        broadcast("pos_toggle_accepting_orders");
+      }
       const at = Date.now();
       for (const [token, until] of sessions)
         if (until <= at) sessions.delete(token);
@@ -691,7 +703,7 @@ if (require.main === module) {
   const port = Number(
     process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000,
   );
-  createService({ logger, port, enableMdns: true })
+  createService({ logger, port, enableMdns: true, orderSchedule: validateSchedule(JSON.parse(fs.readFileSync(path.join(__dirname, "config/server-schedule.json"), "utf8"))) })
     .then((service) => {
       const stop = () => {
         void service.close();

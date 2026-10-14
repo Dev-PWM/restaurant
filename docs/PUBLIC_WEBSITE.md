@@ -71,7 +71,7 @@ Rehearse it once: with a tablet on the restaurant Wi-Fi, cut the router's intern
 2. On cellular data, load `/order/`, choose a dish and toppings, submit a test order, and confirm its status survives a refresh.
 3. On another device, load `/pos/`, sign in with the staff password, accept the test order, mark it ready, and collect the test payment. Check the matching sale in `/analytics/`.
 4. Check desktop and phone layouts, receipt amounts, notification permission behavior, and the bank transfer text. Verify that another customer's browser cannot see the test customer's details.
-5. Back up the volume to private storage and test restoring a copy on a separate disposable instance before accepting real orders.
+5. For Docker deployments only, back up the `restaurant-data` volume to private storage and test restoring it on a separate disposable instance before accepting real orders. For the selected Cloudflare deployment, use the release checks below.
 
 Browser notifications require permission and an open page. Background push and SMS are not configured. Transfer completion is recorded by staff after checking the bank; the site does not verify or initiate a bank payment.
 
@@ -81,3 +81,43 @@ Bank details can be set with `VITE_BANK_NAME`, `VITE_BANK_CLABE`, `VITE_BANK_BEN
 
 The domain and always-on host are pending. Local automated and browser checks cannot prove DNS, certificate issuance, container startup, external connectivity, or backups on the eventual host. Complete the host checks above when those resources are available.
 When customizing a bank identity, set `VITE_BANK_NAME`, `VITE_BANK_CLABE` and `VITE_BANK_BENEFICIARY` together. The build rejects partial settings and a CLABE that is not exactly 18 digits, preventing customized labels from being combined with a default account number. This validates configuration completeness, not account ownership or whether a transfer reached the bank.
+
+## Customer ordering hours
+
+The server stays available at all times. New customer orders are accepted only
+Monday–Saturday, 09:30–17:00 in `America/Mexico_City`, configured in
+`config/server-schedule.json`. Outside those hours the customer page says
+“Estamos cerrados”, and the server rejects new submissions. Staff can continue
+preparing existing orders, collecting payments, viewing sales and closing the shift.
+Existing customer order tracking and retries remain available. A manual staff pause
+is independent of the schedule and stays paused until staff re-enable orders.
+
+Deploy the application as one continuously running instance with its persistent
+data volume; do not schedule host shutdown at closing time. The current Mac agent
+also keeps the server running continuously, but the public website still depends
+on that Mac remaining awake until the server and tunnel move to the cloud host.
+The container includes the schedule file; rebuild it after changing hours.
+
+## Selected Cloudflare Workers deployment
+
+The current selected deployment is the free-tier Workers/SQLite Durable Object
+version, described in [the Cloudflare guide](../deploy/CLOUDFLARE_FREE.md).
+It hosts both frontends and the ledger on Cloudflare and does not depend on the
+Mac or its tunnel connector. The Mac/tunnel and Docker instructions above remain
+alternative deployments and recovery references.
+
+### Cloudflare release checks
+
+1. Both domains must report `storage: cloudflare-sqlite` from `/api/health` while
+   the Mac server is stopped. Check HTTPS, customer closed-page hours, hidden
+   staff routes on the customer domain, and staff sign-in and sales access.
+2. Export a private cloud backup with `npm run cloud:backup -- https://zapatapos.live`.
+   Keep the `.cloud-backups` files outside Git and code-review uploads.
+3. Run `npm run cloud:restore-check -- /absolute/path/to/backup.json`. It imports
+   that backup into an isolated local Cloudflare runtime and compares every
+   stored file, then disposes of the test database. It never changes production.
+4. Before taking real payments, confirm source-to-cloud totals match and the
+   cloud runtime order/payment, duplicate retry, hibernation and restart tests
+   pass. Complete the staff/customer browser checks on the public domains.
+5. Remove `MIGRATION_KEY`, retain the private original backup, and leave the Mac
+   routine disabled. Refresh pages opened before the migration.

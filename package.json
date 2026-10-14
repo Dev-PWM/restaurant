@@ -37,7 +37,20 @@
     "legacy:restore": "node scripts/data.cjs restore",
     "legacy:startup:enable": "node scripts/mac-login.cjs install",
     "legacy:startup:disable": "node scripts/mac-login.cjs uninstall",
-    "legacy:startup:status": "node scripts/mac-login.cjs status"
+    "legacy:startup:status": "node scripts/mac-login.cjs status",
+    "schedule:enable": "node scripts/server-schedule.cjs install",
+    "schedule:status": "node scripts/server-schedule.cjs status",
+    "schedule:disable": "node scripts/server-schedule.cjs disable",
+    "cloud:build": "node scripts/cloud-build.cjs",
+    "cloud:dev": "wrangler dev --config cloudflare/wrangler.jsonc",
+    "cloud:deploy": "node scripts/cloud-deploy.cjs",
+    "cloud:check": "wrangler deploy --dry-run --config cloudflare/wrangler.jsonc",
+    "cloud:test": "npm run cloud:build && wrangler deploy --dry-run --config cloudflare/wrangler.jsonc --outdir .wrangler/cloud-build && node --test tests/cloudflare/*.test.cjs",
+    "cloud:secrets": "node scripts/cloud-data.cjs secrets",
+    "cloud:import": "node scripts/cloud-data.cjs import",
+    "cloud:backup": "node scripts/cloud-data.cjs export",
+    "cloud:restore-check": "node scripts/cloud-restore-check.cjs",
+    "cloud:bootstrap": "node scripts/cloud-deploy.cjs bootstrap"
   },
   "engines": {
     "node": "^22.18.0 || >=24.11.0"
@@ -66,10 +79,13 @@
     "eslint": "^10.12.0",
     "globals": "^17.13.0",
     "jsqr": "^1.4.0",
+    "miniflare": "5.20261012.0-beta",
     "prettier": "^3.9.9",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
-    "vite": "^8.3.2"
+    "vite": "^8.3.2",
+    "wrangler": "4.151.0",
+    "ws": "8.21.0"
   },
   "overrides": {
     "@parcel/watcher": "^2.6.0",

@@ -1,3 +1,4 @@
+import { orderingHoursText } from "../../../../shared/ui/ordering-hours.js";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -44,6 +45,27 @@ export const pendingTotalKey = "masaflow.v3.pendingTotalCents";
 export type CartLine = OrderInput["items"][number] & { id: string };
 
 export { itemAvailable };
+
+function BusinessPromotion() {
+  return (
+    <aside className="business-promotion" aria-label="Desarrollo web para tu negocio">
+      <p className="business-promotion-eyebrow">¿Tienes un negocio?</p>
+      <h2>Tu negocio también puede tener una experiencia así.</h2>
+      <p className="business-promotion-description">
+        Convierte visitas en clientes con una página web o un sistema a la medida
+        de tu negocio. Hagamos realidad tu próximo proyecto.
+      </p>
+      <a
+        href="https://partnershipwithmedia-dev.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Hablemos de tu proyecto (abre en una pestaña nueva)"
+      >
+        Hablemos de tu proyecto <ArrowRight size={18} aria-hidden="true" />
+      </a>
+    </aside>
+  );
+}
 
 function restoredPending(): OrderInput | null {
   try {
@@ -221,6 +243,25 @@ export function Menu() {
     );
   }
 
+  if (snapshot.orderingHours && !snapshot.orderingHours.open) {
+    const hoursText = orderingHoursText(snapshot.orderingHours);
+    return (
+      <div className="mx-auto flex min-h-[90dvh] max-w-lg flex-col items-center justify-center p-8 text-center">
+        <Brand />
+        <ChefHat className="my-8 text-clay-600" size={64} />
+        <h1 className="display text-4xl">Estamos cerrados.</h1>
+        <p className="mt-5 text-xl text-stone-600">
+          {hoursText.hours}
+        </p>
+        <p className="mt-3 text-sm text-stone-500">{hoursText.zone}</p>
+        <p className="mt-8 text-sm text-stone-500">
+          Los pedidos que ya recibimos siguen en curso.
+        </p>
+        <BusinessPromotion />
+      </div>
+    );
+  }
+
   // Pausing web orders only hides the public menu; existing orders remain active.
   if (!snapshot.acceptingOrders) {
     return (
@@ -236,6 +277,7 @@ export function Menu() {
           Este menú volverá a estar disponible cuando se reanuden los pedidos
           web.
         </p>
+        <BusinessPromotion />
       </div>
     );
   }
@@ -590,6 +632,10 @@ export function Menu() {
           <span className="sr-only" data-testid="cart-item-count">{cartItemCount} {cartItemCount === 1 ? "artículo" : "artículos"}</span>
         </aside>
       </main>
+
+      <footer className="business-promotion-footer">
+        <BusinessPromotion />
+      </footer>
 
       {/* Floating Sticky Cart Bar */}
       {cart.length > 0 && (

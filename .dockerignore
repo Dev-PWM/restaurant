@@ -9,3 +9,5 @@ artifacts
 *.log
 .masaflow-realtime
 **/dist-realtime
+.cloud-secrets
+.cloud-backups

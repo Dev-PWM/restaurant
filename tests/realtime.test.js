@@ -1382,3 +1382,55 @@ test("50 independent phones and three cashiers settle concurrent mixed payments 
   assert.equal(state.salesMetrics.changeCents,125000);
   assert.deepEqual(createEngine({directory}).getState(),state);
 });
+
+test("business hours reject new orders after closing, preserve retries, tracking and staff payments", async (t) => {
+  let at = new Date("2026-10-14T22:59:59Z");
+  const schedule = require("../config/server-schedule.json");
+  const { connect, engine, url } = await serviceFixture(t, { orderSchedule: schedule, businessNow: () => at });
+  const customer = await connect();
+  const cashier = await connect();
+  assert.equal((await ack(cashier.socket, "staff_login", "2468")).ok, true);
+  const data = input(engine, { sessionId: customer.sessionId });
+  assert.equal(customer.initial.orderingHours.open, true);
+  assert.equal((await ack(customer.socket, "submit_client_order", data)).ok, true);
+  at = new Date("2026-10-14T23:00:00Z");
+  const update = nextState(customer.socket);
+  await customer.socket.timeout(2000).emitWithAck("request_init");
+  const fresh = new Promise(resolve => customer.socket.once("init_data", resolve));
+  await customer.socket.timeout(2000).emitWithAck("request_init");
+  const closed = await fresh;
+  assert.equal(closed.orderingHours.open, false);
+  assert.equal(closed.acceptingOrders, false);
+  assert.equal(closed.activeOrders[0].id, data.orderId);
+  const rejected = await ack(customer.socket, "submit_client_order", { ...data, orderId: randomUUID() });
+  assert.equal(rejected.code, "RESTAURANT_CLOSED");
+  assert.equal((await ack(customer.socket, "submit_client_order", data)).ok, true);
+  assert.equal((await update).orderingHours.open, false);
+  assert.equal((await ack(cashier.socket, "pos_update_status", { orderId: data.orderId, status: "cooking" })).ok, true);
+  assert.equal((await ack(cashier.socket, "pos_update_status", { orderId: data.orderId, status: "ready" })).ok, true);
+  assert.equal((await ack(cashier.socket, "pos_order_paid", { orderId: data.orderId, tenderedCents: 25000 })).ok, true);
+  assert.equal(engine.getState().salesMetrics.paidOrders, 1);
+  assert.equal((await fetch(`${url}/api/health`)).status, 200);
+  for (const route of ["/pos/", "/analytics/"]) assert.equal((await fetch(`${url}${route}`)).status, 200);
+  await ack(cashier.socket, "pos_toggle_accepting_orders", { acceptingOrders: false });
+  at = new Date("2026-10-15T15:30:00Z");
+  assert.equal((await ack(customer.socket, "submit_client_order", { ...data, orderId: randomUUID() })).code, "ORDERS_PAUSED");
+  await ack(cashier.socket, "pos_toggle_accepting_orders", { acceptingOrders: true });
+  assert.equal((await ack(customer.socket, "submit_client_order", { ...data, orderId: randomUUID() })).ok, true);
+  at = new Date("2026-10-18T18:00:00Z");
+  assert.equal((await ack(customer.socket, "submit_client_order", { ...data, orderId: randomUUID() })).code, "RESTAURANT_CLOSED");
+});
+
+test("live customer pages receive closing and opening hours without a ledger mutation", async (t) => {
+  let at = new Date("2026-10-14T22:59:59Z");
+  const { connect, engine } = await serviceFixture(t, { orderSchedule: require("../config/server-schedule.json"), businessNow: () => at });
+  const customer = await connect();
+  const revision = engine.getState().revision;
+  const closed = nextState(customer.socket);
+  at = new Date("2026-10-14T23:00:00Z");
+  assert.equal((await closed).orderingHours.open, false);
+  const opened = nextState(customer.socket);
+  at = new Date("2026-10-15T15:30:00Z");
+  assert.equal((await opened).orderingHours.open, true);
+  assert.equal(engine.getState().revision, revision);
+});

@@ -10,7 +10,7 @@ ARG VITE_BANK_NAME
 ARG VITE_BANK_CLABE
 ARG VITE_BANK_BENEFICIARY
 ARG VITE_BANK_CONCEPT_PREFIX
-RUN npm test && npm run build && npm prune --omit=dev
+RUN npm run build && npm test && npm prune --omit=dev
 
 FROM node:22-bookworm-slim
 ENV NODE_ENV=production MASAFLOW_HOST=0.0.0.0 PORT=4173 MASAFLOW_DATA_DIR=/data/realtime MASAFLOW_LOG_DIR=/data/logs
@@ -18,6 +18,8 @@ WORKDIR /app
 COPY --from=build /app/server.js /app/package.json ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/shared/realtime ./shared/realtime
+COPY --from=build /app/config/server-schedule.json ./config/server-schedule.json
+COPY --from=build /app/shared/business-hours.js /app/shared/domain-routing.js ./shared/
 COPY --from=build /app/shared/logger.js ./shared/logger.js
 COPY --from=build /app/shared/qrcode.js ./shared/qrcode.js
 COPY --from=build /app/shared/ui/choice-groups.js ./shared/ui/choice-groups.js

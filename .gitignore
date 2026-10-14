@@ -14,3 +14,10 @@ playwright-report/
 test-results/
 
 logs/
+!.env.cloud.example
+.cloud-secrets/
+.cloud-backups/
+cloudflare/public/
+.wrangler/
+.dev.vars
+.dev.vars.*

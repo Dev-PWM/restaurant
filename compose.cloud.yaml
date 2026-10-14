@@ -1,0 +1,59 @@
+# One persistent restaurant server, reachable publicly only through Cloudflare Tunnel.
+# Use a new cloud tunnel during migration; never share traffic across separate ledgers.
+name: masaflow-cloud
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_BANK_NAME: ${VITE_BANK_NAME:-}
+        VITE_BANK_CLABE: ${VITE_BANK_CLABE:-}
+        VITE_BANK_BENEFICIARY: ${VITE_BANK_BENEFICIARY:-}
+        VITE_BANK_CONCEPT_PREFIX: ${VITE_BANK_CONCEPT_PREFIX:-}
+    hostname: masaflow-cloud
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 40s
+    environment:
+      NODE_ENV: production
+      MASAFLOW_HOST: 0.0.0.0
+      PORT: 4173
+      MASAFLOW_DATA_DIR: /data/realtime
+      MASAFLOW_LOG_DIR: /data/logs
+      MASAFLOW_CUSTOMER_DOMAIN: ${MASAFLOW_CUSTOMER_DOMAIN:?Set the customer domain}
+      MASAFLOW_STAFF_DOMAIN: ${MASAFLOW_STAFF_DOMAIN:?Set the staff domain}
+      # Only this isolated Docker network can reach the origin; trust the tunnel's forwarded IP.
+      MASAFLOW_PUBLIC_ORIGIN: https://${MASAFLOW_CUSTOMER_DOMAIN:?Set the customer domain}
+      MASAFLOW_STAFF_PASSWORD: ${MASAFLOW_STAFF_PASSWORD:?Set a staff password}
+    volumes:
+      - restaurant-data:/data
+    networks: [origin]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: [tunnel, --no-autoupdate, run, --token-file, /run/secrets/tunnel-token]
+    depends_on:
+      app:
+        condition: service_healthy
+    secrets: [tunnel-token]
+    networks: [origin]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: '3'
+
+secrets:
+  tunnel-token:
+    file: ./.cloud-secrets/tunnel-token
+networks:
+  origin:
+volumes:
+  restaurant-data:
+    name: masaflow-cloud-data

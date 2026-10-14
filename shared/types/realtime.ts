@@ -148,6 +148,7 @@ export interface Snapshot {
   /** Public deployments use a staff password; local restaurant installations can use their PIN. */
   staffAuthMode: "pin" | "password";
   acceptingOrders: boolean;
+  orderingHours?: { open: boolean; timeZone: string; days: number[]; start: string; end: string };
   menuItems: MenuItem[];
   modifiers: Modifier[];
   /** Table numbers and free/occupied only, so customers can see how many are free. No names or amounts. */

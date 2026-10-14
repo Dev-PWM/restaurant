@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from "react";
 import { io, type Socket } from "socket.io-client";
+import { CloudSocket } from "./cloud-socket";
 import { mergeDelta } from "./snapshot-state.js";
 import type {
   ClientToServerEvents,
@@ -83,15 +84,10 @@ export function RealtimeProvider({
     [error, setError] = useState("");
   const socketRef = useRef<AppSocket | null>(null);
   useEffect(() => {
-    const socket: AppSocket = io({
-      autoConnect: false,
-      auth: {
-        sessionId,
-        token: staff ? readStorage(tokenKey) || "" : "",
-        delta: true,
-      },
-      reconnectionDelayMax: 3000,
-    });
+    const auth = { sessionId, token: staff ? readStorage(tokenKey) || "" : "", delta: true };
+    const socket: AppSocket = import.meta.env.VITE_REALTIME_TRANSPORT === "cloudflare"
+      ? new CloudSocket(auth) as unknown as AppSocket
+      : io({ autoConnect: false, auth, reconnectionDelayMax: 3000 });
     socketRef.current = socket;
     const apply = (next: Snapshot) => {
       setSnapshot(next);

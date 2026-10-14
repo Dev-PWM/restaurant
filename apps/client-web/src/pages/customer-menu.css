@@ -1,3 +1,57 @@
+.business-promotion {
+  width: 100%;
+  max-width: 680px;
+  margin: 40px auto 0;
+  padding: 28px;
+  border: 1px solid #e8e0da;
+  border-radius: 20px;
+  background: #fffdfa;
+  color: #2b1711;
+  text-align: left;
+}
+
+.business-promotion-eyebrow {
+  margin: 0 0 10px;
+  color: #95513b;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.business-promotion h2 {
+  margin: 0;
+  font-size: clamp(20px, 3vw, 26px);
+  font-weight: 700;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.business-promotion-description {
+  margin: 14px 0 20px;
+  color: #71645d;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.business-promotion a {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: #2b1711;
+  color: #fffdfa;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: background .15s ease;
+}
+
+.business-promotion a:hover { background: #6b3828; }
+.business-promotion a:focus-visible { outline: 3px solid #95513b; outline-offset: 4px; }
+.business-promotion-footer { padding: 0 20px 120px; }
+
 .customer-menu {
   min-height: 100dvh;
   background: #faf8f4;

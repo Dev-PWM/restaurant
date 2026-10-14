@@ -121,3 +121,47 @@ swiftc -module-cache-path "$TMPDIR/swiftcache" scripts/build-logo.swift -o "$TMP
 ```
 
 The script removes the white sticker background (it expects a white or very light background around the drawing), so a picture on a coloured background needs that step adjusted. Then run `npm run build`.
+
+## Restaurant hours and continuous server availability
+
+Customer orders are accepted **Monday–Saturday, 09:30–17:00, America/Mexico_City**.
+The schedule is in `config/server-schedule.json`. The server stays running outside
+those hours: customers see “Estamos cerrados”, existing orders remain trackable,
+and staff can finish orders, collect payments, close the shift and access sales.
+The server checks hours when admitting each new order. Retries of an already
+accepted order still succeed after closing. The staff's manual order pause remains
+independent and is never reset by opening time. Connected customer pages update
+within 10 seconds of opening or closing without needing a refresh.
+
+`npm start` loads the hours automatically, including in the Docker deployment.
+Rebuild and restart the server after changing the hours or the customer page.
+The app's server factory also accepts an explicit schedule for embedders and tests.
+
+### Continuous server on this Mac
+
+```sh
+npm run build
+npm run schedule:enable
+npm run schedule:status
+npm run schedule:disable
+```
+
+Enable installs a LaunchAgent for the current Mac user and keeps `server.js`
+running at all times. It retries startup failures after one minute and starts at
+login. Disable stops its service and removes the agent. Stop a manually launched
+server before enabling it. The command names are retained from the original
+server on/off routine; they now manage continuous service with scheduled ordering.
+
+The Mac must be powered on, awake, and logged into this account. This local agent
+cannot keep the website available while the Mac sleeps. To operate independently
+of the Mac, use the Cloudflare deployment in `deploy/CLOUDFLARE_FREE.md` or
+the optional persistent-server deployment in `docs/PUBLIC_WEBSITE.md`.
+
+Schedule status and logs are in `~/Library/Logs/MasaFlow/<workspace-id>/`
+(`schedule-state.json`, `schedule.log`, and `schedule-error.log`).
+`schedule:status` reports the exact directory and `ordersOpen` separately from
+whether the server is running. Staff credentials stay in the existing local `.env`.
+
+For the selected Cloudflare free-tier deployment, see
+[the Cloudflare deployment guide](deploy/CLOUDFLARE_FREE.md). The earlier
+DigitalOcean/Compose package remains an optional paid alternative.

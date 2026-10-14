@@ -80,7 +80,9 @@ export default defineConfig(({ mode, command }) => {
       },
     },
     build: {
-      outDir: "dist-realtime",
+      outDir: process.env.MASAFLOW_OUTPUT_ROOT
+        ? path.join(process.env.MASAFLOW_OUTPUT_ROOT, mode === "client-web" ? "order" : mode === "business-pos" ? "pos" : "analytics")
+        : "dist-realtime",
       emptyOutDir: true,
       rollupOptions: { input: path.join(root, "realtime.html") },
     },

@@ -380,15 +380,15 @@ function validate(s) {
   s.salesMetrics = metrics([...s.activeOrders, ...s.completedOrders]);
   return s;
 }
-/** @param {{directory: string, persist?: typeof writeAtomic, persistAsync?: typeof writeAtomicAsync}} options */
-function createEngine({ directory, persist = writeAtomic, persistAsync }) {
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+/** @param {{directory: string, persist?: typeof writeAtomic, persistAsync?: typeof writeAtomicAsync, ordersOpen?: () => boolean, fileSystem?: Pick<typeof fs, "mkdirSync" | "existsSync" | "readFileSync" | "copyFileSync" | "chmodSync">}} options */
+function createEngine({ directory, persist = writeAtomic, persistAsync, ordersOpen = () => true, fileSystem = fs }) {
+  fileSystem.mkdirSync(directory, { recursive: true, mode: 0o700 });
   const file = path.join(directory, "data.json");
   /** @type {State} */
-  let state = fs.existsSync(file)
-    ? validate(JSON.parse(fs.readFileSync(file, "utf8")))
+  let state = fileSystem.existsSync(file)
+    ? validate(JSON.parse(fileSystem.readFileSync(file, "utf8")))
     : initialState();
-  if (!fs.existsSync(file)) persist(file, state);
+  if (!fileSystem.existsSync(file)) persist(file, state);
   let storageFault = false;
   const asyncPersist =
     persistAsync ??
@@ -438,8 +438,8 @@ function createEngine({ directory, persist = writeAtomic, persistAsync }) {
       directory,
       `data.before-zapata-menu-r${state.revision}.json`,
     );
-    fs.copyFileSync(file, menuBackup);
-    fs.chmodSync(menuBackup, 0o600);
+    fileSystem.copyFileSync(file, menuBackup);
+    fileSystem.chmodSync(menuBackup, 0o600);
     const migrated = structuredClone(state);
     migrated.menuItems = structuredClone(MENU_ITEMS);
     migrated.modifiers = structuredClone(MODIFIERS);
@@ -463,8 +463,8 @@ function createEngine({ directory, persist = writeAtomic, persistAsync }) {
       directory,
       `data.before-catalog-r${state.revision}.json`,
     );
-    fs.copyFileSync(file, backup);
-    fs.chmodSync(backup, 0o600);
+    fileSystem.copyFileSync(file, backup);
+    fileSystem.chmodSync(backup, 0o600);
     const migrated = structuredClone(state);
     migrated.menuItems = missing.menuItems;
     migrated.modifiers = missing.modifiers;
@@ -559,6 +559,11 @@ function createEngine({ directory, persist = writeAtomic, persistAsync }) {
         data.shiftId === state.shiftId,
         "El turno cambió. Revisa el menú y envía un pedido nuevo.",
         "SHIFT_CHANGED",
+      );
+      ensure(
+        ordersOpen(),
+        "Estamos cerrados. Revisa nuestro horario para hacer un pedido nuevo.",
+        "RESTAURANT_CLOSED",
       );
       ensure(
         next.acceptingOrders,

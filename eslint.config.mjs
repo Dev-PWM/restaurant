@@ -9,6 +9,9 @@ export default [
       "**/dist-realtime/**",
       "**/.data-app-offline/**",
       "assets/**",
+      "cloudflare/public/**",
+      "**/.wrangler/**",
+      ".claude/worktrees/**",
     ],
   },
   {
