@@ -5,6 +5,7 @@ node_modules/
 .env.*
 !.env.example
 !.env.public.example
+!.env.tunnel.example
 apps/analytics/dist/
 artifacts/qa/
 apps/*/dist-realtime/

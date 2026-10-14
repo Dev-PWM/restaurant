@@ -19,6 +19,10 @@ const {
   getNetworkInfo,
 } = require("./shared/realtime/mdns.js");
 const { toSvg, toDataUri } = require("./shared/qrcode.js");
+const {
+  createDomainRouting,
+  isLocalSameOrigin,
+} = require("./shared/domain-routing.js");
 /** @typedef {import('./shared/types/realtime').Snapshot} Snapshot */
 /** @typedef {import('./shared/types/realtime').Command} Command */
 /** @typedef {import('./shared/types/realtime').Reply} Reply */
@@ -45,7 +49,7 @@ const quietly = (/** @type {() => void} */ write) => {
     // The log stream reports its own failures on stderr.
   }
 };
-/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean, persist?: typeof import('./shared/realtime/engine.js').writeAtomic}} [options] */
+/** @param {{dataDirectory?: string, pin?: string, staffPassword?: string, publicOrigin?: string, customerDomain?: string, staffDomain?: string, sessionMs?: number, logger?: import("pino").Logger, adminPasswordHash?: string, port?: number, enableMdns?: boolean, persist?: typeof import('./shared/realtime/engine.js').writeAtomic}} [options] */
 async function createService(options = {}) {
   const log = (options.logger ?? createSilentLogger()).child({
     component: "server",
@@ -69,10 +73,24 @@ async function createService(options = {}) {
       "MASAFLOW_PUBLIC_ORIGIN debe ser un origen HTTPS sin ruta.",
     );
   }
+  // Cloudflare Tunnel: one process answers both brand domains (customers at the first, staff at the second).
+  const routing = createDomainRouting({
+    customerDomain:
+      options.customerDomain ?? process.env.MASAFLOW_CUSTOMER_DOMAIN ?? "",
+    staffDomain: options.staffDomain ?? process.env.MASAFLOW_STAFF_DOMAIN ?? "",
+  });
+  const publicOrigins = [
+    ...new Set([...(publicOrigin ? [publicOrigin] : []), ...routing.origins]),
+  ];
+  const isPublic = publicOrigins.length > 0;
+  // Behind the Docker Caddy service every request comes from the proxy container, so its forwarded address is
+  // trusted from any peer. Behind the tunnel the proxy is cloudflared on this machine: only loopback may set
+  // it, so a device on the restaurant Wi-Fi cannot claim to be 127.0.0.1 or dodge a rate limit.
+  const trustAnyProxy = Boolean(publicOrigin) && !routing.enabled;
   const staffPassword =
     options.staffPassword ?? process.env.MASAFLOW_STAFF_PASSWORD ?? "";
   ensure(
-    (!publicOrigin || staffPassword.length >= 12) &&
+    (!isPublic || staffPassword.length >= 12) &&
       (!staffPassword ||
         (staffPassword.length >= 12 && staffPassword.length <= 256)),
     "Configura MASAFLOW_STAFF_PASSWORD con 12 a 256 caracteres para publicar el sitio.",
@@ -124,10 +142,12 @@ async function createService(options = {}) {
       res.setHeader("X-Frame-Options", "DENY");
       next();
     });
+    // Before every static handler: decides "/" and the hidden staff paths per domain.
+    app.use(routing.middleware);
     const server = http.createServer(app);
     /** @type {Server<import('./shared/types/realtime').ClientToServerEvents, import('./shared/types/realtime').ServerToClientEvents, Record<string, never>, SocketData>} */
     const io = new Server(server, {
-      cors: { origin: publicOrigin || "*" },
+      cors: { origin: isPublic ? publicOrigins : "*" },
       allowRequest: (req, callback) => {
         // Browsers omit Origin on the initial same-origin polling GET, but
         // supply it on polling POSTs and WebSocket handshakes.
@@ -137,9 +157,12 @@ async function createService(options = {}) {
           req.headers["sec-fetch-site"] === "same-origin";
         callback(
           null,
-          !publicOrigin ||
-            req.headers.origin === publicOrigin ||
-            sameOriginPoll,
+          !isPublic ||
+            publicOrigins.includes(req.headers.origin ?? "") ||
+            sameOriginPoll ||
+            // Tunnel mode keeps the restaurant running on its own network when the internet is down.
+            (routing.enabled &&
+              isLocalSameOrigin(req.headers.origin, req.headers.host)),
         );
       },
       maxHttpBufferSize: 65536,
@@ -231,7 +254,7 @@ async function createService(options = {}) {
     io.use((socket, next) => {
       try {
         limit(
-          `connect:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`,
+          `connect:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], trustAnyProxy)}`,
           120,
           60000,
         );
@@ -252,7 +275,7 @@ async function createService(options = {}) {
             address: clientAddress(
               socket.handshake.address,
               socket.handshake.headers["x-forwarded-for"],
-              Boolean(publicOrigin),
+              trustAnyProxy,
             ),
             reason: error instanceof Error ? error.message : "unknown",
           },
@@ -279,7 +302,7 @@ async function createService(options = {}) {
       socket.on("staff_login", (value, ack) => {
         if (typeof ack !== "function") return;
         try {
-          const key = `pin:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`;
+          const key = `pin:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], trustAnyProxy)}`;
           const failures = limits.get(key);
           ensure(
             !failures || failures.until <= Date.now() || failures.count < 8,
@@ -357,7 +380,7 @@ async function createService(options = {}) {
             try {
               if (event === "submit_client_order") {
                 limit(
-                  `orders:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], Boolean(publicOrigin))}`,
+                  `orders:${clientAddress(socket.handshake.address, socket.handshake.headers["x-forwarded-for"], trustAnyProxy)}`,
                   60,
                   60000,
                 );
@@ -453,20 +476,23 @@ async function createService(options = {}) {
         /^\$2[ab]\$\d{2}\$[./A-Za-z0-9]{53}$/.test(adminHash),
         "MASAFLOW_ADMIN_PASSWORD_HASH debe ser un hash bcrypt. Genera uno con npm run admin:hash.",
       );
-      /** @param {string} peer @param {string | string[] | undefined} forwarded */
-      const local = (peer, forwarded) =>
-        LOOPBACK.includes(
-          clientAddress(peer, forwarded, Boolean(publicOrigin)),
-        );
+      /** "This computer" means a loopback client that did not come in through a public domain or Cloudflare.
+       * cloudflared itself connects from loopback, so the Host and Cf-Connecting-Ip checks keep a tunneled
+       * request from counting as local even if its forwarded address were missing.
+       * @param {string} peer @param {string | string[] | undefined} forwarded @param {import("node:http").IncomingHttpHeaders} headers */
+      const local = (peer, forwarded, headers) =>
+        !routing.isPublicHost(headers.host) &&
+        headers["cf-connecting-ip"] === undefined &&
+        LOOPBACK.includes(clientAddress(peer, forwarded, trustAnyProxy));
       // Registered before instrument(), so this runs ahead of the Admin UI's own password check
       // (a bcrypt compare on the main thread), and caps how often anyone can trigger it.
       io.of("/admin").use((socket, next) => {
         const forwarded = socket.handshake.headers["x-forwarded-for"];
-        if (!local(socket.handshake.address, forwarded))
+        if (!local(socket.handshake.address, forwarded, socket.handshake.headers))
           return next(new Error("Solo disponible desde este equipo."));
         try {
           limit(
-            `admin:${clientAddress(socket.handshake.address, forwarded, Boolean(publicOrigin))}`,
+            `admin:${clientAddress(socket.handshake.address, forwarded, trustAnyProxy)}`,
             20,
             60000,
           );
@@ -491,7 +517,11 @@ async function createService(options = {}) {
       app.use(
         "/admin-ui",
         (req, res, next) =>
-          local(req.socket.remoteAddress ?? "", req.headers["x-forwarded-for"])
+          local(
+            req.socket.remoteAddress ?? "",
+            req.headers["x-forwarded-for"],
+            req.headers,
+          )
             ? next()
             : res.status(403).send("Solo disponible desde este equipo."),
         express.static(
@@ -510,7 +540,7 @@ async function createService(options = {}) {
     app.get("/api/health", (_req, res) =>
       res.json({ service: "masaflow", version: "0.3.0", status: "ready" }),
     );
-    if (!publicOrigin)
+    if (!isPublic)
       app.get("/api/network", (_req, res) => {
         const addr = server.address();
         const currentPort =
@@ -518,7 +548,7 @@ async function createService(options = {}) {
           effectivePort;
         res.json(getNetworkInfo(currentPort));
       });
-    if (!publicOrigin)
+    if (!isPublic)
       app.get("/api/network/qr", (req, res) => {
         const addr = server.address();
         const currentPort =
@@ -582,7 +612,7 @@ async function createService(options = {}) {
     let closing;
     // Announce only after the writer lock, ledger and routes are ready. A failed
     // startup must never leave a stale network service running.
-    if (options.enableMdns && !publicOrigin) {
+    if (options.enableMdns && !isPublic) {
       try {
         mdns = createMdnsAdvertiser({ port: effectivePort, logger: log });
       } catch (err) {
@@ -597,6 +627,7 @@ async function createService(options = {}) {
       io,
       engine,
       mdns,
+      publicOrigins,
       getNetworkInfo: () => {
         const addr = server.address();
         const currentPort =
@@ -660,8 +691,7 @@ if (require.main === module) {
   const port = Number(
     process.env.PORT && process.env.PORT !== "8080" ? process.env.PORT : 3000,
   );
-  const publicOrigin = process.env.MASAFLOW_PUBLIC_ORIGIN || "";
-  createService({ logger, port, enableMdns: !publicOrigin })
+  createService({ logger, port, enableMdns: true })
     .then((service) => {
       const stop = () => {
         void service.close();
@@ -678,9 +708,9 @@ if (require.main === module) {
         port,
         process.env.MASAFLOW_HOST || "0.0.0.0",
         () => {
-          if (publicOrigin) {
+          if (service.publicOrigins.length) {
             logger.info(
-              { port, url: `${publicOrigin}/pos/` },
+              { port, origins: service.publicOrigins },
               "MasaFlow público listo",
             );
             return;
